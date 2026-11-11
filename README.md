@@ -1,21 +1,16 @@
-
 ZOONL LIVE
 
-A Flutter social live-streaming app.
+A Flutter starter app for ZOONL LIVE, a social live-streaming experience.
 
-About
+Getting started
 
-ZOONL LIVE is a global social platform for live audio, video, private rooms, virtual gifts, and social interaction.
-
-Current Status
-
-The app is currently under development.
-
-Flutter Commands
-
-Run these commands in the project terminal:
+Install the Flutter SDK, then run:
 
 flutter pub get
-flutter analyze
+flutter run
+
+To run the widget tests:
+
 flutter test
-flutter build apk --debug
+
+The app currently includes a dark-themed home screen, sample live rooms, feature highlights, and working bottom navigation. Room actions display placeholder feedback; connect these to your live/video and account services when those are available.
