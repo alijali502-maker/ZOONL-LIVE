@@ -20,5 +20,4 @@ flutter test
 The app currently includes a dark-themed home screen, sample live rooms, feature highlights, and working bottom navigation. Room actions display placeholder feedback; connect these to your live/video and account services when those are available.What changed: Files, features and functionality.
 What could break: Bugs, authentication, Firebase, database and security risks.
 Missing tests: What has not been properly tested.
-Build readiness: Whether the Flutter app is ready to run.
-Next steps: Exactly what needs fixing before merging.
+
