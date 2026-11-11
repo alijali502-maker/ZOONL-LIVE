@@ -1,0 +1,10 @@
+{
+  "name": "ZOONL LIVE",
+  "short_name": "ZOONL LIVE",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#101020",
+  "theme_color": "#101020",
+  "description": "Connect with people around the world on ZOONL LIVE.",
+  "orientation": "portrait-primary"
+}
