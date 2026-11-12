@@ -44,9 +44,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Disable release lint analysis failure
+      - name: Configure Gradle lint
         run: |
-                    mkdir -p "$HOME/.gradle/init.d"
+          mkdir -p "$HOME/.gradle/init.d"
           cat > "$HOME/.gradle/init.d/disable-release-lint.gradle" <<'EOF'
           allprojects {
               tasks.configureEach { task ->
