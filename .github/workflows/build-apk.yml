@@ -1,4 +1,5 @@
 
+
 name: Build ZOONL LIVE APK
 
 on:
@@ -32,6 +33,11 @@ jobs:
 
       - name: Check Flutter
         run: flutter doctor -v
+
+      - name: Generate Android platform files
+        run: |
+          flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
+          cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
 
       - name: Clean project
         run: flutter clean
