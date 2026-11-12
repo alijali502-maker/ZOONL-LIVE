@@ -1,5 +1,4 @@
 
-
 name: Build ZOONL LIVE APK
 
 on:
@@ -8,8 +7,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -27,14 +30,23 @@ jobs:
         with:
           channel: stable
 
-      - name: Clean and build APK
-        run: |
-          flutter clean
-          flutter pub get
-          flutter build apk --release -v
+      - name: Check Flutter
+        run: flutter doctor -v
+
+      - name: Clean project
+        run: flutter clean
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: zoonl-live-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
+
