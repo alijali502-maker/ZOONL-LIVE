@@ -1,34 +1,40 @@
 
+
 name: Build ZOONL LIVE APK
-'on':
+
+on:
   workflow_dispatch:
   push:
     branches:
       - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout source
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up Java
+
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Flutter
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
-      - name: Generate Android project files
-        run: flutter create --platforms=android .
+
       - name: Install dependencies
         run: flutter pub get
-      - name: Build APK
-        run: flutter build apk --debug
+
+      - name: Build release APK
+        run: flutter build apk --release
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZOONL-LIVE-APK
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: zoonl-live-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
