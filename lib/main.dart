@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-
+import 'core/app_config.dart';
 void main() {
   runApp(const ZoonlLive());
 }
