@@ -556,8 +556,8 @@ Widget zoonlIdLine(User? user) {
                 '$name',
                 style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
-              Text(
-                zoonlIdLine(user),
+              zoonlIdLine(user),
+                
               const SizedBox(height: 12),
               const Wrap(
                 spacing: 7,
