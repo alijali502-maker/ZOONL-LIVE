@@ -557,10 +557,7 @@ Widget zoonlIdLine(User? user) {
                 style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
               ),
               Text(
-                user == null ? 'Sign in to connect your account' : 'ID: ${user.id}',
-                style: const TextStyle(color: muted, fontSize: 10),
-                textAlign: TextAlign.center,
-              ),
+                zoonlIdLine(user),
               const SizedBox(height: 12),
               const Wrap(
                 spacing: 7,
