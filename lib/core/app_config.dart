@@ -1,9 +1,9 @@
 class AppConfig {
   static const supabaseUrl =
-      String.fromEnvironment('SUPABASE_URL');
+      'https://ewzdhminqdldilydrpmk.supabase.co';
 
   static const supabaseAnonKey =
-      String.fromEnvironment('SUPABASE_ANON_KEY');
+      'sb_publishable_P1GBaaj0pYUaUer_5Lf7JA_3KX2YwOI';
 
   static const appName = 'ZOONL LIVE';
 }
