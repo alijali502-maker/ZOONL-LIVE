@@ -90,34 +90,37 @@ class _LiveDataScreenState extends State<LiveDataScreen> {
   }
 
   Future<void> loadOriginalData() async {
-    setState(() {
-      loading = true;
-      connectionError = null;
-      records.clear();
-      tableErrors.clear();
-    });
+  if (!mounted) return;
 
-    try {
-      for (final table in zoonlTables) {
-        try {
-          final result = await client
-              .from(table)
-              .select()
-              .limit(100);
+  setState(() {
+    loading = true;
+    connectionError = null;
+    records.clear();
+    tableErrors.clear();
+  });
 
-          records[table] = List<Map<String, dynamic>>.from(result);
-        } catch (e) {
-          tableErrors[table] = e.toString();
-        }
+  await Future.wait(
+    zoonlTables.map((table) async {
+      try {
+        final result = await client
+            .from(table)
+            .select()
+            .limit(100)
+            .timeout(const Duration(seconds: 10));
+
+        records[table] = List<Map<String, dynamic>>.from(result);
+      } catch (e) {
+        tableErrors[table] = e.toString();
       }
-    } catch (e) {
-      connectionError = e.toString();
-    }
+    }),
+  );
 
-    if (mounted) {
-      setState(() => loading = false);
-    }
-  }
+  if (!mounted) return;
+
+  setState(() {
+    loading = false;
+  });
+}
 
   @override
   Widget build(BuildContext context) {
