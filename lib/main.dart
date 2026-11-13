@@ -99,27 +99,31 @@ class _LiveDataScreenState extends State<LiveDataScreen> {
     tableErrors.clear();
   });
 
-  await Future.wait(
-    zoonlTables.map((table) async {
-      try {
-        final result = await client
-            .from(table)
-            .select()
-            .limit(100)
-            .timeout(const Duration(seconds: 10));
+  try {
+    await Future.wait(
+      zoonlTables.map((table) async {
+        try {
+          final result = await client
+              .from(table)
+              .select()
+              .limit(100)
+              .timeout(const Duration(seconds: 8));
 
-        records[table] = List<Map<String, dynamic>>.from(result);
-      } catch (e) {
-        tableErrors[table] = e.toString();
-      }
-    }),
-  );
-
-  if (!mounted) return;
-
-  setState(() {
-    loading = false;
-  });
+          records[table] = List<Map<String, dynamic>>.from(result);
+        } catch (e) {
+          tableErrors[table] = e.toString();
+        }
+      }),
+    ).timeout(const Duration(seconds: 12));
+  } catch (e) {
+    connectionError = e.toString();
+  } finally {
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
 }
 
   @override
