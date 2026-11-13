@@ -488,7 +488,34 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+Widget zoonlIdLine(User? user) {
+  if (user == null) {
+    return const Text('Sign in to create your ZOONL ID');
+  }
 
+  return FutureBuilder<Map<String, dynamic>?>(
+    future: Supabase.instance.client
+        .from('user_public_profiles')
+        .select('zoonl_id')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Text('Loading ZOONL ID...');
+      }
+
+      final id = snapshot.data?['zoonl_id'];
+
+      return Text(
+        id == null
+            ? 'Complete profile setup to generate your ZOONL ID'
+            : 'ZOONL ID: $id',
+        style: const TextStyle(color: muted, fontSize: 10),
+        textAlign: TextAlign.center,
+      );
+    },
+  );
+}
   Widget profilePage() {
     final user = Supabase.instance.client.auth.currentUser;
     final rows = data['profiles'] ?? [];
