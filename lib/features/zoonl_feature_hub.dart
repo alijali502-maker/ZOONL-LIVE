@@ -27,7 +27,8 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   bool _isLoadingFeed = false;
   String? _feedError;
-  List> _zoonlFeedItems = [];
+  List<dynamic> _zoonlFeedItems = [];
+
 
 
   final Map<String, bool> permissions = {
