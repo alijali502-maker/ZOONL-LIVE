@@ -1,10 +1,10 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:just_audio/just_audio.dart';
 import 'core/app_config.dart';
 import 'login_screen.dart';
+import 'features/zoonl_feature_hub.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -128,10 +128,12 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> loadData() async {
     if (userId.isEmpty) return;
 
-    setState(() {
-      loading = true;
-      loadError = null;
-    });
+    if (mounted) {
+      setState(() {
+        loading = true;
+        loadError = null;
+      });
+    }
 
     await Future.wait([
       loadProfile(),
@@ -141,9 +143,11 @@ class _MainScreenState extends State<MainScreen> {
       loadGifts(),
       loadTransactions(),
       loadMemberships(),
-      loadPermissions(),
-      loadAgencyApplications(),
     ]);
+
+    // Owner permission must load before Owner-only agency applications.
+    await loadPermissions();
+    await loadAgencyApplications();
 
     if (mounted) setState(() => loading = false);
   }
@@ -283,8 +287,7 @@ class _MainScreenState extends State<MainScreen> {
           .select()
           .order('created_at', ascending: false)
           .limit(100);
-      agencyApplications =
-          List<Map<String, dynamic>>.from(result);
+      agencyApplications = List<Map<String, dynamic>>.from(result);
     } catch (_) {
       agencyApplications = [];
     }
@@ -728,6 +731,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final showControl = isOwner || canManageTopups;
+
+    // Features Hub is placed after Agency.
     final pages = <Widget>[
       homePage(),
       livePage(),
@@ -735,6 +740,10 @@ class _MainScreenState extends State<MainScreen> {
       giftsPage(),
       profilePage(),
       agencyPage(),
+      ZoonlFeatureHub(
+        isOwner: isOwner,
+        isAdmin: !isOwner && canManageTopups,
+      ),
       if (showControl) controlPage(),
     ];
 
@@ -768,6 +777,11 @@ class _MainScreenState extends State<MainScreen> {
         icon: Icon(Icons.business_outlined),
         selectedIcon: Icon(Icons.business, color: gold),
         label: 'Agency',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.grid_view_outlined),
+        selectedIcon: Icon(Icons.grid_view, color: gold),
+        label: 'Features',
       ),
       if (showControl)
         NavigationDestination(
@@ -987,8 +1001,7 @@ class _MainScreenState extends State<MainScreen> {
                   'Watch creators', () => setState(() => tab = 1))),
               const SizedBox(width: 10),
               Expanded(child: feature(Icons.card_giftcard, 'GIFT CENTER',
-                  'Send virtual gifts', () => setState(() => tab = 3)),
-              ),
+                  'Send virtual gifts', () => setState(() => tab = 3))),
             ],
           ),
           const SizedBox(height: 10),
@@ -1417,7 +1430,7 @@ class _MainScreenState extends State<MainScreen> {
             tileColor: panel,
             leading: const Icon(Icons.admin_panel_settings, color: gold),
             title: Text(isOwner ? 'Owner Dashboard' : 'Admin Dashboard'),
-            onTap: () => setState(() => tab = 6),
+            onTap: () => setState(() => tab = 7),
           ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
