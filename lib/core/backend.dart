@@ -1,49 +1,56 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Backend {
-  static SupabaseClient get db => Supabase.instance.client;
+  static SupabaseClient get client => Supabase.instance.client;
+
+  static User? get currentUser => client.auth.currentUser;
 
   static Future<void> initialize({
     required String supabaseUrl,
-    required String anonKey,
+    required String supabaseAnonKey,
   }) async {
     await Supabase.initialize(
       url: supabaseUrl,
-      anonKey: anonKey,
+      anonKey: supabaseAnonKey,
     );
   }
 
-  static User? get currentUser => db.auth.currentUser;
-
-  static bool get isLoggedIn => currentUser != null;
-
-  static Future<List>> fetchZoonlLiveFeed() async {
-    final response = await db
-        .from('zoonl_api_full_feed')
+  static Future<List> fetchZoonlLiveFeed() async {
+    final response = await client
+        .from('zoonl_live_feed')
         .select()
-        .order('sort_order', ascending: true);
-    return List>.from(response);
+        .order('created_at', ascending: false);
+    if (response is List) {
+      return List.from(response);
+    }
+    return [];
   }
 
   static Future<dynamic> sendZoonlLiveGift({
     required String senderId,
     required String receiverId,
     required String giftCode,
+    required int coins,
   }) async {
-    return await db.rpc('zoonl_send_live_gift', params: {
-      'p_sender_id': senderId,
-      'p_receiver_id': receiverId,
-      'p_zoonl_gift_code': giftCode,
-    });
+    final response = await client.from('zoonl_live_gifts').insert({
+      'sender_id': senderId,
+      'receiver_id': receiverId,
+      'gift_code': giftCode,
+      'coins': coins,
+    }).select();
+    return response;
   }
 
   static Future<dynamic> equipZoonlCosmetic({
     required String userId,
     required String itemCode,
   }) async {
-    return await db.rpc('zoonl_equip_cosmetic', params: {
-      'p_user_id': userId,
-      'p_zoonl_item_code': itemCode,
-    });
+    final response = await client.from('zoonl_user_cosmetics').upsert({
+      'user_id': userId,
+      'item_code': itemCode,
+      'is_equipped': true,
+    }).select();
+    return response;
   }
 }
