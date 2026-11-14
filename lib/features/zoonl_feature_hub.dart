@@ -29,8 +29,6 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   String? _feedError;
   List<dynamic> _zoonlFeedItems = [];
 
-
-
   final Map<String, bool> permissions = {
     'Manage Users': false,
     'Manage Top-ups': false,
@@ -55,6 +53,12 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   ];
 
   final TextEditingController searchController = TextEditingController();
+
+  Map<String, dynamic> _toMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
+  }
 
   @override
   void initState() {
@@ -509,6 +513,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   Widget _backpack() {
     final backpackItems = _zoonlFeedItems
+        .map(_toMap)
         .where((e) => e['feed_type'] == 'GIFT' || e['feed_type'] == 'AVATAR_FRAME')
         .toList();
 
@@ -537,6 +542,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   Widget _themes() {
     final themeItems = _zoonlFeedItems
+        .map(_toMap)
         .where((e) =>
             e['feed_type'] == 'PROFILE_BG' ||
             e['feed_type'] == 'ENTRY_EFFECT' ||
