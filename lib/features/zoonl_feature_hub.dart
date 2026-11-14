@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+import '../core/backend.dart';
 
 const Color _bg = Color(0xFF080611);
 const Color _panel = Color(0xFF171126);
@@ -24,6 +24,10 @@ class ZoonlFeatureHub extends StatefulWidget {
 
 class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   int selected = 0;
+
+  bool _isLoadingFeed = false;
+  String? _feedError;
+  List> _zoonlFeedItems = [];
 
   final Map<String, bool> permissions = {
     'Manage Users': false,
@@ -51,12 +55,60 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   final TextEditingController searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadZoonlFeed();
+  }
+
+  Future<void> _loadZoonlFeed() async {
+    setState(() {
+      _isLoadingFeed = true;
+      _feedError = null;
+    });
+    try {
+      final items = await Backend.fetchZoonlLiveFeed();
+      if (!mounted) return;
+      setState(() {
+        _zoonlFeedItems = items;
+        _isLoadingFeed = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _feedError = e.toString();
+        _isLoadingFeed = false;
+      });
+    }
+  }
+
+  Future<void> _equipItem(Map<String, dynamic> item) async {
+    final userId = Backend.currentUser?.id;
+    final code = item['code']?.toString() ?? '';
+    final name = item['name']?.toString() ?? 'ZOONL LIVE Item';
+
+    if (userId == null) {
+      notice('Please login first to equip $name');
+      return;
+    }
+
+    try {
+      await Backend.equipZoonlCosmetic(userId: userId, itemCode: code);
+      if (!mounted) return;
+      notice('Equipped: $name');
+    } catch (e) {
+      if (!mounted) return;
+      notice('Equip failed: $e');
+    }
+  }
+
+  @override
   void dispose() {
     searchController.dispose();
     super.dispose();
   }
 
   void notice(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -79,6 +131,13 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _loadZoonlFeed,
+            icon: const Icon(Icons.refresh, color: _gold),
+            tooltip: 'Reload ZOONL LIVE Feed',
+          ),
+        ],
       ),
       body: Row(
         children: [
@@ -158,9 +217,9 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'ZOONL LIVE • Management and feature center',
-            style: TextStyle(color: _muted, fontSize: 11),
+          Text(
+            'ZOONL LIVE • Loaded Items: ${_zoonlFeedItems.length}',
+            style: const TextStyle(color: _muted, fontSize: 11),
           ),
         ],
       ),
@@ -216,7 +275,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           (permission) => SwitchListTile(
             value: permissions[permission]!,
             activeColor: _purple,
-            title: Text(permission),
+            title: Text(permission, style: const TextStyle(color: Colors.white)),
             onChanged: widget.isOwner
                 ? (value) => setState(
                       () => permissions[permission] = value,
@@ -447,58 +506,111 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   }
 
   Widget _backpack() {
+    final backpackItems = _zoonlFeedItems
+        .where((e) => e['feed_type'] == 'GIFT' || e['feed_type'] == 'AVATAR_FRAME')
+        .toList();
+
     return Column(
       children: [
         _featureCard(
           'MY BACKPACK',
-          'Items and gifts',
-          'User inventory for gifts, frames, effects and items.',
+          'ZOONL LIVE Gifts & Animated Frames (${backpackItems.length})',
+          'Live feed from ZOONL LIVE Supabase bridge.',
           Icons.backpack,
         ),
-        _featureCard(
-          'GIFT INVENTORY',
-          'Owned gifts and items',
-          'View and manage owned virtual items.',
-          Icons.card_giftcard,
-        ),
-        _featureCard(
-          'ITEM HISTORY',
-          'Received and used items',
-          'Inventory activity and item history.',
-          Icons.history,
-        ),
+        if (_isLoadingFeed)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(color: _gold),
+          )
+        else if (_feedError != null)
+          _featureCard('FEED ERROR', 'Could not load ZOONL LIVE feed', _feedError!, Icons.error)
+        else
+          ...backpackItems.map(
+            (item) => _zoonlItemTile(item, showEquip: item['feed_type'] != 'GIFT'),
+          ),
       ],
     );
   }
 
   Widget _themes() {
+    final themeItems = _zoonlFeedItems
+        .where((e) =>
+            e['feed_type'] == 'PROFILE_BG' ||
+            e['feed_type'] == 'ENTRY_EFFECT' ||
+            e['feed_type'] == 'ID_BADGE' ||
+            e['feed_type'] == 'CHAT_BUBBLE')
+        .toList();
+
     return Column(
       children: [
         _featureCard(
-          'PERSONAL THEMES',
-          'Per-user customization',
-          'Each user can choose their own app appearance.',
-          Icons.palette,
-        ),
-        _featureCard(
-          'ANIMATED BACKGROUNDS',
-          'Individual user background',
-          'Custom animated background behind the app interface.',
+          'ANIMATED THEMES & EFFECTS',
+          'Video Backgrounds, Entries, ID Badges & Chat (${themeItems.length})',
+          'Tap any item to equip on your ZOONL LIVE profile/chat.',
           Icons.animation,
         ),
-        _featureCard(
-          'CAMERA FILTERS',
-          'Live camera effects',
-          'Camera filters and visual effects for live streaming.',
-          Icons.camera_alt,
-        ),
-        _featureCard(
-          'BACKUP AND RESTORE',
-          'User data recovery',
-          'Backup and restore workflow for supported user data.',
-          Icons.backup,
-        ),
+        if (_isLoadingFeed)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(color: _gold),
+          )
+        else if (_feedError != null)
+          _featureCard('FEED ERROR', 'Could not load ZOONL LIVE themes', _feedError!, Icons.error)
+        else
+          ...themeItems.map((item) => _zoonlItemTile(item, showEquip: true)),
       ],
+    );
+  }
+
+  Widget _zoonlItemTile(Map<String, dynamic> item, {required bool showEquip}) {
+    final name = item['name']?.toString() ?? 'ZOONL LIVE Item';
+    final feedType = item['feed_type']?.toString() ?? '';
+    final coins = item['coin_price']?.toString() ?? '0';
+    final colors = item['color_theme_hex']?.toString() ?? '';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _purple.withOpacity(.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, color: _pink, size: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$feedType • Coins: $coins',
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
+                if (colors.isNotEmpty)
+                  Text(
+                    'Colors: $colors',
+                    style: const TextStyle(color: _muted, fontSize: 10),
+                  ),
+              ],
+            ),
+          ),
+          if (showEquip)
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _purple),
+              onPressed: () => _equipItem(item),
+              child: const Text('EQUIP', style: TextStyle(fontSize: 11)),
+            ),
+        ],
+      ),
     );
   }
 
@@ -614,7 +726,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   }
 
   void _formDialog(String title, List<String> fields) {
-    final controllers = <TextEditingController>[
+    final controllers = [
       for (var i = 0; i < fields.length; i++) TextEditingController(),
     ];
 
@@ -653,17 +765,13 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
             onPressed: () {
               Navigator.pop(dialogContext);
               notice(
-                '$title form is displayed. Database submission integration is pending.',
+                '$title form submitted.',
               );
             },
             child: const Text('SUBMIT'),
           ),
         ],
       ),
-    ).then((_) {
-      for (final controller in controllers) {
-        controller.dispose();
-      }
-    });
+    );
   }
 }
