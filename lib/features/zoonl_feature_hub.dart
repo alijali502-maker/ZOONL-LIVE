@@ -27,7 +27,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   bool _isLoadingFeed = false;
   String? _feedError;
-  List<dynamic> _zoonlFeedItems = [];
+  List _zoonlFeedItems = [];
 
   final Map<String, bool> permissions = {
     'Manage Users': false,
@@ -56,8 +56,10 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   Map<String, dynamic> _toMap(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
-    if (raw is Map) return Map<String, dynamic>.from(raw);
-    return <String, dynamic>{};
+    if (raw is Map) {
+      return raw.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return {};
   }
 
   @override
