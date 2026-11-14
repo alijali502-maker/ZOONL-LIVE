@@ -82,13 +82,24 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> gifts = [];
   List<Map<String, dynamic>> transactions = [];
   List<Map<String, dynamic>> memberships = [];
+  List<Map<String, dynamic>> agencyApplications = [];
 
   String? loadError;
 
   String get userId => db.auth.currentUser?.id ?? '';
+  String get zoonlId => publicProfile['zoonl_id']?.toString() ?? '';
 
   int get coins => number(wallet['coins']);
   int get diamonds => number(wallet['diamonds']);
+
+  static const List<Map<String, dynamic>> coinPackages = [
+    {'usd': 10, 'coins': 30000},
+    {'usd': 20, 'coins': 60000},
+    {'usd': 30, 'coins': 90000},
+    {'usd': 40, 'coins': 120000},
+    {'usd': 50, 'coins': 150000},
+    {'usd': 60, 'coins': 180000},
+  ];
 
   int number(dynamic value) {
     if (value is num) return value.toInt();
@@ -131,6 +142,7 @@ class _MainScreenState extends State<MainScreen> {
       loadTransactions(),
       loadMemberships(),
       loadPermissions(),
+      loadAgencyApplications(),
     ]);
 
     if (mounted) setState(() => loading = false);
@@ -166,12 +178,12 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> loadProfile() async {
     try {
-      final result = await db
-          .from('profiles')
-          .select()
-          .eq('id', userId)
-          .maybeSingle();
-      profile = result ?? {};
+      profile = await db
+              .from('profiles')
+              .select()
+              .eq('id', userId)
+              .maybeSingle() ??
+          {};
     } catch (_) {
       profile = {};
     }
@@ -179,12 +191,12 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> loadPublicProfile() async {
     try {
-      final result = await db
-          .from('user_public_profiles')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-      publicProfile = result ?? {};
+      publicProfile = await db
+              .from('user_public_profiles')
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle() ??
+          {};
     } catch (_) {
       publicProfile = {};
     }
@@ -192,12 +204,12 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> loadWallet() async {
     try {
-      final result = await db
-          .from('wallets')
-          .select()
-          .eq('user_id', userId)
-          .maybeSingle();
-      wallet = result ?? {};
+      wallet = await db
+              .from('wallets')
+              .select()
+              .eq('user_id', userId)
+              .maybeSingle() ??
+          {};
     } catch (e) {
       wallet = {};
       loadError = e.toString();
@@ -260,6 +272,24 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  Future<void> loadAgencyApplications() async {
+    if (!isOwner) {
+      agencyApplications = [];
+      return;
+    }
+    try {
+      final result = await db
+          .from('agency_applications')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(100);
+      agencyApplications =
+          List<Map<String, dynamic>>.from(result);
+    } catch (_) {
+      agencyApplications = [];
+    }
+  }
+
   void message(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -277,7 +307,7 @@ class _MainScreenState extends State<MainScreen> {
     final e = error.toString().toUpperCase();
 
     if (e.contains('TOPUP_PERMISSION_DENIED')) {
-      return 'Owner ने आपको Coins Top-up की अनुमति नहीं दी है।';
+      return 'Owner ने Top-up की अनुमति नहीं दी है।';
     }
     if (e.contains('TARGET_USER_NOT_FOUND')) {
       return 'यह ZOONL ID नहीं मिली।';
@@ -285,32 +315,11 @@ class _MainScreenState extends State<MainScreen> {
     if (e.contains('INVALID_COIN_AMOUNT')) {
       return 'Coins की संख्या सही नहीं है।';
     }
-    if (e.contains('INVALID_ZOONL_ID')) {
-      return 'ZOONL ID में केवल अंक लिखें।';
-    }
     if (e.contains('OWNER_ONLY')) {
       return 'यह काम केवल Owner कर सकता है।';
     }
-    if (e.contains('ADMIN_USER_NOT_FOUND')) {
-      return 'यह Admin ZOONL ID नहीं मिली।';
-    }
     if (e.contains('INSUFFICIENT_COINS')) {
       return 'आपके पास पर्याप्त Coins नहीं हैं।';
-    }
-    if (e.contains('ROOM_NOT_LIVE')) {
-      return 'यह Live Room अभी चालू नहीं है।';
-    }
-    if (e.contains('ROOM_NOT_FOUND')) {
-      return 'Live Room नहीं मिला।';
-    }
-    if (e.contains('CANNOT_SEND_GIFT_TO_SELF')) {
-      return 'आप अपने ही Room में Gift नहीं भेज सकते।';
-    }
-    if (e.contains('GIFT_NOT_AVAILABLE')) {
-      return 'यह Gift उपलब्ध नहीं है।';
-    }
-    if (e.contains('ROOM_ACCESS_REQUIRED')) {
-      return 'इस Private Room की अनुमति जरूरी है।';
     }
     return 'अनुरोध पूरा नहीं हुआ: $error';
   }
@@ -329,15 +338,12 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (dialogContext) {
         bool busy = false;
-
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text(
-                'ADD COINS',
-                style: TextStyle(color: gold),
-              ),
+              title: const Text('ADD COINS',
+                  style: TextStyle(color: gold)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -347,7 +353,6 @@ class _MainScreenState extends State<MainScreen> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Target ZOONL ID',
-                        hintText: 'Example: 10002',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -356,7 +361,6 @@ class _MainScreenState extends State<MainScreen> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Coins Amount',
-                        hintText: 'Example: 10000',
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -365,11 +369,6 @@ class _MainScreenState extends State<MainScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Description (optional)',
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Coins सीधे Target User के Wallet में जुड़ेंगे।',
-                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   ],
                 ),
@@ -394,12 +393,11 @@ class _MainScreenState extends State<MainScreen> {
                             return;
                           }
                           if (amount == null || amount <= 0) {
-                            message('Coins की सही संख्या लिखें।');
+                            message('सही Coins संख्या लिखें।');
                             return;
                           }
 
                           setDialogState(() => busy = true);
-
                           try {
                             final response = await db.rpc(
                               'add_zoonl_coins',
@@ -413,10 +411,8 @@ class _MainScreenState extends State<MainScreen> {
                               },
                             );
 
-                            final result = Map<String, dynamic>.from(
-                              response as Map,
-                            );
-
+                            final result =
+                                Map<String, dynamic>.from(response as Map);
                             if (result['success'] != true) {
                               throw Exception('TOPUP_FAILED');
                             }
@@ -424,12 +420,9 @@ class _MainScreenState extends State<MainScreen> {
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
                             }
-
                             await loadData();
-
                             message(
-                              '$targetId में $amount Coins जोड़ दिए गए। '
-                              'नया Balance: ${result['new_balance']}',
+                              '$targetId में $amount Coins जोड़ दिए गए।',
                             );
                           } catch (e) {
                             setDialogState(() => busy = false);
@@ -437,11 +430,7 @@ class _MainScreenState extends State<MainScreen> {
                           }
                         },
                   child: busy
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const CircularProgressIndicator()
                       : const Text('ADD COINS'),
                 ),
               ],
@@ -460,24 +449,19 @@ class _MainScreenState extends State<MainScreen> {
     if (!isOwner) return;
 
     final idController = TextEditingController();
-
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         bool busy = false;
-
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            Future<void> savePermission(bool allowed) async {
+            Future<void> save(bool allowed) async {
               final adminId = idController.text.trim();
-
               if (!RegExp(r'^[0-9]+$').hasMatch(adminId)) {
                 message('Admin का सही ZOONL ID लिखें।');
                 return;
               }
-
               setDialogState(() => busy = true);
-
               try {
                 await db.rpc(
                   'owner_set_admin_topup_permission',
@@ -486,18 +470,13 @@ class _MainScreenState extends State<MainScreen> {
                     'p_allowed': allowed,
                   },
                 );
-
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                 }
-
                 await loadPermissions();
-
-                message(
-                  allowed
-                      ? 'Admin $adminId को Top-up की अनुमति दे दी गई।'
-                      : 'Admin $adminId की Top-up अनुमति हटा दी गई।',
-                );
+                message(allowed
+                    ? 'Admin को Top-up अनुमति दी गई।'
+                    : 'Admin की Top-up अनुमति हटा दी गई।');
               } catch (e) {
                 setDialogState(() => busy = false);
                 message(friendlyError(e));
@@ -506,16 +485,13 @@ class _MainScreenState extends State<MainScreen> {
 
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text(
-                'ADMIN TOP-UP ACCESS',
-                style: TextStyle(color: gold),
-              ),
+              title: const Text('ADMIN TOP-UP ACCESS',
+                  style: TextStyle(color: gold)),
               content: TextField(
                 controller: idController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Admin ZOONL ID',
-                  hintText: 'Admin का ID लिखें',
                 ),
               ),
               actions: [
@@ -526,14 +502,12 @@ class _MainScreenState extends State<MainScreen> {
                   child: const Text('CANCEL'),
                 ),
                 TextButton(
-                  onPressed: busy ? null : () => savePermission(false),
-                  child: const Text(
-                    'REVOKE',
-                    style: TextStyle(color: pink),
-                  ),
+                  onPressed: busy ? null : () => save(false),
+                  child: const Text('REVOKE',
+                      style: TextStyle(color: pink)),
                 ),
                 FilledButton(
-                  onPressed: busy ? null : () => savePermission(true),
+                  onPressed: busy ? null : () => save(true),
                   child: const Text('GRANT'),
                 ),
               ],
@@ -542,15 +516,101 @@ class _MainScreenState extends State<MainScreen> {
         );
       },
     );
-
     idController.dispose();
+  }
+
+  Future<void> applyForAgency() async {
+    final nameController = TextEditingController();
+    final contactController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        bool busy = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: panel,
+              title: const Text('AGENCY APPLICATION',
+                  style: TextStyle(color: gold)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Proposed Agency Name',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contactController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Contact Details',
+                        hintText: 'Phone, email or other contact',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text('CANCEL'),
+                ),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) {
+                            message('Agency का नाम लिखें।');
+                            return;
+                          }
+                          setDialogState(() => busy = true);
+                          try {
+                            await db.from('agency_applications').insert({
+                              'applicant_id': userId,
+                              'proposed_name': name,
+                              'contact_details': {
+                                'contact': contactController.text.trim(),
+                              },
+                              'application_status': 'pending',
+                            });
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            message('Agency Application भेज दी गई।');
+                            await loadData();
+                          } catch (e) {
+                            setDialogState(() => busy = false);
+                            message('Application भेजी नहीं जा सकी: $e');
+                          }
+                        },
+                  child: busy
+                      ? const CircularProgressIndicator()
+                      : const Text('SUBMIT APPLICATION'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    contactController.dispose();
   }
 
   Future<void> sendGift(Map<String, dynamic> gift) async {
     if (sendingGift) return;
 
     final availableRooms = rooms
-        .where((room) => room['owner_id']?.toString() != userId)
+        .where((r) => r['owner_id']?.toString() != userId)
         .toList();
 
     if (availableRooms.isEmpty) {
@@ -569,46 +629,30 @@ class _MainScreenState extends State<MainScreen> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final total = number(gift['coin_price']) * quantity;
-
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text(
-                'SEND GIFT',
-                style: TextStyle(color: gold),
-              ),
+              title: const Text('SEND GIFT',
+                  style: TextStyle(color: gold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  giftImage(gift, 80),
-                  const SizedBox(height: 10),
+                  giftImage(gift, 75),
                   Text(value(gift['gift_name'], 'Gift')),
-                  const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: roomId,
-                    isExpanded: true,
                     dropdownColor: panel2,
-                    decoration: const InputDecoration(
-                      labelText: 'Live Room',
-                    ),
-                    items: availableRooms.map((room) {
-                      return DropdownMenuItem<String>(
-                        value: room['id'].toString(),
-                        child: Text(
-                          value(room['room_name'], 'Live Room'),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    items: availableRooms.map((r) {
+                      return DropdownMenuItem(
+                        value: r['id'].toString(),
+                        child: Text(value(r['room_name'], 'Live Room')),
                       );
                     }).toList(),
-                    onChanged: (v) => setDialogState(() => roomId = v),
+                    onChanged: (v) =>
+                        setDialogState(() => roomId = v),
                   ),
-                  const SizedBox(height: 10),
                   DropdownButtonFormField<int>(
                     value: quantity,
                     dropdownColor: panel2,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantity',
-                    ),
                     items: [1, 5, 10, 20, 50].map((n) {
                       return DropdownMenuItem(
                         value: n,
@@ -621,14 +665,9 @@ class _MainScreenState extends State<MainScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 12),
                   Text(
-                    'Total: $total Coins',
+                    'Total: ${number(gift['coin_price']) * quantity} Coins',
                     style: const TextStyle(color: gold),
-                  ),
-                  Text(
-                    'Your balance: $coins Coins',
-                    style: const TextStyle(color: muted, fontSize: 12),
                   ),
                 ],
               ),
@@ -640,9 +679,7 @@ class _MainScreenState extends State<MainScreen> {
                 FilledButton(
                   onPressed: () async {
                     if (roomId == null) return;
-
                     setState(() => sendingGift = true);
-
                     try {
                       final response = await db.rpc(
                         'send_live_gift',
@@ -652,19 +689,14 @@ class _MainScreenState extends State<MainScreen> {
                           'p_quantity': quantity,
                         },
                       );
-
-                      final result = Map<String, dynamic>.from(
-                        response as Map,
-                      );
-
+                      final result =
+                          Map<String, dynamic>.from(response as Map);
                       if (result['success'] != true) {
                         throw Exception('GIFT_SEND_FAILED');
                       }
-
                       if (dialogContext.mounted) {
                         Navigator.pop(dialogContext);
                       }
-
                       final sound = gift['sound_url']?.toString() ?? '';
                       if (sound.isNotEmpty) {
                         try {
@@ -673,56 +705,17 @@ class _MainScreenState extends State<MainScreen> {
                           await audioPlayer.play();
                         } catch (_) {}
                       }
-
                       await loadData();
-
-                      message(
-                        '${value(result['gift_name'], 'Gift')} भेजा गया। '
-                        '${result['coins_deducted']} Coins कटे। '
-                        'Host को ${result['diamonds_received']} Diamonds मिले।',
-                      );
-
-                      if (mounted) {
-                        showDialog<void>(
-                          context: this.context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: panel,
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                giftImage(gift, 110),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'GIFT SENT SUCCESSFULLY',
-                                  style: TextStyle(
-                                    color: gold,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${value(gift['gift_name'], 'Gift')} x$quantity',
-                                ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text('OK'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
+                      message('Gift सफलतापूर्वक भेज दिया गया।');
                     } catch (e) {
                       message(friendlyError(e));
                     } finally {
-                      if (mounted) setState(() => sendingGift = false);
+                      if (mounted) {
+                        setState(() => sendingGift = false);
+                      }
                     }
                   },
-                  child: sendingGift
-                      ? const CircularProgressIndicator()
-                      : const Text('SEND'),
+                  child: const Text('SEND'),
                 ),
               ],
             );
@@ -735,13 +728,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final showControl = isOwner || canManageTopups;
-
     final pages = <Widget>[
       homePage(),
       livePage(),
       walletPage(),
       giftsPage(),
       profilePage(),
+      agencyPage(),
       if (showControl) controlPage(),
     ];
 
@@ -770,6 +763,11 @@ class _MainScreenState extends State<MainScreen> {
         icon: Icon(Icons.person_outline),
         selectedIcon: Icon(Icons.person, color: gold),
         label: 'Profile',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.business_outlined),
+        selectedIcon: Icon(Icons.business, color: gold),
+        label: 'Agency',
       ),
       if (showControl)
         NavigationDestination(
@@ -826,22 +824,18 @@ class _MainScreenState extends State<MainScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (subtitle != null)
-                Text(
-                  subtitle,
+              Text(title,
                   style: const TextStyle(
-                    color: muted,
-                    fontSize: 10,
-                    letterSpacing: 1,
-                  ),
-                ),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  )),
+              if (subtitle != null)
+                Text(subtitle,
+                    style: const TextStyle(
+                      color: muted,
+                      fontSize: 10,
+                      letterSpacing: 1,
+                    )),
             ],
           ),
         ),
@@ -857,18 +851,14 @@ class _MainScreenState extends State<MainScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 19,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            )),
         const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: const TextStyle(color: muted, fontSize: 11),
-        ),
+        Text(subtitle,
+            style: const TextStyle(color: muted, fontSize: 11)),
       ],
     );
   }
@@ -884,13 +874,12 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           const Icon(Icons.info_outline, color: gold, size: 34),
           const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 6),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: muted, fontSize: 11),
-          ),
+          Text(subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: muted, fontSize: 11)),
         ],
       ),
     );
@@ -898,7 +887,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget metric(String title, String amount, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(15),
@@ -907,17 +896,13 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           Icon(icon, color: gold, size: 23),
           const SizedBox(height: 7),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            title,
-            style: const TextStyle(color: muted, fontSize: 10),
-          ),
+          Text(amount,
+              style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+              )),
+          Text(title,
+              style: const TextStyle(color: muted, fontSize: 10)),
         ],
       ),
     );
@@ -945,17 +930,13 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             Icon(icon, color: gold, size: 24),
             const Spacer(),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(color: muted, fontSize: 10),
-            ),
+            Text(title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                )),
+            Text(subtitle,
+                style: const TextStyle(color: muted, fontSize: 10)),
           ],
         ),
       ),
@@ -967,41 +948,34 @@ class _MainScreenState extends State<MainScreen> {
       profile['display_name'],
       value(profile['username'], 'ZOONL Member'),
     );
-
     return RefreshIndicator(
       onRefresh: loadData,
       color: gold,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
         children: [
-          header('ZOONL LIVE', subtitle: 'WELCOME TO YOUR LIVE WORLD'),
+          header('ZOONL LIVE',
+              subtitle: 'WELCOME TO YOUR LIVE WORLD'),
           const SizedBox(height: 23),
-          Text(
-            'Welcome, $name',
-            style: const TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          Text('Welcome, $name',
+              style: const TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w900,
+              )),
           const SizedBox(height: 5),
           Text(
-            'ZOONL ID: ${value(publicProfile['zoonl_id'])}',
+            'ZOONL ID: ${zoonlId.isEmpty ? 'Not available' : zoonlId}',
             style: const TextStyle(color: gold),
           ),
+          if (isOwner) ownerIdentityCard(),
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(
-                child: metric('Coins', '$coins', Icons.monetization_on),
-              ),
+              Expanded(child: metric('Coins', '$coins', Icons.monetization_on)),
               const SizedBox(width: 10),
-              Expanded(
-                child: metric('Diamonds', '$diamonds', Icons.diamond),
-              ),
+              Expanded(child: metric('Diamonds', '$diamonds', Icons.diamond)),
               const SizedBox(width: 10),
-              Expanded(
-                child: metric('Live Rooms', '${rooms.length}', Icons.live_tv),
-              ),
+              Expanded(child: metric('Live Rooms', '${rooms.length}', Icons.live_tv)),
             ],
           ),
           const SizedBox(height: 23),
@@ -1009,56 +983,66 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: feature(
-                  Icons.live_tv,
-                  'LIVE ROOMS',
-                  'Watch creators',
-                  () => setState(() => tab = 1),
-                ),
-              ),
+              Expanded(child: feature(Icons.live_tv, 'LIVE ROOMS',
+                  'Watch creators', () => setState(() => tab = 1))),
               const SizedBox(width: 10),
-              Expanded(
-                child: feature(
-                  Icons.card_giftcard,
-                  'GIFT CENTER',
-                  'Send virtual gifts',
-                  () => setState(() => tab = 3),
-                ),
+              Expanded(child: feature(Icons.card_giftcard, 'GIFT CENTER',
+                  'Send virtual gifts', () => setState(() => tab = 3)),
               ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: feature(
-                  Icons.account_balance_wallet,
-                  'MY WALLET',
-                  'Coins and Diamonds',
-                  () => setState(() => tab = 2),
-                ),
-              ),
+              Expanded(child: feature(Icons.account_balance_wallet,
+                  'MY WALLET', 'Coins and Diamonds',
+                  () => setState(() => tab = 2))),
               const SizedBox(width: 10),
-              Expanded(
-                child: feature(
-                  Icons.person,
-                  'MY PROFILE',
-                  'Your ZOONL identity',
-                  () => setState(() => tab = 4),
-                ),
-              ),
+              Expanded(child: feature(Icons.business, 'AGENCY',
+                  'Agency application', () => setState(() => tab = 5))),
             ],
           ),
           const SizedBox(height: 22),
           heading('Live Now', 'Rooms currently broadcasting'),
           const SizedBox(height: 10),
-          if (loading)
-            const Center(child: CircularProgressIndicator(color: gold))
-          else if (rooms.isEmpty)
+          if (rooms.isEmpty)
             empty('No Active Live Rooms', 'Live Rooms यहाँ दिखाई देंगे।')
           else
             ...rooms.take(3).map(roomCard),
+        ],
+      ),
+    );
+  }
+
+  Widget ownerIdentityCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF684A20), Color(0xFF211735)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: gold),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.verified, color: gold, size: 32),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('OFFICIAL ZOONL OWNER',
+                    style: TextStyle(
+                      color: gold,
+                      fontWeight: FontWeight.w900,
+                    )),
+                Text('ZOONL ID 10001',
+                    style: TextStyle(color: Colors.white)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1076,7 +1060,8 @@ class _MainScreenState extends State<MainScreen> {
           heading('LIVE NOW', '${rooms.length} active rooms'),
           const SizedBox(height: 12),
           if (rooms.isEmpty)
-            empty('No Live Rooms Found', 'जब कोई Host Live होगा, Room यहाँ आएगा।')
+            empty('No Live Rooms Found',
+                'जब कोई Host Live होगा, Room यहाँ आएगा।')
           else
             ...rooms.map(roomCard),
         ],
@@ -1086,7 +1071,6 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget roomCard(Map<String, dynamic> room) {
     final mine = room['owner_id']?.toString() == userId;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 11),
       padding: const EdgeInsets.all(14),
@@ -1103,10 +1087,8 @@ class _MainScreenState extends State<MainScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  value(room['room_name'], 'ZOONL Live Room'),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+                Text(value(room['room_name'], 'ZOONL Live Room'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(
                   '${value(room['room_type'], 'Live')} • '
                   '${number(room['viewer_count'])} viewers',
@@ -1117,17 +1099,13 @@ class _MainScreenState extends State<MainScreen> {
           ),
           if (!mine)
             FilledButton(
-              onPressed: gifts.isEmpty
-                  ? null
-                  : () => sendGift(gifts.first),
+              onPressed: gifts.isEmpty ? null : () => sendGift(gifts.first),
               style: FilledButton.styleFrom(backgroundColor: purple),
               child: const Text('Gift'),
             )
           else
-            const Text(
-              'YOUR ROOM',
-              style: TextStyle(color: gold, fontSize: 10),
-            ),
+            const Text('YOUR ROOM',
+                style: TextStyle(color: gold, fontSize: 10)),
         ],
       ),
     );
@@ -1154,24 +1132,21 @@ class _MainScreenState extends State<MainScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'YOUR BALANCE',
-                  style: TextStyle(color: Colors.white70, letterSpacing: 2),
-                ),
+                const Text('YOUR BALANCE',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      letterSpacing: 2,
+                    )),
                 const SizedBox(height: 18),
                 Row(
                   children: [
                     const Icon(Icons.monetization_on, color: gold, size: 29),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$coins',
+                    Expanded(child: Text('$coins',
                         style: const TextStyle(
                           fontSize: 31,
                           fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
+                        ))),
                     const Text('COINS', style: TextStyle(color: gold)),
                   ],
                 ),
@@ -1180,37 +1155,81 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     const Icon(Icons.diamond, color: pink, size: 28),
                     const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$diamonds',
+                    Expanded(child: Text('$diamonds',
                         style: const TextStyle(
                           fontSize: 27,
                           fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                        ))),
                     const Text('DIAMONDS', style: TextStyle(color: pink)),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 15),
-          if (canManageTopups)
+          const SizedBox(height: 18),
+          heading('DIRECT TOP-UP', 'Buy Coins directly from ZOONL LIVE'),
+          const SizedBox(height: 5),
+          const Text('USD 1 = 3,000 Coins • No bonus',
+              style: TextStyle(color: gold)),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: coinPackages.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.65,
+            ),
+            itemBuilder: (context, index) {
+              final p = coinPackages[index];
+              return Container(
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: panel,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: purple.withOpacity(0.45)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('\$${p['usd']}',
+                        style: const TextStyle(
+                          color: gold,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        )),
+                    Text('${p['coins']} Coins',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const Text('Direct package',
+                        style: TextStyle(color: muted, fontSize: 10)),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Payment checkout अभी connect नहीं है। Package selection से '
+            'अपने आप Coins add नहीं होंगे।',
+            style: TextStyle(color: muted, fontSize: 11),
+          ),
+          if (canManageTopups) ...[
+            const SizedBox(height: 18),
             FilledButton.icon(
               onPressed: openTopupDialog,
               icon: const Icon(Icons.add),
-              label: const Text('ADD COINS TO USER'),
-              style: FilledButton.styleFrom(
-                backgroundColor: purple,
-                padding: const EdgeInsets.all(14),
-              ),
+              label: const Text('MANUAL ADD COINS TO USER'),
+              style: FilledButton.styleFrom(backgroundColor: purple),
             ),
+          ],
           const SizedBox(height: 22),
           heading('Wallet History', 'Your latest transactions'),
           const SizedBox(height: 10),
           if (transactions.isEmpty)
-            empty('No Transactions', 'आपकी Wallet History यहाँ दिखाई देगी।')
+            empty('No Transactions',
+                'आपकी Wallet History यहाँ दिखाई देगी।')
           else
             ...transactions.map(transactionCard),
         ],
@@ -1220,9 +1239,6 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget transactionCard(Map<String, dynamic> row) {
     final amount = number(row['amount']);
-    final currency = value(row['currency'], '');
-    final type = value(row['transaction_type'], 'Transaction');
-
     return Container(
       margin: const EdgeInsets.only(bottom: 9),
       padding: const EdgeInsets.all(14),
@@ -1241,21 +1257,18 @@ class _MainScreenState extends State<MainScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(type, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  value(row['description'], 'Wallet transaction'),
-                  style: const TextStyle(color: muted, fontSize: 11),
-                ),
+                Text(value(row['transaction_type'], 'Transaction'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(value(row['description'], 'Wallet transaction'),
+                    style: const TextStyle(color: muted, fontSize: 11)),
               ],
             ),
           ),
-          Text(
-            '$amount $currency',
-            style: TextStyle(
-              color: amount < 0 ? pink : const Color(0xFF6DDBA5),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('${row['amount']} ${value(row['currency'], '')}',
+              style: TextStyle(
+                color: amount < 0 ? pink : const Color(0xFF6DDBA5),
+                fontWeight: FontWeight.bold,
+              )),
         ],
       ),
     );
@@ -1269,37 +1282,6 @@ class _MainScreenState extends State<MainScreen> {
         padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
         children: [
           header('GIFT CENTER', subtitle: 'SEND GIFTS TO LIVE CREATORS'),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(17),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF653C91), Color(0xFF241532)],
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.card_giftcard, size: 40, color: gold),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'VIRTUAL GIFTS',
-                        style: TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        '$coins Coins available',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 20),
           heading('Gift Collection', '${gifts.length} available gifts'),
           const SizedBox(height: 12),
@@ -1334,17 +1316,13 @@ class _MainScreenState extends State<MainScreen> {
       child: Column(
         children: [
           Expanded(child: Center(child: giftImage(gift, 95))),
-          Text(
-            value(gift['gift_name'], 'Gift'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
+          Text(value(gift['gift_name'], 'Gift'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
-          Text(
-            '${number(gift['coin_price'])} Coins',
-            style: const TextStyle(color: gold),
-          ),
+          Text('${number(gift['coin_price'])} Coins',
+              style: const TextStyle(color: gold)),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
@@ -1363,11 +1341,10 @@ class _MainScreenState extends State<MainScreen> {
     final animation = gift['animation_url']?.toString() ?? '';
     final image = gift['image_url']?.toString() ?? '';
     final url = animation.isNotEmpty ? animation : image;
-
     if (url.isEmpty) {
-      return Icon(Icons.card_giftcard, size: size * 0.65, color: gold);
+      return Icon(Icons.card_giftcard,
+          size: size * 0.65, color: gold);
     }
-
     return Image.network(
       url,
       height: size,
@@ -1386,7 +1363,6 @@ class _MainScreenState extends State<MainScreen> {
       profile['display_name'],
       value(profile['username'], 'ZOONL Member'),
     );
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
       children: [
@@ -1397,61 +1373,52 @@ class _MainScreenState extends State<MainScreen> {
           decoration: BoxDecoration(
             color: panel,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: purple.withOpacity(0.3)),
+            border: Border.all(color: isOwner ? gold : purple),
           ),
           child: Column(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 42,
                 backgroundColor: purple2,
-                child: Icon(Icons.person, size: 43, color: gold),
-              ),
-              const SizedBox(height: 13),
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
+                child: Icon(
+                  isOwner ? Icons.verified_user : Icons.person,
+                  size: 43,
+                  color: gold,
                 ),
               ),
+              const SizedBox(height: 13),
+              Text(name,
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.bold,
+                  )),
               const SizedBox(height: 7),
-              Text(
-                'ZOONL ID: ${value(publicProfile['zoonl_id'])}',
-                style: const TextStyle(color: gold, letterSpacing: 1),
-              ),
+              Text('ZOONL ID: ${zoonlId.isEmpty ? 'Not available' : zoonlId}',
+                  style: const TextStyle(color: gold, letterSpacing: 1)),
+              if (isOwner) ...[
+                const SizedBox(height: 8),
+                const Text('OFFICIAL OWNER • ID 10001',
+                    style: TextStyle(color: gold)),
+              ],
               const SizedBox(height: 10),
-              Text(
-                db.auth.currentUser?.email ?? '',
-                style: const TextStyle(color: muted),
-              ),
+              Text(db.auth.currentUser?.email ?? '',
+                  style: const TextStyle(color: muted)),
             ],
           ),
         ),
         const SizedBox(height: 16),
         profileInfo('User Level', value(profile['user_level'], '1')),
         profileInfo('Country', value(profile['country'])),
-        profileInfo(
-          'Verified',
-          profile['is_verified'] == true ? 'Yes' : 'No',
-        ),
+        profileInfo('Verified',
+            profile['is_verified'] == true ? 'Yes' : 'No'),
         profileInfo('PRIME Memberships', '${memberships.length}'),
-        if (isOwner || canManageTopups) ...[
-          const SizedBox(height: 15),
+        if (isOwner || canManageTopups)
           ListTile(
             tileColor: panel,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            leading: const Icon(
-              Icons.admin_panel_settings,
-              color: gold,
-            ),
+            leading: const Icon(Icons.admin_panel_settings, color: gold),
             title: Text(isOwner ? 'Owner Dashboard' : 'Admin Dashboard'),
-            subtitle: const Text('Coins Top-up Control'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 15),
-            onTap: () => setState(() => tab = 5),
+            onTap: () => setState(() => tab = 6),
           ),
-        ],
         const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: () => db.auth.signOut(),
@@ -1477,12 +1444,99 @@ class _MainScreenState extends State<MainScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(title, style: const TextStyle(color: muted)),
-          ),
-          Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(title,
+              style: const TextStyle(color: muted))),
+          Text(text,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
+    );
+  }
+
+  Widget agencyPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
+      children: [
+        header('AGENCY CENTER', subtitle: 'ZOONL AGENCY NETWORK'),
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: panel,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: purple.withOpacity(0.4)),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.business, color: gold, size: 34),
+              SizedBox(height: 10),
+              Text('BECOME A ZOONL AGENCY',
+                  style: TextStyle(
+                    color: gold,
+                    fontWeight: FontWeight.bold,
+                  )),
+              SizedBox(height: 7),
+              Text(
+                'Agency application भेजें। Owner द्वारा review के बाद '
+                'approval status यहाँ manage किया जाएगा।',
+                style: TextStyle(color: muted, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: applyForAgency,
+          icon: const Icon(Icons.send),
+          label: const Text('APPLY FOR AGENCY'),
+          style: FilledButton.styleFrom(
+            backgroundColor: purple,
+            padding: const EdgeInsets.all(15),
+          ),
+        ),
+        const SizedBox(height: 20),
+        heading('My Application', 'Your submitted agency requests'),
+        const SizedBox(height: 10),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: db
+              .from('agency_applications')
+              .select()
+              .eq('applicant_id', userId)
+              .order('created_at', ascending: false)
+              .then((r) => List<Map<String, dynamic>>.from(r)),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final rows = snapshot.data ?? [];
+            if (rows.isEmpty) {
+              return empty('No Application',
+                  'आपकी Agency Application यहाँ दिखाई देगी।');
+            }
+            return Column(
+              children: rows.map((row) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 9),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: panel,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(value(row['proposed_name'], 'Agency')),
+                    subtitle: Text(
+                      'Status: ${value(row['application_status'])}',
+                      style: const TextStyle(color: gold),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1492,9 +1546,10 @@ class _MainScreenState extends State<MainScreen> {
       children: [
         header(
           isOwner ? 'OWNER DASHBOARD' : 'ADMIN DASHBOARD',
-          subtitle: 'SECURE COINS MANAGEMENT',
+          subtitle: 'ZOONL MANAGEMENT CONTROL',
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
+        if (isOwner) ownerIdentityCard(),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -1512,7 +1567,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                isOwner ? 'OWNER ACCESS' : 'AUTHORIZED ADMIN ACCESS',
+                isOwner ? 'OFFICIAL OWNER ACCESS' : 'AUTHORIZED ADMIN ACCESS',
                 style: const TextStyle(
                   color: gold,
                   fontWeight: FontWeight.bold,
@@ -1521,14 +1576,14 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(height: 7),
               Text(
                 isOwner
-                    ? 'Owner can add Coins to any ZOONL ID and grant or revoke Admin Top-up access.'
-                    : 'You can add Coins to a user only while the Owner permission remains active.',
+                    ? 'Owner identity: ZOONL ID 10001. Owner controls the existing Top-up permission.'
+                    : 'आपका Top-up access Owner की अनुमति पर निर्भर है।',
                 style: const TextStyle(color: muted, height: 1.5),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         FilledButton.icon(
           onPressed: openTopupDialog,
           icon: const Icon(Icons.add_circle_outline),
@@ -1539,7 +1594,7 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ),
         if (isOwner) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: openAdminPermissionDialog,
             icon: const Icon(Icons.manage_accounts),
@@ -1550,26 +1605,47 @@ class _MainScreenState extends State<MainScreen> {
               padding: const EdgeInsets.all(16),
             ),
           ),
-          const SizedBox(height: 15),
-          const Text(
-            'Owner authority: ZOONL ID 10001',
-            style: TextStyle(color: gold),
-          ),
+          const SizedBox(height: 24),
+          heading('AGENCY APPLICATIONS',
+              '${agencyApplications.length} requests'),
+          const SizedBox(height: 10),
+          if (agencyApplications.isEmpty)
+            empty('No Agency Applications',
+                'नई applications यहाँ दिखाई देंगी।')
+          else
+            ...agencyApplications.map((row) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: panel,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(value(row['proposed_name'], 'Agency'),
+                        style: const TextStyle(
+                          color: gold,
+                          fontWeight: FontWeight.bold,
+                        )),
+                    const SizedBox(height: 5),
+                    Text('Applicant: ${value(row['applicant_id'])}',
+                        style: const TextStyle(color: muted)),
+                    Text('Status: ${value(row['application_status'])}',
+                        style: const TextStyle(color: muted)),
+                    Text(
+                      'Application ID: ${value(row['id'])}',
+                      style: const TextStyle(
+                        color: muted,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
-        const SizedBox(height: 22),
-        heading(
-          'Top-up Permission',
-          isOwner
-              ? 'Only Owner can change Admin access.'
-              : 'Your access is controlled by the Owner.',
-        ),
-        const SizedBox(height: 10),
-        Text(
-          isOwner
-              ? 'Admin को अनुमति देने के लिए उसका ZOONL ID लिखें। REVOKE से अनुमति वापस ली जा सकती है।'
-              : 'यदि Owner आपकी अनुमति हटाता है, तो Server Top-up रोक देगा।',
-          style: const TextStyle(color: muted, height: 1.5),
-        ),
       ],
     );
   }
