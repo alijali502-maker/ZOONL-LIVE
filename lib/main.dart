@@ -825,7 +825,7 @@ class _MainScreenState extends State<MainScreen> {
                         labelText: 'Agency Portal Plan (Paid)',
                       ),
                       items: agencyPaidPlans.map((plan) {
-                        return DropdownMenuItem(
+                        return DropdownMenuItem>(
                           value: plan,
                           child: Text(
                             '${plan['plan']} (${plan['fee_coins']} Coins)',
@@ -1202,7 +1202,7 @@ class _MainScreenState extends State<MainScreen> {
       child: Row(
         children: [
           Icon(
-            specialOwner ? Icons.crown : Icons.shield,
+            specialOwner ? Icons.workspace_premium : Icons.shield,
             size: 16,
             color: levelAccentColor,
           ),
@@ -1601,11 +1601,12 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     const Icon(Icons.monetization_on, color: gold, size: 29),
                     const SizedBox(width: 10),
-                    Expanded(child: Text('$coins',
-                        style: const TextStyle(
-                          fontSize: 31,
-                          fontWeight: FontWeight.w900,
-                        ))),
+                    Expanded(
+                        child: Text('$coins',
+                            style: const TextStyle(
+                              fontSize: 31,
+                              fontWeight: FontWeight.w900,
+                            ))),
                     const Text('COINS', style: TextStyle(color: gold)),
                   ],
                 ),
@@ -1614,11 +1615,12 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     const Icon(Icons.diamond, color: pink, size: 28),
                     const SizedBox(width: 10),
-                    Expanded(child: Text('$diamonds',
-                        style: const TextStyle(
-                          fontSize: 27,
-                          fontWeight: FontWeight.bold,
-                        ))),
+                    Expanded(
+                        child: Text('$diamonds',
+                            style: const TextStyle(
+                              fontSize: 27,
+                              fontWeight: FontWeight.bold,
+                            ))),
                     const Text('DIAMONDS', style: TextStyle(color: pink)),
                   ],
                 ),
