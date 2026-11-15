@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -32,6 +33,7 @@ class ZoonlApp extends StatelessWidget {
 
 class ZoonlStore extends ChangeNotifier {
   static final ZoonlStore instance = ZoonlStore._internal();
+
   ZoonlStore._internal() {
     _initDefaults();
     _startGlobalTicker();
@@ -54,7 +56,12 @@ class ZoonlStore extends ChangeNotifier {
     'isNewId': false,
     'trialExpiresAt': null,
     'friendListPublic': true,
-    'linkedAccounts': <String>['Email Auth', 'Phone SMS', 'Google', 'Device Key'],
+    'linkedAccounts': <String>[
+      'Email Auth',
+      'Phone SMS',
+      'Google',
+      'Device Key'
+    ],
     'payoutLocked': true,
     'payoutMethod': 'Official Owner Vault',
     'payoutAccount': 'OWNER-10001-VAULT',
@@ -78,16 +85,17 @@ class ZoonlStore extends ChangeNotifier {
     },
   };
 
-  List> memberships = >[];
-  List> agencyApplications = >[];
+  List<Map<String, dynamic>> memberships = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> agencyApplications =
+      <Map<String, dynamic>>[];
 
   String officialHostingEmail = 'hosting@zoonllive.com';
   String officialHostingContact = '+971-50-000-10001';
   String supportEmail = 'support@zoonllive.com';
   String supportContact = '+971-50-111-10001';
 
-  final List> ownerRewardLibrary =
-      >[
+  final List<Map<String, dynamic>> ownerRewardLibrary =
+      <Map<String, dynamic>>[
     <String, dynamic>{
       'id': 'r1',
       'type': 'Frame',
@@ -120,7 +128,8 @@ class ZoonlStore extends ChangeNotifier {
     },
   ];
 
-  final List> backupStore = >[
+  final List<Map<String, dynamic>> backupStore =
+      <Map<String, dynamic>>[
     <String, dynamic>{
       'id': 'b1',
       'type': 'Frame',
@@ -144,43 +153,60 @@ class ZoonlStore extends ChangeNotifier {
     },
   ];
 
-  final List> streamers = >[];
-  final List> shortVideos = >[];
-  final List> privateRooms = >[];
-  final List> inboxMessages = >[];
-  final List> friendsList = >[];
-  final List> adminAssignedStreamers =
-      >[];
+  final List<Map<String, dynamic>> streamers =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> shortVideos =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> privateRooms =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> inboxMessages =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> friendsList =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> adminAssignedStreamers =
+      <Map<String, dynamic>>[];
 
-  final List> _giftTickerQueue = >[];
+  final List<Map<String, dynamic>> _giftTickerQueue =
+      <Map<String, dynamic>>[];
+
   Map<String, dynamic>? activeGlobalGiftBanner;
   Timer? _tickerTimer;
 
   Map<String, dynamic>? pendingNewIdWelcome;
 
-  void syncRemoteLists(List<dynamic> rawMemberships, List<dynamic> rawApps) {
-    memberships = List>.from(
+  void syncRemoteLists(
+    List<dynamic> rawMemberships,
+    List<dynamic> rawApps,
+  ) {
+    memberships = List<Map<String, dynamic>>.from(
       rawMemberships.map(
         (dynamic item) => item is Map<String, dynamic>
             ? item
             : Map<String, dynamic>.from(item as Map),
       ),
     );
-    agencyApplications = List>.from(
+
+    agencyApplications = List<Map<String, dynamic>>.from(
       rawApps.map(
         (dynamic item) => item is Map<String, dynamic>
             ? item
             : Map<String, dynamic>.from(item as Map),
       ),
     );
+
     notifyListeners();
   }
 
   void _initDefaults() {
-    memberships = >[
-      <String, dynamic>{'id': 'M-1', 'tier': 'SVIP', 'active': true},
+    memberships = <Map<String, dynamic>>[
+      <String, dynamic>{
+        'id': 'M-1',
+        'tier': 'SVIP',
+        'active': true,
+      },
     ];
-    agencyApplications = >[
+
+    agencyApplications = <Map<String, dynamic>>[
       <String, dynamic>{
         'id': 'AG-1',
         'agencyCode': 'AG-1001',
@@ -188,7 +214,7 @@ class ZoonlStore extends ChangeNotifier {
       },
     ];
 
-    streamers.addAll(>[
+    streamers.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
         'id': 'STR-101',
         'userId': '88412',
@@ -212,7 +238,7 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>['90012'],
         'mutedUsers': <String>[],
-        'giftersHistory': >[
+        'giftersHistory': <Map<String, dynamic>>[
           <String, dynamic>{
             'userId': '77101',
             'name': 'Rohan',
@@ -256,14 +282,14 @@ class ZoonlStore extends ChangeNotifier {
         'seatCount': 8,
         'plusOpen': true,
         'callRequestOpen': true,
-        'pendingCallRequests': >[
+        'pendingCallRequests': <Map<String, dynamic>>[
           <String, dynamic>{
             'userId': '55210',
             'name': 'Ayan',
             'type': 'CALL',
           },
         ],
-        'seats': List>.generate(8, (int i) {
+        'seats': List<Map<String, dynamic>>.generate(8, (int i) {
           return <String, dynamic>{
             'seat': i + 1,
             'occupied': i == 0,
@@ -281,7 +307,7 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>[],
         'mutedUsers': <String>[],
-        'giftersHistory': >[],
+        'giftersHistory': <Map<String, dynamic>>[],
       },
       <String, dynamic>{
         'id': 'STR-103',
@@ -289,7 +315,9 @@ class ZoonlStore extends ChangeNotifier {
         'name': 'Noor Star',
         'verified': true,
         'isLive': false,
-        'offlineSince': DateTime.now().subtract(const Duration(minutes: 24)),
+        'offlineSince': DateTime.now().subtract(
+          const Duration(minutes: 24),
+        ),
         'mode': 'VIDEO',
         'sentCoins': 850000,
         'receivedCoins': 640000,
@@ -300,11 +328,11 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>[],
         'mutedUsers': <String>[],
-        'giftersHistory': >[],
+        'giftersHistory': <Map<String, dynamic>>[],
       },
     ]);
 
-    shortVideos.addAll(>[
+    shortVideos.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
         'id': 'SV-1',
         'author': 'Zara Queen',
@@ -323,18 +351,38 @@ class ZoonlStore extends ChangeNotifier {
       },
     ]);
 
-    friendsList.addAll(>[
-      <String, dynamic>{'id': '88412', 'name': 'Zara Queen', 'isLive': true},
-      <String, dynamic>{'id': '88450', 'name': 'Noor Star', 'isLive': false},
-      <String, dynamic>{'id': '66310', 'name': 'Danish', 'isLive': true},
+    friendsList.addAll(<Map<String, dynamic>>[
+      <String, dynamic>{
+        'id': '88412',
+        'name': 'Zara Queen',
+        'isLive': true,
+      },
+      <String, dynamic>{
+        'id': '88450',
+        'name': 'Noor Star',
+        'isLive': false,
+      },
+      <String, dynamic>{
+        'id': '66310',
+        'name': 'Danish',
+        'isLive': true,
+      },
     ]);
 
-    adminAssignedStreamers.addAll(>[
-      <String, dynamic>{'id': '88412', 'name': 'Zara Queen', 'isLive': true},
-      <String, dynamic>{'id': '88419', 'name': 'Maya Melody', 'isLive': true},
+    adminAssignedStreamers.addAll(<Map<String, dynamic>>[
+      <String, dynamic>{
+        'id': '88412',
+        'name': 'Zara Queen',
+        'isLive': true,
+      },
+      <String, dynamic>{
+        'id': '88419',
+        'name': 'Maya Melody',
+        'isLive': true,
+      },
     ]);
 
-    inboxMessages.addAll(>[
+    inboxMessages.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
         'from': 'Zara Queen',
         'fromId': '88412',
@@ -347,14 +395,19 @@ class ZoonlStore extends ChangeNotifier {
 
   void _startGlobalTicker() {
     _tickerTimer?.cancel();
-    _tickerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_giftTickerQueue.isNotEmpty) {
-        activeGlobalGiftBanner = _giftTickerQueue.removeAt(0);
-      } else {
-        activeGlobalGiftBanner = null;
-      }
-      notifyListeners();
-    });
+
+    _tickerTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (_giftTickerQueue.isNotEmpty) {
+          activeGlobalGiftBanner = _giftTickerQueue.removeAt(0);
+        } else {
+          activeGlobalGiftBanner = null;
+        }
+
+        notifyListeners();
+      },
+    );
   }
 
   bool isPermanentlyBannedByOwner(String targetId) {
@@ -367,12 +420,15 @@ class ZoonlStore extends ChangeNotifier {
   }) {
     if (currentUser['id'] != ownerId) return;
     if (targetId == ownerId) return;
+
     _ownerPermanentBannedIds.add(targetId);
     _ownerBanReasons[targetId] = reason;
+
     streamers.removeWhere(
       (Map<String, dynamic> s) =>
           s['userId'] == targetId || s['id'] == targetId,
     );
+
     notifyListeners();
   }
 
@@ -382,9 +438,14 @@ class ZoonlStore extends ChangeNotifier {
     required bool asStreamer,
   }) {
     if (isPermanentlyBannedByOwner(newId)) return;
-    final DateTime expiry = DateTime.now().add(const Duration(days: 5));
-    final String autoStreamerCode =
-        asStreamer ? 'ST-${Random().nextInt(89999) + 10000}' : '';
+
+    final DateTime expiry = DateTime.now().add(
+      const Duration(days: 5),
+    );
+
+    final String autoStreamerCode = asStreamer
+        ? 'ST-${Random().nextInt(89999) + 10000}'
+        : '';
 
     currentUser = <String, dynamic>{
       'id': newId,
@@ -411,7 +472,7 @@ class ZoonlStore extends ChangeNotifier {
       'offlineSince': null,
     };
 
-    backupStore.addAll(>[
+    backupStore.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
         'id': 'trial_frame_$newId',
         'type': 'Frame',
@@ -449,21 +510,27 @@ class ZoonlStore extends ChangeNotifier {
         '5D Background Aura',
       ],
     };
+
     notifyListeners();
   }
 
   void checkTrialExpiryAndMoveToBackup() {
     final String? expStr = currentUser['trialExpiresAt'] as String?;
+
     if (expStr == null) return;
+
     final DateTime? expiry = DateTime.tryParse(expStr);
+
     if (expiry != null && DateTime.now().isAfter(expiry)) {
       currentUser['vipTier'] = 'NONE';
+
       for (final Map<String, dynamic> item in backupStore) {
         if (item['fromTrial'] == true) {
           item['equipped'] = false;
           item['expiredToBackup'] = true;
         }
       }
+
       notifyListeners();
     }
   }
@@ -491,17 +558,23 @@ class ZoonlStore extends ChangeNotifier {
       4200000,
       4700000,
     ];
+
     if (sentCoins <= thresholds[0]) return 1;
+
     for (int i = 1; i < thresholds.length; i++) {
       if (sentCoins < thresholds[i]) return i;
     }
+
     int lvl = 20;
     int acc = thresholds.last;
+
     while (lvl < 100 && sentCoins >= acc) {
       final int step = lvl < 50 ? 1500000 : 3500000;
       acc += step;
+
       if (sentCoins >= acc) lvl++;
     }
+
     return min(100, lvl);
   }
 
@@ -537,6 +610,7 @@ class ZoonlStore extends ChangeNotifier {
         'color': const Color(0xFFFFD54F),
       };
     }
+
     return <String, dynamic>{
       'stars': 0,
       'label': 'NO STAR',
@@ -554,6 +628,7 @@ class ZoonlStore extends ChangeNotifier {
       };
     } else if (sentCoins < 150000) {
       final int d = sentCoins < 80000 ? 1 : 2;
+
       return <String, dynamic>{
         'kind': 'DEMON',
         'count': d,
@@ -562,6 +637,7 @@ class ZoonlStore extends ChangeNotifier {
       };
     } else {
       int crown = 1;
+
       if (sentCoins >= 45000000) {
         crown = 40;
       } else if (sentCoins >= 35000000) {
@@ -579,7 +655,9 @@ class ZoonlStore extends ChangeNotifier {
       } else if (sentCoins >= 500000) {
         crown = 2;
       }
+
       crown = min(40, crown);
+
       return <String, dynamic>{
         'kind': 'CROWN',
         'count': crown,
@@ -595,42 +673,57 @@ class ZoonlStore extends ChangeNotifier {
     required int giftCoins,
   }) {
     final String senderId = currentUser['id'] as String;
+
     if (isPermanentlyBannedByOwner(senderId)) return;
 
     if (currentUser['id'] != ownerId) {
       final int bal = (currentUser['coins'] as int?) ?? 0;
+
       if (bal < giftCoins) return;
+
       currentUser['coins'] = bal - giftCoins;
     }
 
     currentUser['sentCoins'] =
         ((currentUser['sentCoins'] as int?) ?? 0) + giftCoins;
-    currentUser['level'] = resolveUserLevel(currentUser['sentCoins'] as int);
+
+    currentUser['level'] = resolveUserLevel(
+      currentUser['sentCoins'] as int,
+    );
 
     streamer['receivedCoins'] =
         ((streamer['receivedCoins'] as int?) ?? 0) + giftCoins;
+
     streamer['dailyReceiving'] =
         ((streamer['dailyReceiving'] as int?) ?? 0) + giftCoins;
 
     final double payoutGain = (giftCoins * 0.65) / 100.0;
+
     streamer['walletBalance'] =
         ((streamer['walletBalance'] as double?) ?? 0.0) + payoutGain;
+
     currentUser['walletBalance'] =
         ((currentUser['walletBalance'] as double?) ?? 0.0) + payoutGain;
 
-    final List> history = List>.from(
+    final List<Map<String, dynamic>> history =
+        List<Map<String, dynamic>>.from(
       (streamer['giftersHistory'] as List<dynamic>?) ?? <dynamic>[],
     );
+
     history.insert(0, <String, dynamic>{
       'userId': senderId,
       'name': currentUser['name'],
       'coins': giftCoins,
       'period': 'DAILY',
     });
+
     streamer['giftersHistory'] = history;
 
     final Map<String, dynamic> crownInfo =
-        resolveStreamerCrownOrDemon(streamer['receivedCoins'] as int);
+        resolveStreamerCrownOrDemon(
+      streamer['receivedCoins'] as int,
+    );
+
     final Map<String, dynamic> banner = <String, dynamic>{
       'senderName': currentUser['name'],
       'senderLevel': currentUser['level'],
@@ -645,19 +738,26 @@ class ZoonlStore extends ChangeNotifier {
     } else {
       _giftTickerQueue.add(banner);
     }
+
     notifyListeners();
   }
 
   bool canStartLive() {
     if (currentUser['id'] == ownerId) return true;
     if (currentUser['isVerifiedStreamer'] == true) return true;
+
     return ((currentUser['level'] as int?) ?? 1) >= 5;
   }
 
-  void toggleLiveStatus({required bool goLive, String mode = 'VIDEO'}) {
+  void toggleLiveStatus({
+    required bool goLive,
+    String mode = 'VIDEO',
+  }) {
     if (goLive && !canStartLive()) return;
+
     currentUser['isLive'] = goLive;
     currentUser['offlineSince'] = goLive ? null : DateTime.now();
+
     notifyListeners();
   }
 
@@ -672,6 +772,7 @@ class ZoonlStore extends ChangeNotifier {
     final List<String> muted = List<String>.from(
       (streamer['mutedUsers'] as List<dynamic>?) ?? <dynamic>[],
     );
+
     final List<String> blacklist = List<String>.from(
       (streamer['blacklist'] as List<dynamic>?) ?? <dynamic>[],
     );
@@ -680,24 +781,32 @@ class ZoonlStore extends ChangeNotifier {
       if (action == 'MUTE' && !muted.contains(targetUserId)) {
         muted.add(targetUserId);
       }
+
       if (action == 'UNMUTE') {
         muted.remove(targetUserId);
       }
+
       if (action == 'BLACKLIST' && !blacklist.contains(targetUserId)) {
         blacklist.add(targetUserId);
       }
     } else if (actorIsAdmin) {
       final bool hasVipOrSvip =
           actorVipTier == 'VIP' || actorVipTier == 'SVIP';
-      if (action == 'MUTE' && hasVipOrSvip && !muted.contains(targetUserId)) {
+
+      if (action == 'MUTE' &&
+          hasVipOrSvip &&
+          !muted.contains(targetUserId)) {
         muted.add(targetUserId);
       }
+
       if (action == 'UNMUTE' && hasVipOrSvip) {
         muted.remove(targetUserId);
       }
     }
+
     streamer['mutedUsers'] = muted;
     streamer['blacklist'] = blacklist;
+
     notifyListeners();
   }
 }
@@ -711,12 +820,14 @@ class ZoonlMainShell extends StatefulWidget {
 
 class _ZoonlMainShellState extends State<ZoonlMainShell> {
   final ZoonlStore store = ZoonlStore.instance;
+
   int topTabIndex = 0;
   int bottomIndex = 0;
 
   @override
   void initState() {
     super.initState();
+
     store.checkTrialExpiryAndMoveToBackup();
     store.addListener(_onStoreChanged);
   }
@@ -742,7 +853,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             child: Column(
               children: <Widget>[
                 if (store.activeGlobalGiftBanner != null)
-                  _buildGlobalGiftBanner(store.activeGlobalGiftBanner!),
+                  _buildGlobalGiftBanner(
+                    store.activeGlobalGiftBanner!,
+                  ),
                 if (bottomIndex == 0) _buildTopSectionTabs(),
                 Expanded(
                   child: ZoonlCompleteBody(
@@ -773,18 +886,34 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
   Widget _buildGlobalGiftBanner(Map<String, dynamic> banner) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 4,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: <Color>[Color(0xFF2A184A), Color(0xFF140D26)],
+          colors: <Color>[
+            Color(0xFF2A184A),
+            Color(0xFF140D26),
+          ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE6C47A), width: 1),
+        border: Border.all(
+          color: const Color(0xFFE6C47A),
+          width: 1,
+        ),
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.card_giftcard, color: Color(0xFFFFD700), size: 16),
+          const Icon(
+            Icons.card_giftcard,
+            color: Color(0xFFFFD700),
+            size: 16,
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -811,6 +940,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       'Audio',
       'VIP Hub',
     ];
+
     return Container(
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -820,6 +950,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (BuildContext context, int index) {
           final bool active = topTabIndex == index;
+
           return ChoiceChip(
             label: Text(labels[index]),
             selected: active,
@@ -829,7 +960,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               color: active ? Colors.white : const Color(0xFFE6C47A),
               fontWeight: FontWeight.bold,
             ),
-            onSelected: (_) => setState(() => topTabIndex = index),
+            onSelected: (_) {
+              setState(() => topTabIndex = index);
+            },
           );
         },
       ),
@@ -837,7 +970,8 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   }
 
   Widget _buildFloatingAdminFriendBubble() {
-    final List> liveTargets = >[
+    final List<Map<String, dynamic>> liveTargets =
+        <Map<String, dynamic>>[
       ...store.adminAssignedStreamers.where(
         (Map<String, dynamic> e) => e['isLive'] == true,
       ),
@@ -877,7 +1011,10 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                       return ListTile(
                         leading: const CircleAvatar(
                           backgroundColor: Color(0xFF7C4DFF),
-                          child: Icon(Icons.live_tv, color: Colors.white),
+                          child: Icon(
+                            Icons.live_tv,
+                            color: Colors.white,
+                          ),
                         ),
                         title: Text(
                           '${item['name']} (ID: ${item['id']})',
@@ -885,7 +1022,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         ),
                         subtitle: const Text(
                           'LIVE NOW',
-                          style: TextStyle(color: Color(0xFF00E676)),
+                          style: TextStyle(
+                            color: Color(0xFF00E676),
+                          ),
                         ),
                         onTap: () {
                           Navigator.pop(context);
@@ -905,10 +1044,16 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: const LinearGradient(
-            colors: <Color>[Color(0xFFE6C47A), Color(0xFF7C4DFF)],
+            colors: <Color>[
+              Color(0xFFE6C47A),
+              Color(0xFF7C4DFF),
+            ],
           ),
           boxShadow: const <BoxShadow>[
-            BoxShadow(color: Colors.black54, blurRadius: 8),
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 8,
+            ),
           ],
         ),
         child: Stack(
@@ -940,7 +1085,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
     );
   }
 
-  Widget _buildNewIdWelcomeOverlay(Map<String, dynamic> welcome) {
+  Widget _buildNewIdWelcomeOverlay(
+    Map<String, dynamic> welcome,
+  ) {
     return Container(
       color: Colors.black87,
       padding: const EdgeInsets.all(24),
@@ -950,12 +1097,19 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           decoration: BoxDecoration(
             color: const Color(0xFF16102E),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE6C47A), width: 1.5),
+            border: Border.all(
+              color: const Color(0xFFE6C47A),
+              width: 1.5,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(Icons.auto_awesome, color: Color(0xFFE6C47A), size: 42),
+              const Icon(
+                Icons.auto_awesome,
+                color: Color(0xFFE6C47A),
+                size: 42,
+              ),
               const SizedBox(height: 10),
               Text(
                 welcome['title'] as String,
@@ -1000,25 +1154,39 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         children: <Widget>[
           IconButton(
             icon: const Icon(Icons.home_filled),
-            onPressed: () => setState(() => bottomIndex = 0),
+            onPressed: () {
+              setState(() => bottomIndex = 0);
+            },
           ),
           IconButton(
             icon: const Icon(Icons.mail_outline),
-            onPressed: () => setState(() => bottomIndex = 1),
+            onPressed: () {
+              setState(() => bottomIndex = 1);
+            },
           ),
           GestureDetector(
             onTap: _openCenterLiveStartSheet,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 8,
+              ),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: <Color>[Color(0xFFE6C47A), Color(0xFF7C4DFF)],
+                  colors: <Color>[
+                    Color(0xFFE6C47A),
+                    Color(0xFF7C4DFF),
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Row(
                 children: <Widget>[
-                  Icon(Icons.videocam, color: Colors.black, size: 20),
+                  Icon(
+                    Icons.videocam,
+                    color: Colors.black,
+                    size: 20,
+                  ),
                   SizedBox(width: 4),
                   Text(
                     'LIVE',
@@ -1032,16 +1200,24 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            onPressed: () => setState(() => bottomIndex = 2),
+            icon: const Icon(
+              Icons.account_balance_wallet_outlined,
+            ),
+            onPressed: () {
+              setState(() => bottomIndex = 2);
+            },
           ),
           IconButton(
             icon: const Icon(Icons.support_agent),
-            onPressed: () => setState(() => bottomIndex = 3),
+            onPressed: () {
+              setState(() => bottomIndex = 3);
+            },
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => setState(() => bottomIndex = 4),
+            onPressed: () {
+              setState(() => bottomIndex = 4);
+            },
           ),
         ],
       ),
@@ -1068,13 +1244,26 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ),
               const SizedBox(height: 12),
               ListTile(
-                leading: const Icon(Icons.live_tv, color: Color(0xFFE6C47A)),
-                title: const Text('1. Live Section (Video Broad)'),
-                subtitle: const Text('Verified Streamer Lv.1+ | Normal User Lv.5+'),
+                leading: const Icon(
+                  Icons.live_tv,
+                  color: Color(0xFFE6C47A),
+                ),
+                title: const Text(
+                  '1. Live Section (Video Broad)',
+                ),
+                subtitle: const Text(
+                  'Verified Streamer Lv.1+ | Normal User Lv.5+',
+                ),
                 onTap: () {
                   Navigator.pop(context);
+
                   if (!store.canStartLive()) return;
-                  store.toggleLiveStatus(goLive: true, mode: 'VIDEO');
+
+                  store.toggleLiveStatus(
+                    goLive: true,
+                    mode: 'VIDEO',
+                  );
+
                   setState(() {
                     bottomIndex = 0;
                     topTabIndex = 1;
@@ -1082,13 +1271,26 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.graphic_eq, color: Color(0xFF7C4DFF)),
-                title: const Text('2. Audio Section (6 / 8 Seats)'),
-                subtitle: const Text('Streamer + / Call Join Accept-Reject Control'),
+                leading: const Icon(
+                  Icons.graphic_eq,
+                  color: Color(0xFF7C4DFF),
+                ),
+                title: const Text(
+                  '2. Audio Section (6 / 8 Seats)',
+                ),
+                subtitle: const Text(
+                  'Streamer + / Call Join Accept-Reject Control',
+                ),
                 onTap: () {
                   Navigator.pop(context);
+
                   if (!store.canStartLive()) return;
-                  store.toggleLiveStatus(goLive: true, mode: 'AUDIO');
+
+                  store.toggleLiveStatus(
+                    goLive: true,
+                    mode: 'AUDIO',
+                  );
+
                   setState(() {
                     bottomIndex = 0;
                     topTabIndex = 3;
@@ -1096,26 +1298,36 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.vpn_key, color: Colors.amberAccent),
-                title: const Text('3. Private Room (Key + Inbox Invite)'),
+                leading: const Icon(
+                  Icons.vpn_key,
+                  color: Colors.amberAccent,
+                ),
+                title: const Text(
+                  '3. Private Room (Key + Inbox Invite)',
+                ),
                 subtitle: const Text(
                   'Hidden Publicly • Max 2–3 People • Audio/Video/Gift',
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  final String keyCode = 'KEY-${Random().nextInt(9000) + 1000}';
+
+                  final String keyCode =
+                      'KEY-${Random().nextInt(9000) + 1000}';
+
                   store.privateRooms.add(<String, dynamic>{
                     'roomId': 'PR-${Random().nextInt(99999)}',
                     'hostId': store.currentUser['id'],
                     'key': keyCode,
                     'maxSeats': 3,
                   });
+
                   store.inboxMessages.add(<String, dynamic>{
                     'from': store.currentUser['name'],
                     'fromId': store.currentUser['id'],
                     'text': 'Private Room Invite — Key: $keyCode',
                     'privateKey': keyCode,
                   });
+
                   store.notifyListeners();
                 },
               ),
@@ -1140,7 +1352,8 @@ class ZoonlCompleteBody extends StatefulWidget {
   });
 
   @override
-  State<ZoonlCompleteBody> createState() => _ZoonlCompleteBodyState();
+  State<ZoonlCompleteBody> createState() =>
+      _ZoonlCompleteBodyState();
 }
 
 class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
@@ -1148,35 +1361,49 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
   String selectedVideoFilter = 'VIP Velvet Glow';
   bool recordingShort = false;
-  final TextEditingController shortCaptionCtrl = TextEditingController();
+
+  final TextEditingController shortCaptionCtrl =
+      TextEditingController();
 
   double skinSmooth = 0.75;
   double faceSize = 0.50;
   double eyeSize = 0.65;
+
   String eyeLens = 'Crystal Hazel';
   String eyeColor = 'Amber Gold';
   String makeupPreset = 'Royal Glamour';
+
   bool micMuted = false;
   bool camMuted = false;
+
   String pkModeSelected = '6P';
   String historyPeriod = 'DAILY';
 
   String kycCountry = 'Pakistan';
   String kycDob = '1998-05-12';
+
   bool kycFrontUploaded = false;
   bool kycBackUploaded = false;
   bool kycCardSelfieUploaded = false;
+
   final TextEditingController payoutAccountCtrl =
-      TextEditingController(text: 'EasyPaisa - 03001234567');
-  final TextEditingController agencyTrackCtrl = TextEditingController();
+      TextEditingController(
+    text: 'EasyPaisa - 03001234567',
+  );
+
+  final TextEditingController agencyTrackCtrl =
+      TextEditingController();
+
   bool registrationSubmitted = false;
 
   bool aiExpanded = false;
   bool femaleVoiceEnabled = true;
+
   String selectedAiAnswer =
       'Assalam-o-Alaikum! Main ZOONL LIVE AI Support hoon. Koi bhi option chunein ya sawal poochein.';
 
-  final List> aiQuickPrompts = >[
+  final List<Map<String, String>> aiQuickPrompts =
+      <Map<String, String>>[
     <String, String>{
       'q': '65% Earning & 1–5 Payout rule kya hai?',
       'a':
@@ -1230,9 +1457,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   @override
   Widget build(BuildContext context) {
     if (widget.bottomIndex == 1) return _buildInboxScreen();
-    if (widget.bottomIndex == 2) return _buildWalletAndEarningScreen();
+    if (widget.bottomIndex == 2) {
+      return _buildWalletAndEarningScreen();
+    }
     if (widget.bottomIndex == 3) return _buildSupportAiScreen();
-    if (widget.bottomIndex == 4) return _buildProfileAndSettingsScreen();
+    if (widget.bottomIndex == 4) {
+      return _buildProfileAndSettingsScreen();
+    }
 
     switch (widget.topTabIndex) {
       case 0:
@@ -1255,6 +1486,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       'Neon Cyber',
       'Soft Porcelain',
     ];
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
@@ -1269,7 +1501,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   return ChoiceChip(
                     label: Text(f),
                     selected: selectedVideoFilter == f,
-                    onSelected: (_) => setState(() => selectedVideoFilter = f),
+                    onSelected: (_) {
+                      setState(() => selectedVideoFilter = f);
+                    },
                   );
                 }).toList(),
               ),
@@ -1285,30 +1519,40 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Row(
                 children: <Widget>[
                   ElevatedButton.icon(
-                    onPressed: () =>
-                        setState(() => recordingShort = !recordingShort),
+                    onPressed: () {
+                      setState(() {
+                        recordingShort = !recordingShort;
+                      });
+                    },
                     icon: Icon(
                       recordingShort
                           ? Icons.stop
                           : Icons.fiber_manual_record,
                     ),
                     label: Text(
-                      recordingShort ? 'Stop Recording' : 'Record Video',
+                      recordingShort
+                          ? 'Stop Recording'
+                          : 'Record Video',
                     ),
                   ),
                   const SizedBox(width: 10),
                   FilledButton.icon(
                     onPressed: () {
-                      store.shortVideos.insert(0, <String, dynamic>{
-                        'id': 'SV-${DateTime.now().millisecondsSinceEpoch}',
-                        'author': store.currentUser['name'],
-                        'authorId': store.currentUser['id'],
-                        'caption': shortCaptionCtrl.text.isEmpty
-                            ? 'New ZOONL Short'
-                            : shortCaptionCtrl.text,
-                        'filter': selectedVideoFilter,
-                        'likes': 0,
-                      });
+                      store.shortVideos.insert(
+                        0,
+                        <String, dynamic>{
+                          'id':
+                              'SV-${DateTime.now().millisecondsSinceEpoch}',
+                          'author': store.currentUser['name'],
+                          'authorId': store.currentUser['id'],
+                          'caption': shortCaptionCtrl.text.isEmpty
+                              ? 'New ZOONL Short'
+                              : shortCaptionCtrl.text,
+                          'filter': selectedVideoFilter,
+                          'likes': 0,
+                        },
+                      );
+
                       shortCaptionCtrl.clear();
                       store.notifyListeners();
                     },
@@ -1327,13 +1571,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Expanded(child: Text('${vid['caption']}')),
+                Expanded(
+                  child: Text('${vid['caption']}'),
+                ),
                 TextButton.icon(
                   onPressed: () {
-                    vid['likes'] = ((vid['likes'] as int?) ?? 0) + 1;
+                    vid['likes'] =
+                        ((vid['likes'] as int?) ?? 0) + 1;
+
                     store.notifyListeners();
                   },
-                  icon: const Icon(Icons.favorite, color: Colors.pinkAccent),
+                  icon: const Icon(
+                    Icons.favorite,
+                    color: Colors.pinkAccent,
+                  ),
                   label: Text('${vid['likes']}'),
                 ),
               ],
@@ -1345,14 +1596,19 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildLiveSection() {
-    final Map<String, dynamic> activeStreamer = store.streamers.firstWhere(
+    final Map<String, dynamic> activeStreamer =
+        store.streamers.firstWhere(
       (Map<String, dynamic> s) => s['mode'] == 'VIDEO',
       orElse: () => store.streamers.first,
     );
-    final Map<String, dynamic> crownInfo = store.resolveStreamerCrownOrDemon(
+
+    final Map<String, dynamic> crownInfo =
+        store.resolveStreamerCrownOrDemon(
       (activeStreamer['receivedCoins'] as int?) ?? 0,
     );
-    final Map<String, dynamic> starInfo = store.resolveColorStar(
+
+    final Map<String, dynamic> starInfo =
+        store.resolveColorStar(
       (store.currentUser['sentCoins'] as int?) ?? 0,
     );
 
@@ -1370,13 +1626,19 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Row(
-                children: <String>['DAILY', 'WEEKLY', 'MONTHLY'].map((String p) {
+                children: <String>[
+                  'DAILY',
+                  'WEEKLY',
+                  'MONTHLY',
+                ].map((String p) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: ChoiceChip(
                       label: Text(p),
                       selected: historyPeriod == p,
-                      onSelected: (_) => setState(() => historyPeriod = p),
+                      onSelected: (_) {
+                        setState(() => historyPeriod = p);
+                      },
                     ),
                   );
                 }).toList(),
@@ -1385,7 +1647,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Text(
                 'Top 10 & All Senders ($historyPeriod): '
                 '${((activeStreamer['giftersHistory'] as List<dynamic>?) ?? <dynamic>[]).take(10).map((dynamic g) => '${g['name']} (${g['coins']})').join(', ')}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFFE6C47A)),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFE6C47A),
+                ),
               ),
               const Divider(height: 18),
               Row(
@@ -1399,23 +1664,38 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF1A1235),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE6C47A)),
+                        border: Border.all(
+                          color: const Color(0xFFE6C47A),
+                        ),
                       ),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
                         children: <Widget>[
                           Text(
                             'Streamer Live (${camMuted ? "Cam Off" : "Cam On"} • ${micMuted ? "Mic Off" : "Mic On"})',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          Text('Color Star: ${starInfo['label']}'),
+                          Text(
+                            'Color Star: ${starInfo['label']}',
+                          ),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceEvenly,
                             children: <Widget>[
                               IconButton(
-                                icon: Icon(micMuted ? Icons.mic_off : Icons.mic),
-                                onPressed: () =>
-                                    setState(() => micMuted = !micMuted),
+                                icon: Icon(
+                                  micMuted
+                                      ? Icons.mic_off
+                                      : Icons.mic,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    micMuted = !micMuted;
+                                  });
+                                },
                               ),
                               IconButton(
                                 icon: Icon(
@@ -1423,11 +1703,15 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                                       ? Icons.videocam_off
                                       : Icons.videocam,
                                 ),
-                                onPressed: () =>
-                                    setState(() => camMuted = !camMuted),
+                                onPressed: () {
+                                  setState(() {
+                                    camMuted = !camMuted;
+                                  });
+                                },
                               ),
                               Switch(
-                                value: activeStreamer['videoCallOpen'] == true,
+                                value:
+                                    activeStreamer['videoCallOpen'] == true,
                                 onChanged: (bool v) {
                                   activeStreamer['videoCallOpen'] = v;
                                   store.notifyListeners();
@@ -1449,10 +1733,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF100A24),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF7C4DFF)),
+                          border: Border.all(
+                            color: const Color(0xFF7C4DFF),
+                          ),
                         ),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
                           children: <Widget>[
                             const Text(
                               'Side Guest',
@@ -1470,9 +1757,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                             ),
                             DropdownButton<String>(
                               isExpanded: true,
-                              value: activeStreamer['guestCallMode']
-                                      as String? ??
-                                  'VIDEO',
+                              value:
+                                  activeStreamer['guestCallMode']
+                                          as String? ??
+                                      'VIDEO',
                               items: const <DropdownMenuItem<String>>[
                                 DropdownMenuItem<String>(
                                   value: 'VIDEO',
@@ -1506,15 +1794,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
               Slider(
                 value: skinSmooth,
-                onChanged: (double v) => setState(() => skinSmooth = v),
+                onChanged: (double v) {
+                  setState(() => skinSmooth = v);
+                },
               ),
               Slider(
                 value: faceSize,
-                onChanged: (double v) => setState(() => faceSize = v),
+                onChanged: (double v) {
+                  setState(() => faceSize = v);
+                },
               ),
               Slider(
                 value: eyeSize,
-                onChanged: (double v) => setState(() => eyeSize = v),
+                onChanged: (double v) {
+                  setState(() => eyeSize = v);
+                },
               ),
               Wrap(
                 spacing: 8,
@@ -1550,18 +1844,26 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title: 'PK Battle Arena (6P • 3P • 2P • Friend Train • 4-Grid)',
+          title:
+              'PK Battle Arena (6P • 3P • 2P • Friend Train • 4-Grid)',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Wrap(
                 spacing: 8,
-                children: <String>['6P', '3P', '2P', 'TRAIN', '4GRID']
-                    .map((String m) {
+                children: <String>[
+                  '6P',
+                  '3P',
+                  '2P',
+                  'TRAIN',
+                  '4GRID',
+                ].map((String m) {
                   return ChoiceChip(
                     label: Text(m),
                     selected: pkModeSelected == m,
-                    onSelected: (_) => setState(() => pkModeSelected = m),
+                    onSelected: (_) {
+                      setState(() => pkModeSelected = m);
+                    },
                   );
                 }).toList(),
               ),
@@ -1579,17 +1881,23 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           : pkModeSelected == '3P'
                               ? 3
                               : 2,
-                  (int idx) => Container(
-                    width: 140,
-                    height: 80,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1235),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE6C47A)),
-                    ),
-                    child: Text('Slot ${idx + 1} ($pkModeSelected)'),
-                  ),
+                  (int idx) {
+                    return Container(
+                      width: 140,
+                      height: 80,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1235),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFE6C47A),
+                        ),
+                      ),
+                      child: Text(
+                        'Slot ${idx + 1} ($pkModeSelected)',
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -1600,11 +1908,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildAudioSection() {
-    final Map<String, dynamic> audioRoom = store.streamers.firstWhere(
+    final Map<String, dynamic> audioRoom =
+        store.streamers.firstWhere(
       (Map<String, dynamic> s) => s['mode'] == 'AUDIO',
       orElse: () => store.streamers.first,
     );
-    final List> seats = List>.from(
+
+    final List<Map<String, dynamic>> seats =
+        List<Map<String, dynamic>>.from(
       (audioRoom['seats'] as List<dynamic>?) ?? <dynamic>[],
     );
 
@@ -1612,22 +1923,32 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title: '${audioRoom['name']} • Audio Room (${seats.length} Seats)',
+          title:
+              '${audioRoom['name']} • Audio Room (${seats.length} Seats)',
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               IconButton(
-                icon: const Icon(Icons.add_circle, color: Color(0xFFE6C47A)),
+                icon: const Icon(
+                  Icons.add_circle,
+                  color: Color(0xFFE6C47A),
+                ),
                 onPressed: () {
-                  audioRoom['plusOpen'] = !(audioRoom['plusOpen'] == true);
+                  audioRoom['plusOpen'] =
+                      !(audioRoom['plusOpen'] == true);
+
                   store.notifyListeners();
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.phone_in_talk, color: Color(0xFF00E676)),
+                icon: const Icon(
+                  Icons.phone_in_talk,
+                  color: Color(0xFF00E676),
+                ),
                 onPressed: () {
                   audioRoom['callRequestOpen'] =
                       !(audioRoom['callRequestOpen'] == true);
+
                   store.notifyListeners();
                 },
               ),
@@ -1638,7 +1959,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
@@ -1646,6 +1968,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 itemCount: seats.length,
                 itemBuilder: (_, int i) {
                   final Map<String, dynamic> seat = seats[i];
+
                   return Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF191133),
@@ -1655,7 +1978,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: <Widget>[
-                        const Icon(Icons.headset_mic, color: Color(0xFFE6C47A)),
+                        const Icon(
+                          Icons.headset_mic,
+                          color: Color(0xFFE6C47A),
+                        ),
                         Text(
                           'Seat ${seat['seat']}',
                           style: const TextStyle(fontSize: 11),
@@ -1672,11 +1998,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 },
               ),
               const SizedBox(height: 10),
-              ...((audioRoom['pendingCallRequests'] as List<dynamic>?) ??
+              ...((audioRoom['pendingCallRequests']
+                          as List<dynamic>?) ??
                       <dynamic>[])
                   .map((dynamic req) {
                 return ListTile(
-                  title: Text('Call Join Request: ${req['name']}'),
+                  title: Text(
+                    'Call Join Request: ${req['name']}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
@@ -1689,6 +2018,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           ((audioRoom['pendingCallRequests']
                                   as List<dynamic>))
                               .remove(req);
+
                           store.notifyListeners();
                         },
                       ),
@@ -1701,6 +2031,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           ((audioRoom['pendingCallRequests']
                                   as List<dynamic>))
                               .remove(req);
+
                           store.notifyListeners();
                         },
                       ),
@@ -1738,7 +2069,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               const SizedBox(height: 8),
               ...store.backupStore.map((Map<String, dynamic> b) {
                 return ListTile(
-                  title: Text('${b['name']} (${b['type']})'),
+                  title: Text(
+                    '${b['name']} (${b['type']})',
+                  ),
                   trailing: Switch(
                     value: b['equipped'] == true,
                     onChanged: (bool v) {
@@ -1752,15 +2085,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         _luxuryCard(
-          title: 'Private Rooms (Hidden Publicly • Key + Inbox Invite)',
+          title:
+              'Private Rooms (Hidden Publicly • Key + Inbox Invite)',
           child: Column(
-            children: store.privateRooms.map((Map<String, dynamic> pr) {
-              return ListTile(
-                leading: const Icon(Icons.lock, color: Color(0xFFE6C47A)),
-                title: Text('Private Room ${pr['roomId']} (Key: ${pr['key']})'),
-                subtitle: const Text('Max 2–3 People • Audio + Video + Gifting'),
-              );
-            }).toList(),
+            children: store.privateRooms.map(
+              (Map<String, dynamic> pr) {
+                return ListTile(
+                  leading: const Icon(
+                    Icons.lock,
+                    color: Color(0xFFE6C47A),
+                  ),
+                  title: Text(
+                    'Private Room ${pr['roomId']} (Key: ${pr['key']})',
+                  ),
+                  subtitle: const Text(
+                    'Max 2–3 People • Audio + Video + Gifting',
+                  ),
+                );
+              },
+            ).toList(),
           ),
         ),
       ],
@@ -1770,28 +2113,35 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   Widget _buildInboxScreen() {
     return ListView(
       padding: const EdgeInsets.all(12),
-      children: store.inboxMessages.map((Map<String, dynamic> m) {
-        return _luxuryCard(
-          title: 'From: ${m['from']} (ID: ${m['fromId']})',
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              Expanded(child: Text('${m['text']}')),
-              if (m['privateKey'] != null)
-                ElevatedButton(
-                  onPressed: widget.onSwitchToLive,
-                  child: Text('Enter Key (${m['privateKey']})'),
+      children: store.inboxMessages.map(
+        (Map<String, dynamic> m) {
+          return _luxuryCard(
+            title: 'From: ${m['from']} (ID: ${m['fromId']})',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Expanded(
+                  child: Text('${m['text']}'),
                 ),
-            ],
-          ),
-        );
-      }).toList(),
+                if (m['privateKey'] != null)
+                  ElevatedButton(
+                    onPressed: widget.onSwitchToLive,
+                    child: Text(
+                      'Enter Key (${m['privateKey']})',
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ).toList(),
     );
   }
 
   Widget _buildWalletAndEarningScreen() {
     final int nowDay = DateTime.now().day;
-    final bool inPayoutWindow = nowDay >= 1 && nowDay <= 5;
+    final bool inPayoutWindow =
+        nowDay >= 1 && nowDay <= 5;
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -1809,13 +2159,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 inPayoutWindow
                     ? 'Payout Window Open (1–5 Tareekh) — 5 din ke andar payout milega.'
                     : 'Payout Window: Mahina khatam hone ke baad 1 se 5 tareekh tak request lagayein (5 din ke andar payout).',
-                style: const TextStyle(color: Color(0xFFE6C47A)),
+                style: const TextStyle(
+                  color: Color(0xFFE6C47A),
+                ),
               ),
             ],
           ),
         ),
         _luxuryCard(
-          title: 'Earning Folder — Step-by-Step Direct / Agency Registration',
+          title:
+              'Earning Folder — Step-by-Step Direct / Agency Registration',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -1827,14 +2180,19 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   'Saudi Arabia',
                   'India',
                   'Other',
-                ]
-                    .map(
-                      (String c) =>
-                          DropdownMenuItem<String>(value: c, child: Text(c)),
-                    )
-                    .toList(),
-                onChanged: (String? v) =>
-                    setState(() => kycCountry = v ?? 'Pakistan'),
+                ].map(
+                  (String c) {
+                    return DropdownMenuItem<String>(
+                      value: c,
+                      child: Text(c),
+                    );
+                  },
+                ).toList(),
+                onChanged: (String? v) {
+                  setState(() {
+                    kycCountry = v ?? 'Pakistan';
+                  });
+                },
                 decoration: const InputDecoration(
                   labelText: 'Country / Nationality',
                 ),
@@ -1845,17 +2203,31 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 spacing: 8,
                 children: <Widget>[
                   OutlinedButton(
-                    onPressed: () => setState(() => kycFrontUploaded = true),
-                    child:
-                        Text(kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front'),
+                    onPressed: () {
+                      setState(() => kycFrontUploaded = true);
+                    },
+                    child: Text(
+                      kycFrontUploaded
+                          ? 'Front ID ✓'
+                          : 'Upload ID Front',
+                    ),
                   ),
                   OutlinedButton(
-                    onPressed: () => setState(() => kycBackUploaded = true),
-                    child: Text(kycBackUploaded ? 'Back ID ✓' : 'Upload ID Back'),
+                    onPressed: () {
+                      setState(() => kycBackUploaded = true);
+                    },
+                    child: Text(
+                      kycBackUploaded
+                          ? 'Back ID ✓'
+                          : 'Upload ID Back',
+                    ),
                   ),
                   OutlinedButton(
-                    onPressed: () =>
-                        setState(() => kycCardSelfieUploaded = true),
+                    onPressed: () {
+                      setState(
+                        () => kycCardSelfieUploaded = true,
+                      );
+                    },
                     child: Text(
                       kycCardSelfieUploaded
                           ? 'Card Selfie ✓'
@@ -1886,7 +2258,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   setState(() {
                     registrationSubmitted = true;
                     store.currentUser['payoutLocked'] = true;
-                    store.currentUser['payoutAccount'] = payoutAccountCtrl.text;
+                    store.currentUser['payoutAccount'] =
+                        payoutAccountCtrl.text;
                   });
                 },
                 child: Text(
@@ -1907,34 +2280,46 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         GestureDetector(
-          onTap: () => setState(() => aiExpanded = !aiExpanded),
+          onTap: () {
+            setState(() => aiExpanded = !aiExpanded);
+          },
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFF1A1134),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE6C47A)),
+              border: Border.all(
+                color: const Color(0xFFE6C47A),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
                   children: <Widget>[
                     Row(
                       children: <Widget>[
-                        const Icon(Icons.smart_toy, color: Color(0xFFE6C47A)),
+                        const Icon(
+                          Icons.smart_toy,
+                          color: Color(0xFFE6C47A),
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           aiExpanded
                               ? 'ZOONL AI Assistant (Female Voice)'
                               : 'AI Support (Tap to Open)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
                     Icon(
-                      aiExpanded ? Icons.expand_less : Icons.expand_more,
+                      aiExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
                     ),
                   ],
                 ),
@@ -1945,8 +2330,11 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       const Text('Female Voice: '),
                       Switch(
                         value: femaleVoiceEnabled,
-                        onChanged: (bool v) =>
-                            setState(() => femaleVoiceEnabled = v),
+                        onChanged: (bool v) {
+                          setState(() {
+                            femaleVoiceEnabled = v;
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -1955,22 +2343,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   const SizedBox(height: 10),
-                  ...aiQuickPrompts.map((Map<String, String> item) {
-                    return ListTile(
-                      dense: true,
-                      title: Text(item['q'] ?? ''),
-                      trailing: const Icon(
-                        Icons.volume_up,
-                        size: 18,
-                        color: Color(0xFFE6C47A),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          selectedAiAnswer = item['a'] ?? '';
-                        });
-                      },
-                    );
-                  }),
+                  ...aiQuickPrompts.map(
+                    (Map<String, String> item) {
+                      return ListTile(
+                        dense: true,
+                        title: Text(item['q'] ?? ''),
+                        trailing: const Icon(
+                          Icons.volume_up,
+                          size: 18,
+                          color: Color(0xFFE6C47A),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            selectedAiAnswer = item['a'] ?? '';
+                          });
+                        },
+                      );
+                    },
+                  ),
                 ],
               ],
             ),
@@ -1984,8 +2374,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               Text('Support Email: ${store.supportEmail}'),
               Text('Support Contact: ${store.supportContact}'),
-              Text('Official Hosting Email: ${store.officialHostingEmail}'),
-              Text('Official Hosting Contact: ${store.officialHostingContact}'),
+              Text(
+                'Official Hosting Email: ${store.officialHostingEmail}',
+              ),
+              Text(
+                'Official Hosting Contact: ${store.officialHostingContact}',
+              ),
             ],
           ),
         ),
@@ -1994,8 +2388,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildProfileAndSettingsScreen() {
-    final bool isOwner = store.currentUser['id'] == ZoonlStore.ownerId;
-    final bool isLive = store.currentUser['isLive'] == true;
+    final bool isOwner =
+        store.currentUser['id'] == ZoonlStore.ownerId;
+
+    final bool isLive =
+        store.currentUser['isLive'] == true;
+
     final DateTime? offlineSince =
         store.currentUser['offlineSince'] as DateTime?;
 
@@ -2016,13 +2414,18 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     ? 'Status: LIVE'
                     : 'Status: OFFLINE ${offlineSince != null ? "(Since ${offlineSince.hour}:${offlineSince.minute})" : ""}',
                 style: TextStyle(
-                  color: isLive ? Colors.greenAccent : Colors.orangeAccent,
+                  color: isLive
+                      ? Colors.greenAccent
+                      : Colors.orangeAccent,
                 ),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
-                title: const Text('Friend List Public / Private'),
-                value: store.currentUser['friendListPublic'] == true,
+                title: const Text(
+                  'Friend List Public / Private',
+                ),
+                value:
+                    store.currentUser['friendListPublic'] == true,
                 onChanged: (bool v) {
                   store.currentUser['friendListPublic'] = v;
                   store.notifyListeners();
@@ -2036,7 +2439,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         ),
         if (isOwner)
           _luxuryCard(
-            title: 'Owner 10001 Sovereign Control (Permanent Ban & Limits)',
+            title:
+                'Owner 10001 Sovereign Control (Permanent Ban & Limits)',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -2075,20 +2479,32 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           streamer: streamer,
           targetUserId: targetUserId,
           action: action,
-          actorIsStreamer: store.currentUser['id'] == streamer['userId'],
-          actorIsAdmin: (streamer['roomAdmins'] as List<dynamic>)
-              .contains(store.currentUser['id']),
-          actorVipTier: store.currentUser['vipTier'] as String? ?? 'NONE',
+          actorIsStreamer:
+              store.currentUser['id'] == streamer['userId'],
+          actorIsAdmin:
+              (streamer['roomAdmins'] as List<dynamic>)
+                  .contains(store.currentUser['id']),
+          actorVipTier:
+              store.currentUser['vipTier'] as String? ?? 'NONE',
         );
       },
       itemBuilder: (_) => const <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(value: 'MUTE', child: Text('Mute Chat')),
-        PopupMenuItem<String>(value: 'UNMUTE', child: Text('Unmute Chat')),
+        PopupMenuItem<String>(
+          value: 'MUTE',
+          child: Text('Mute Chat'),
+        ),
+        PopupMenuItem<String>(
+          value: 'UNMUTE',
+          child: Text('Unmute Chat'),
+        ),
         PopupMenuItem<String>(
           value: 'BLACKLIST',
           child: Text('Blacklist (Streamer Only)'),
         ),
-        PopupMenuItem<String>(value: 'BOOT', child: Text('Boot from Room')),
+        PopupMenuItem<String>(
+          value: 'BOOT',
+          child: Text('Boot from Room'),
+        ),
       ],
     );
   }
@@ -2104,7 +2520,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       decoration: BoxDecoration(
         color: const Color(0xFF120D24),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF3A2766)),
+        border: Border.all(
+          color: const Color(0xFF3A2766),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
