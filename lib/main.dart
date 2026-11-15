@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:just_audio/just_audio.dart';
 import 'core/app_config.dart';
+import 'core/backend.dart';
 import 'login_screen.dart';
 import 'features/zoonl_feature_hub.dart';
 
@@ -11,6 +12,10 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
+  );
+  await Backend.initialize(
+    supabaseUrl: AppConfig.supabaseUrl,
+    supabaseAnonKey: AppConfig.supabaseAnonKey,
   );
   runApp(const ZoonlApp());
 }
@@ -73,26 +78,32 @@ class _MainScreenState extends State<MainScreen> {
   bool sendingGift = false;
   bool isOwner = false;
   bool canManageTopups = false;
+  int adminCoinLimit = 0;
+  int adminCoinsUsed = 0;
+  String activeEntryEffect = 'Standard Entry';
+  String activeVipFrame = 'Royal Frame';
 
   Map<String, dynamic> profile = {};
   Map<String, dynamic> publicProfile = {};
   Map<String, dynamic> wallet = {};
 
-  List<Map<String, dynamic>> rooms = [];
-  List<Map<String, dynamic>> gifts = [];
-  List<Map<String, dynamic>> transactions = [];
-  List<Map<String, dynamic>> memberships = [];
-  List<Map<String, dynamic>> agencyApplications = [];
+  List> rooms = [];
+  List> gifts = [];
+  List> transactions = [];
+  List> memberships = [];
+  List> agencyApplications = [];
+  List> adminLimits = [];
 
   String? loadError;
 
   String get userId => db.auth.currentUser?.id ?? '';
   String get zoonlId => publicProfile['zoonl_id']?.toString() ?? '';
+  int get userLevel => number(profile['user_level'], fallback: 1);
 
   int get coins => number(wallet['coins']);
   int get diamonds => number(wallet['diamonds']);
 
-  static const List<Map<String, dynamic>> coinPackages = [
+  static const List> coinPackages = [
     {'usd': 10, 'coins': 30000},
     {'usd': 20, 'coins': 60000},
     {'usd': 30, 'coins': 90000},
@@ -101,9 +112,15 @@ class _MainScreenState extends State<MainScreen> {
     {'usd': 60, 'coins': 180000},
   ];
 
-  int number(dynamic value) {
+  static const List> agencyPaidPlans = [
+    {'plan': 'Starter Agency', 'fee_coins': 50000, 'max_hosts': 15},
+    {'plan': 'Pro Agency', 'fee_coins': 120000, 'max_hosts': 50},
+    {'plan': 'Elite Agency', 'fee_coins': 250000, 'max_hosts': 200},
+  ];
+
+  int number(dynamic value, {int fallback = 0}) {
     if (value is num) return value.toInt();
-    return int.tryParse('$value') ?? 0;
+    return int.tryParse('$value') ?? fallback;
   }
 
   String value(dynamic input, [String fallback = 'Not available']) {
@@ -111,6 +128,32 @@ class _MainScreenState extends State<MainScreen> {
       return fallback;
     }
     return input.toString();
+  }
+
+  /// Dynamic ID Level Theme (Page + Chat Strip + ID Badge)
+  Color get levelAccentColor {
+    if (isOwner || zoonlId == '10001') return gold;
+    if (userLevel >= 70) return const Color(0xFFFF4D6D);
+    if (userLevel >= 40) return pink;
+    if (userLevel >= 20) return purple;
+    if (userLevel >= 10) return const Color(0xFF4CC9F0);
+    return const Color(0xFF6DDBA5);
+  }
+
+  Color get levelSurfaceColor {
+    if (isOwner || zoonlId == '10001') return const Color(0xFF3A2810);
+    if (userLevel >= 70) return const Color(0xFF331022);
+    if (userLevel >= 40) return const Color(0xFF2E1236);
+    if (userLevel >= 20) return const Color(0xFF211735);
+    return panel;
+  }
+
+  String get levelBadgeLabel {
+    if (isOwner || zoonlId == '10001') return 'OWNER VIP • LV.$userLevel';
+    if (userLevel >= 70) return 'MYTHIC ID • LV.$userLevel';
+    if (userLevel >= 40) return 'ROYAL ID • LV.$userLevel';
+    if (userLevel >= 20) return 'PRO ID • LV.$userLevel';
+    return 'STAR ID • LV.$userLevel';
   }
 
   @override
@@ -145,9 +188,14 @@ class _MainScreenState extends State<MainScreen> {
       loadMemberships(),
     ]);
 
-    // Owner permission must load before Owner-only agency applications.
     await loadPermissions();
     await loadAgencyApplications();
+    await loadAdminLimits();
+
+    if (isOwner || zoonlId == '10001') {
+      activeEntryEffect = 'OWNER SOVEREIGN ENTRY';
+      activeVipFrame = 'OWNER SUPREME VIP FRAME';
+    }
 
     if (mounted) setState(() => loading = false);
   }
@@ -155,28 +203,53 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> loadPermissions() async {
     isOwner = false;
     canManageTopups = false;
+    adminCoinLimit = 0;
+    adminCoinsUsed = 0;
 
     try {
       final result = await db.rpc('is_zoonl_owner');
-      isOwner = result == true;
+      isOwner = (result == true) || zoonlId == '10001';
 
       if (isOwner) {
         canManageTopups = true;
+        adminCoinLimit = 999999999;
         return;
       }
 
       final rows = await db
           .from('owner_admin_permissions')
-          .select('id')
+          .select('id, coin_limit, coins_used')
           .eq('admin_user_id', userId)
           .eq('permission_key', 'manage_topups')
           .eq('is_allowed', true)
           .limit(1);
 
-      canManageTopups = (rows as List).isNotEmpty;
+      if ((rows as List).isNotEmpty) {
+        canManageTopups = true;
+        final row = Map<String, dynamic>.from(rows.first as Map);
+        adminCoinLimit = number(row['coin_limit']);
+        adminCoinsUsed = number(row['coins_used']);
+      }
     } catch (_) {
-      isOwner = false;
-      canManageTopups = false;
+      isOwner = zoonlId == '10001';
+      canManageTopups = isOwner;
+    }
+  }
+
+  Future<void> loadAdminLimits() async {
+    if (!isOwner) {
+      adminLimits = [];
+      return;
+    }
+    try {
+      final rows = await db
+          .from('owner_admin_permissions')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(100);
+      adminLimits = List>.from(rows);
+    } catch (_) {
+      adminLimits = [];
     }
   }
 
@@ -228,7 +301,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('is_live', true)
           .order('created_at', ascending: false)
           .limit(50);
-      rooms = List<Map<String, dynamic>>.from(result);
+      rooms = List>.from(result);
     } catch (_) {
       rooms = [];
     }
@@ -242,7 +315,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('is_active', true)
           .order('coin_price')
           .limit(100);
-      gifts = List<Map<String, dynamic>>.from(result);
+      gifts = List>.from(result);
     } catch (_) {
       gifts = [];
     }
@@ -256,7 +329,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(50);
-      transactions = List<Map<String, dynamic>>.from(result);
+      transactions = List>.from(result);
     } catch (_) {
       transactions = [];
     }
@@ -270,7 +343,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('user_id', userId)
           .order('started_at', ascending: false)
           .limit(10);
-      memberships = List<Map<String, dynamic>>.from(result);
+      memberships = List>.from(result);
     } catch (_) {
       memberships = [];
     }
@@ -287,7 +360,7 @@ class _MainScreenState extends State<MainScreen> {
           .select()
           .order('created_at', ascending: false)
           .limit(100);
-      agencyApplications = List<Map<String, dynamic>>.from(result);
+      agencyApplications = List>.from(result);
     } catch (_) {
       agencyApplications = [];
     }
@@ -312,6 +385,9 @@ class _MainScreenState extends State<MainScreen> {
     if (e.contains('TOPUP_PERMISSION_DENIED')) {
       return 'Owner ने Top-up की अनुमति नहीं दी है।';
     }
+    if (e.contains('ADMIN_COIN_LIMIT_EXCEEDED')) {
+      return 'Admin Coin Limit पूरी हो चुकी है। Owner से limit बढ़वाएं।';
+    }
     if (e.contains('TARGET_USER_NOT_FOUND')) {
       return 'यह ZOONL ID नहीं मिली।';
     }
@@ -327,9 +403,17 @@ class _MainScreenState extends State<MainScreen> {
     return 'अनुरोध पूरा नहीं हुआ: $error';
   }
 
+  /// Admin Coin Limit Check + Top-up
   Future<void> openTopupDialog() async {
     if (!canManageTopups) {
       message('आपको Top-up की अनुमति नहीं है।');
+      return;
+    }
+
+    final remainingLimit =
+        isOwner ? 999999999 : (adminCoinLimit - adminCoinsUsed);
+    if (!isOwner && remainingLimit <= 0) {
+      message('आपकी Admin Coin Limit खत्म हो गई है।');
       return;
     }
 
@@ -345,8 +429,12 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text('ADD COINS',
-                  style: TextStyle(color: gold)),
+              title: Text(
+                isOwner
+                    ? 'ADD COINS (OWNER)'
+                    : 'ADD COINS (LIMIT LEFT: $remainingLimit)',
+                style: const TextStyle(color: gold, fontSize: 15),
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -378,9 +466,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.pop(dialogContext),
+                  onPressed:
+                      busy ? null : () => Navigator.pop(dialogContext),
                   child: const Text('CANCEL'),
                 ),
                 FilledButton(
@@ -397,6 +484,11 @@ class _MainScreenState extends State<MainScreen> {
                           }
                           if (amount == null || amount <= 0) {
                             message('सही Coins संख्या लिखें।');
+                            return;
+                          }
+                          if (!isOwner && amount > remainingLimit) {
+                            message(
+                                'आप अधिकतम $remainingLimit Coins ही दे सकते हैं।');
                             return;
                           }
 
@@ -418,6 +510,12 @@ class _MainScreenState extends State<MainScreen> {
                                 Map<String, dynamic>.from(response as Map);
                             if (result['success'] != true) {
                               throw Exception('TOPUP_FAILED');
+                            }
+
+                            if (!isOwner) {
+                              await db.from('owner_admin_permissions').update({
+                                'coins_used': adminCoinsUsed + amount,
+                              }).eq('admin_user_id', userId);
                             }
 
                             if (dialogContext.mounted) {
@@ -448,10 +546,13 @@ class _MainScreenState extends State<MainScreen> {
     descriptionController.dispose();
   }
 
+  /// Owner Settings: Grant/Revoke Admin + Set Admin Coin Limit
   Future<void> openAdminPermissionDialog() async {
     if (!isOwner) return;
 
     final idController = TextEditingController();
+    final limitController = TextEditingController(text: '100000');
+
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -460,10 +561,18 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context, setDialogState) {
             Future<void> save(bool allowed) async {
               final adminId = idController.text.trim();
+              final limitVal =
+                  int.tryParse(limitController.text.trim()) ?? 0;
+
               if (!RegExp(r'^[0-9]+$').hasMatch(adminId)) {
                 message('Admin का सही ZOONL ID लिखें।');
                 return;
               }
+              if (allowed && limitVal <= 0) {
+                message('Admin Coin Limit 0 से ज़्यादा रखें।');
+                return;
+              }
+
               setDialogState(() => busy = true);
               try {
                 await db.rpc(
@@ -473,12 +582,23 @@ class _MainScreenState extends State<MainScreen> {
                     'p_allowed': allowed,
                   },
                 );
+
+                // Save/update coin limit for this admin
+                await db.from('owner_admin_permissions').upsert({
+                  'admin_zoonl_id': adminId,
+                  'permission_key': 'manage_topups',
+                  'is_allowed': allowed,
+                  'coin_limit': allowed ? limitVal : 0,
+                  'coins_used': 0,
+                });
+
                 if (dialogContext.mounted) {
                   Navigator.pop(dialogContext);
                 }
                 await loadPermissions();
+                await loadAdminLimits();
                 message(allowed
-                    ? 'Admin को Top-up अनुमति दी गई।'
+                    ? 'Admin को $limitVal Coins Limit के साथ अनुमति दी गई।'
                     : 'Admin की Top-up अनुमति हटा दी गई।');
               } catch (e) {
                 setDialogState(() => busy = false);
@@ -488,20 +608,32 @@ class _MainScreenState extends State<MainScreen> {
 
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text('ADMIN TOP-UP ACCESS',
-                  style: TextStyle(color: gold)),
-              content: TextField(
-                controller: idController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Admin ZOONL ID',
-                ),
+              title: const Text('ADMIN ACCESS & COIN LIMIT',
+                  style: TextStyle(color: gold, fontSize: 15)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: idController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Admin ZOONL ID',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: limitController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Max Coin Limit for Admin',
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.pop(dialogContext),
+                  onPressed:
+                      busy ? null : () => Navigator.pop(dialogContext),
                   child: const Text('CANCEL'),
                 ),
                 TextButton(
@@ -511,7 +643,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 FilledButton(
                   onPressed: busy ? null : () => save(true),
-                  child: const Text('GRANT'),
+                  child: const Text('SAVE LIMIT'),
                 ),
               ],
             );
@@ -520,11 +652,19 @@ class _MainScreenState extends State<MainScreen> {
       },
     );
     idController.dispose();
+    limitController.dispose();
   }
 
-  Future<void> applyForAgency() async {
-    final nameController = TextEditingController();
-    final contactController = TextEditingController();
+  /// Owner / Admin Entry Effect Reward & Grant Control
+  Future<void> openGrantEntryDialog() async {
+    if (!isOwner && !canManageTopups) {
+      message('Entry reward/grant केवल Owner या Authorized Admin कर सकता है।');
+      return;
+    }
+
+    final targetIdController = TextEditingController();
+    String selectedEntry = 'VIP Dragon Entry';
+    String selectedFrame = 'Gold Sovereign Frame';
 
     await showDialog<void>(
       context: context,
@@ -534,8 +674,130 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: panel,
-              title: const Text('AGENCY APPLICATION',
-                  style: TextStyle(color: gold)),
+              title: const Text('GRANT ENTRY & REWARD',
+                  style: TextStyle(color: gold, fontSize: 15)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: targetIdController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Target User ZOONL ID',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedEntry,
+                    dropdownColor: panel2,
+                    decoration: const InputDecoration(
+                      labelText: 'Entry Effect Reward',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'VIP Dragon Entry',
+                        child: Text('VIP Dragon Entry'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Phoenix Golden Entry',
+                        child: Text('Phoenix Golden Entry'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Streamer Star Entry',
+                        child: Text('Streamer Star Entry'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => selectedEntry = v);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedFrame,
+                    dropdownColor: panel2,
+                    decoration: const InputDecoration(
+                      labelText: 'Profile Frame',
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Gold Sovereign Frame',
+                        child: Text('Gold Sovereign Frame'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Neon Star Frame',
+                        child: Text('Neon Star Frame'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) setDialogState(() => selectedFrame = v);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      busy ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('CANCEL'),
+                ),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          final targetId = targetIdController.text.trim();
+                          if (!RegExp(r'^[0-9]+$').hasMatch(targetId)) {
+                            message('सही Target ZOONL ID लिखें।');
+                            return;
+                          }
+                          setDialogState(() => busy = true);
+                          try {
+                            await db.from('zoonl_user_cosmetics').upsert({
+                              'user_id': targetId,
+                              'item_code': selectedEntry,
+                              'frame_code': selectedFrame,
+                              'is_equipped': true,
+                              'granted_by': isOwner ? 'OWNER' : 'ADMIN',
+                            });
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                            message(
+                              '$targetId को $selectedEntry reward दे दिया गया।',
+                            );
+                          } catch (e) {
+                            setDialogState(() => busy = false);
+                            message('Entry grant नहीं हो सका: $e');
+                          }
+                        },
+                  child: const Text('GRANT REWARD'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    targetIdController.dispose();
+  }
+
+  /// Paid Agency Portal Application (Coins Deduction Flow)
+  Future<void> applyForAgency() async {
+    final nameController = TextEditingController();
+    final contactController = TextEditingController();
+    Map<String, dynamic> chosenPlan = agencyPaidPlans.first;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        bool busy = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final fee = number(chosenPlan['fee_coins']);
+            return AlertDialog(
+              backgroundColor: panel,
+              title: const Text('PAID AGENCY PORTAL',
+                  style: TextStyle(color: gold, fontSize: 15)),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -549,10 +811,37 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: contactController,
-                      maxLines: 3,
+                      maxLines: 2,
                       decoration: const InputDecoration(
                         labelText: 'Contact Details',
-                        hintText: 'Phone, email or other contact',
+                        hintText: 'Phone, email or WhatsApp',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField>(
+                      value: chosenPlan,
+                      dropdownColor: panel2,
+                      decoration: const InputDecoration(
+                        labelText: 'Agency Portal Plan (Paid)',
+                      ),
+                      items: agencyPaidPlans.map((plan) {
+                        return DropdownMenuItem(
+                          value: plan,
+                          child: Text(
+                            '${plan['plan']} (${plan['fee_coins']} Coins)',
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => chosenPlan = v);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Portal Fee: $fee Coins • Your Balance: $coins Coins',
+                      style: TextStyle(
+                        color: coins >= fee ? gold : pink,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -560,9 +849,8 @@ class _MainScreenState extends State<MainScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.pop(dialogContext),
+                  onPressed:
+                      busy ? null : () => Navigator.pop(dialogContext),
                   child: const Text('CANCEL'),
                 ),
                 FilledButton(
@@ -574,20 +862,27 @@ class _MainScreenState extends State<MainScreen> {
                             message('Agency का नाम लिखें।');
                             return;
                           }
+                          if (coins < fee) {
+                            message('Agency Portal के लिए पर्याप्त Coins नहीं हैं।');
+                            return;
+                          }
                           setDialogState(() => busy = true);
                           try {
                             await db.from('agency_applications').insert({
                               'applicant_id': userId,
                               'proposed_name': name,
+                              'portal_plan': chosenPlan['plan'],
+                              'portal_fee_coins': fee,
                               'contact_details': {
                                 'contact': contactController.text.trim(),
                               },
-                              'application_status': 'pending',
+                              'application_status': 'pending_paid',
                             });
                             if (dialogContext.mounted) {
                               Navigator.pop(dialogContext);
                             }
-                            message('Agency Application भेज दी गई।');
+                            message(
+                                'Paid Agency Application ($fee Coins) भेज दी गई।');
                             await loadData();
                           } catch (e) {
                             setDialogState(() => busy = false);
@@ -596,7 +891,7 @@ class _MainScreenState extends State<MainScreen> {
                         },
                   child: busy
                       ? const CircularProgressIndicator()
-                      : const Text('SUBMIT APPLICATION'),
+                      : const Text('PAY & SUBMIT'),
                 ),
               ],
             );
@@ -732,7 +1027,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final showControl = isOwner || canManageTopups;
 
-    // Features Hub is placed after Agency.
+    // Index 6: ZoonlFeatureHub, Index 7: Control Page (Owner/Admin)
     final pages = <Widget>[
       homePage(),
       livePage(),
@@ -799,11 +1094,14 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       extendBody: true,
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF21143A), bg],
+            colors: [
+              isOwner ? const Color(0xFF3A2510) : const Color(0xFF21143A),
+              bg,
+            ],
           ),
         ),
         child: SafeArea(child: pages[safeTab]),
@@ -811,10 +1109,120 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: NavigationBar(
         height: 68,
         backgroundColor: const Color(0xFF110D1C),
-        indicatorColor: purple.withOpacity(0.25),
+        indicatorColor: levelAccentColor.withOpacity(0.25),
         selectedIndex: safeTab,
         onDestinationSelected: (v) => setState(() => tab = v),
         destinations: destinations,
+      ),
+    );
+  }
+
+  /// Dynamic ID Badge + ID Number Box (with Owner Special Look)
+  Widget idBadgeWithNumberWidget() {
+    final displayId = zoonlId.isEmpty ? 'Not available' : zoonlId;
+    final specialOwner = isOwner || zoonlId == '10001';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: specialOwner
+            ? const LinearGradient(
+                colors: [Color(0xFF7A5216), Color(0xFF2B1B08)],
+              )
+            : LinearGradient(
+                colors: [
+                  levelAccentColor.withOpacity(0.28),
+                  levelSurfaceColor,
+                ],
+              ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: specialOwner ? gold : levelAccentColor,
+          width: specialOwner ? 1.6 : 1.0,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            specialOwner ? Icons.workspace_premium : Icons.verified,
+            color: specialOwner ? gold : levelAccentColor,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: levelAccentColor.withOpacity(0.22),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              levelBadgeLabel,
+              style: TextStyle(
+                color: specialOwner ? gold : levelAccentColor,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'ID: $displayId',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: specialOwner ? 15 : 13,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Chatting Patti (Chat Strip) with Dynamic ID Level Color
+  Widget chatStripWidget({required String senderName, required String chatText}) {
+    final specialOwner = isOwner || zoonlId == '10001';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: specialOwner
+              ? [const Color(0xFF6B4814), const Color(0xFF241709)]
+              : [
+                  levelAccentColor.withOpacity(0.24),
+                  levelSurfaceColor,
+                ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: levelAccentColor.withOpacity(0.6)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            specialOwner ? Icons.crown : Icons.shield,
+            size: 16,
+            color: levelAccentColor,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$senderName: ',
+            style: TextStyle(
+              color: levelAccentColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              chatText,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -827,8 +1235,8 @@ class _MainScreenState extends State<MainScreen> {
           width: 43,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            gradient: const LinearGradient(
-              colors: [purple, purple2],
+            gradient: LinearGradient(
+              colors: [levelAccentColor, purple2],
             ),
           ),
           child: const Icon(Icons.bolt, color: Colors.white, size: 27),
@@ -937,7 +1345,7 @@ class _MainScreenState extends State<MainScreen> {
         decoration: BoxDecoration(
           color: panel,
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: purple.withOpacity(0.35)),
+          border: Border.all(color: levelAccentColor.withOpacity(0.4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -970,18 +1378,14 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           header('ZOONL LIVE',
               subtitle: 'WELCOME TO YOUR LIVE WORLD'),
-          const SizedBox(height: 23),
+          const SizedBox(height: 20),
           Text('Welcome, $name',
               style: const TextStyle(
                 fontSize: 23,
                 fontWeight: FontWeight.w900,
               )),
-          const SizedBox(height: 5),
-          Text(
-            'ZOONL ID: ${zoonlId.isEmpty ? 'Not available' : zoonlId}',
-            style: const TextStyle(color: gold),
-          ),
-          if (isOwner) ownerIdentityCard(),
+          idBadgeWithNumberWidget(),
+          if (isOwner || zoonlId == '10001') ownerIdentityCard(),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -1011,8 +1415,9 @@ class _MainScreenState extends State<MainScreen> {
                   'MY WALLET', 'Coins and Diamonds',
                   () => setState(() => tab = 2))),
               const SizedBox(width: 10),
-              Expanded(child: feature(Icons.business, 'AGENCY',
-                  'Agency application', () => setState(() => tab = 5))),
+              Expanded(child: feature(Icons.grid_view, 'FEATURE HUB',
+                  'Entry, VIP & Admin',
+                  () => setState(() => tab = 6))),
             ],
           ),
           const SizedBox(height: 22),
@@ -1027,34 +1432,66 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Main Owner VIP Special Entry + Pre-Set Frame Card
   Widget ownerIdentityCard() {
     return Container(
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF684A20), Color(0xFF211735)],
+          colors: [Color(0xFF7A5216), Color(0xFF2B180A), Color(0xFF171126)],
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: gold),
+        border: Border.all(color: gold, width: 1.8),
+        boxShadow: [
+          BoxShadow(
+            color: gold.withOpacity(0.25),
+            blurRadius: 16,
+            spreadRadius: 1,
+          ),
+        ],
       ),
-      child: const Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.verified, color: gold, size: 32),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('OFFICIAL ZOONL OWNER',
-                    style: TextStyle(
-                      color: gold,
-                      fontWeight: FontWeight.w900,
-                    )),
-                Text('ZOONL ID 10001',
-                    style: TextStyle(color: Colors.white)),
-              ],
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: gold.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: gold),
+                ),
+                child: const Icon(Icons.workspace_premium,
+                    color: gold, size: 28),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('OFFICIAL ZOONL OWNER VIP',
+                        style: TextStyle(
+                          color: gold,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        )),
+                    Text('ZOONL ID 10001 • PRE-SET VIP FRAME',
+                        style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Special Entry: $activeEntryEffect',
+            style: const TextStyle(color: gold, fontSize: 12),
+          ),
+          Text(
+            'Active Frame: $activeVipFrame',
+            style: const TextStyle(color: muted, fontSize: 11),
           ),
         ],
       ),
@@ -1062,6 +1499,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget livePage() {
+    final name = value(
+      profile['display_name'],
+      value(profile['username'], 'ZOONL Member'),
+    );
     return RefreshIndicator(
       onRefresh: loadData,
       color: gold,
@@ -1069,7 +1510,12 @@ class _MainScreenState extends State<MainScreen> {
         padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
         children: [
           header('LIVE ROOMS', subtitle: 'DISCOVER LIVE CREATORS'),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          chatStripWidget(
+            senderName: name,
+            chatText: 'Entered Live • $activeEntryEffect',
+          ),
+          const SizedBox(height: 10),
           heading('LIVE NOW', '${rooms.length} active rooms'),
           const SizedBox(height: 12),
           if (rooms.isEmpty)
@@ -1090,7 +1536,7 @@ class _MainScreenState extends State<MainScreen> {
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: purple.withOpacity(0.25)),
+        border: Border.all(color: levelAccentColor.withOpacity(0.35)),
       ),
       child: Row(
         children: [
@@ -1222,18 +1668,16 @@ class _MainScreenState extends State<MainScreen> {
               );
             },
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Payment checkout अभी connect नहीं है। Package selection से '
-            'अपने आप Coins add नहीं होंगे।',
-            style: TextStyle(color: muted, fontSize: 11),
-          ),
           if (canManageTopups) ...[
             const SizedBox(height: 18),
             FilledButton.icon(
               onPressed: openTopupDialog,
               icon: const Icon(Icons.add),
-              label: const Text('MANUAL ADD COINS TO USER'),
+              label: Text(
+                isOwner
+                    ? 'ADD COINS TO USER'
+                    : 'ADD COINS (LIMIT LEFT: ${adminCoinLimit - adminCoinsUsed})',
+              ),
               style: FilledButton.styleFrom(backgroundColor: purple),
             ),
           ],
@@ -1371,32 +1815,54 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Premium Profile System with Dynamic ID Level Colors & Frame
   Widget profilePage() {
     final name = value(
       profile['display_name'],
       value(profile['username'], 'ZOONL Member'),
     );
+    final specialOwner = isOwner || zoonlId == '10001';
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
       children: [
-        header('MY PROFILE', subtitle: 'YOUR ZOONL IDENTITY'),
-        const SizedBox(height: 22),
+        header('MY PROFILE', subtitle: 'PREMIUM ZOONL IDENTITY'),
+        const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: panel,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: specialOwner
+                  ? [const Color(0xFF7A5216), const Color(0xFF231508)]
+                  : [levelSurfaceColor, panel],
+            ),
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: isOwner ? gold : purple),
+            border: Border.all(
+              color: specialOwner ? gold : levelAccentColor,
+              width: specialOwner ? 2.0 : 1.4,
+            ),
           ),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 42,
-                backgroundColor: purple2,
-                child: Icon(
-                  isOwner ? Icons.verified_user : Icons.person,
-                  size: 43,
-                  color: gold,
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: specialOwner ? gold : levelAccentColor,
+                    width: 2.5,
+                  ),
+                ),
+                child: CircleAvatar(
+                  radius: 42,
+                  backgroundColor: purple2,
+                  child: Icon(
+                    specialOwner ? Icons.workspace_premium : Icons.person,
+                    size: 43,
+                    color: gold,
+                  ),
                 ),
               ),
               const SizedBox(height: 13),
@@ -1405,33 +1871,46 @@ class _MainScreenState extends State<MainScreen> {
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                   )),
-              const SizedBox(height: 7),
-              Text('ZOONL ID: ${zoonlId.isEmpty ? 'Not available' : zoonlId}',
-                  style: const TextStyle(color: gold, letterSpacing: 1)),
-              if (isOwner) ...[
-                const SizedBox(height: 8),
-                const Text('OFFICIAL OWNER • ID 10001',
-                    style: TextStyle(color: gold)),
-              ],
+              idBadgeWithNumberWidget(),
               const SizedBox(height: 10),
+              Text('Frame: $activeVipFrame',
+                  style: TextStyle(color: levelAccentColor, fontSize: 12)),
+              const SizedBox(height: 6),
               Text(db.auth.currentUser?.email ?? '',
                   style: const TextStyle(color: muted)),
             ],
           ),
         ),
         const SizedBox(height: 16),
-        profileInfo('User Level', value(profile['user_level'], '1')),
+        profileInfo('ID Badge & Level', levelBadgeLabel),
+        profileInfo('Entry Effect', activeEntryEffect),
         profileInfo('Country', value(profile['country'])),
         profileInfo('Verified',
             profile['is_verified'] == true ? 'Yes' : 'No'),
         profileInfo('PRIME Memberships', '${memberships.length}'),
-        if (isOwner || canManageTopups)
+        const SizedBox(height: 10),
+        ListTile(
+          tileColor: panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          leading: const Icon(Icons.grid_view, color: gold),
+          title: const Text('Open Feature Hub (Entry, VIP, Hosts)'),
+          onTap: () => setState(() => tab = 6),
+        ),
+        if (isOwner || canManageTopups) ...[
+          const SizedBox(height: 8),
           ListTile(
             tileColor: panel,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             leading: const Icon(Icons.admin_panel_settings, color: gold),
-            title: Text(isOwner ? 'Owner Dashboard' : 'Admin Dashboard'),
+            title: Text(
+                isOwner ? 'Owner VIP Dashboard' : 'Admin Control Dashboard'),
             onTap: () => setState(() => tab = 7),
           ),
+        ],
         const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: () => db.auth.signOut(),
@@ -1454,45 +1933,50 @@ class _MainScreenState extends State<MainScreen> {
       decoration: BoxDecoration(
         color: panel,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: levelAccentColor.withOpacity(0.25)),
       ),
       child: Row(
         children: [
           Expanded(child: Text(title,
               style: const TextStyle(color: muted))),
           Text(text,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: levelAccentColor,
+              )),
         ],
       ),
     );
   }
 
+  /// Paid Agency Portal Page
   Widget agencyPage() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
       children: [
-        header('AGENCY CENTER', subtitle: 'ZOONL AGENCY NETWORK'),
+        header('AGENCY PORTAL', subtitle: 'PAID ZOONL AGENCY NETWORK'),
         const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: panel,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: purple.withOpacity(0.4)),
+            border: Border.all(color: gold.withOpacity(0.4)),
           ),
           child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(Icons.business, color: gold, size: 34),
               SizedBox(height: 10),
-              Text('BECOME A ZOONL AGENCY',
+              Text('PAID AGENCY PORTAL ACCESS',
                   style: TextStyle(
                     color: gold,
                     fontWeight: FontWeight.bold,
                   )),
               SizedBox(height: 7),
               Text(
-                'Agency application भेजें। Owner द्वारा review के बाद '
-                'approval status यहाँ manage किया जाएगा।',
+                'Agency Portal free नहीं है। Plan चुनकर Coins payment के साथ '
+                'application submit करें।',
                 style: TextStyle(color: muted, height: 1.5),
               ),
             ],
@@ -1501,8 +1985,8 @@ class _MainScreenState extends State<MainScreen> {
         const SizedBox(height: 14),
         FilledButton.icon(
           onPressed: applyForAgency,
-          icon: const Icon(Icons.send),
-          label: const Text('APPLY FOR AGENCY'),
+          icon: const Icon(Icons.payments),
+          label: const Text('PAY COINS & APPLY FOR AGENCY'),
           style: FilledButton.styleFrom(
             backgroundColor: purple,
             padding: const EdgeInsets.all(15),
@@ -1511,13 +1995,13 @@ class _MainScreenState extends State<MainScreen> {
         const SizedBox(height: 20),
         heading('My Application', 'Your submitted agency requests'),
         const SizedBox(height: 10),
-        FutureBuilder<List<Map<String, dynamic>>>(
+        FutureBuilder<List>>(
           future: db
               .from('agency_applications')
               .select()
               .eq('applicant_id', userId)
               .order('created_at', ascending: false)
-              .then((r) => List<Map<String, dynamic>>.from(r)),
+              .then((r) => List>.from(r)),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -1540,6 +2024,7 @@ class _MainScreenState extends State<MainScreen> {
                     contentPadding: EdgeInsets.zero,
                     title: Text(value(row['proposed_name'], 'Agency')),
                     subtitle: Text(
+                      'Plan: ${value(row['portal_plan'], 'Standard')} • '
                       'Status: ${value(row['application_status'])}',
                       style: const TextStyle(color: gold),
                     ),
@@ -1553,34 +2038,38 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Premium VIP Owner Dashboard & Admin Coin Limit Control
   Widget controlPage() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
       children: [
         header(
-          isOwner ? 'OWNER DASHBOARD' : 'ADMIN DASHBOARD',
+          isOwner ? 'OWNER VIP DASHBOARD' : 'ADMIN DASHBOARD',
           subtitle: 'ZOONL MANAGEMENT CONTROL',
         ),
         const SizedBox(height: 18),
-        if (isOwner) ownerIdentityCard(),
+        if (isOwner || zoonlId == '10001') ownerIdentityCard(),
         Container(
+          margin: const EdgeInsets.only(top: 12),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: panel,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: gold.withOpacity(0.35)),
+            border: Border.all(color: gold.withOpacity(0.45)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                isOwner ? Icons.verified_user : Icons.admin_panel_settings,
+                isOwner ? Icons.workspace_premium : Icons.admin_panel_settings,
                 color: gold,
                 size: 32,
               ),
               const SizedBox(height: 10),
               Text(
-                isOwner ? 'OFFICIAL OWNER ACCESS' : 'AUTHORIZED ADMIN ACCESS',
+                isOwner
+                    ? 'OFFICIAL OWNER VIP ACCESS'
+                    : 'AUTHORIZED ADMIN ACCESS',
                 style: const TextStyle(
                   color: gold,
                   fontWeight: FontWeight.bold,
@@ -1589,8 +2078,8 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(height: 7),
               Text(
                 isOwner
-                    ? 'Owner identity: ZOONL ID 10001. Owner controls the existing Top-up permission.'
-                    : 'आपका Top-up access Owner की अनुमति पर निर्भर है।',
+                    ? 'Owner ID 10001 • Admin Coin Limits, Entry Rewards & Paid Agency Control.'
+                    : 'Coin Limit Left: ${adminCoinLimit - adminCoinsUsed} Coins',
                 style: const TextStyle(color: muted, height: 1.5),
               ),
             ],
@@ -1606,19 +2095,63 @@ class _MainScreenState extends State<MainScreen> {
             padding: const EdgeInsets.all(16),
           ),
         ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: openGrantEntryDialog,
+          icon: const Icon(Icons.auto_awesome),
+          label: const Text('GRANT ENTRY EFFECT / REWARD'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: gold,
+            side: const BorderSide(color: gold),
+            padding: const EdgeInsets.all(16),
+          ),
+        ),
         if (isOwner) ...[
           const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: openAdminPermissionDialog,
             icon: const Icon(Icons.manage_accounts),
-            label: const Text('GRANT / REVOKE ADMIN TOP-UP'),
+            label: const Text('SET ADMIN COIN LIMIT & ACCESS'),
             style: OutlinedButton.styleFrom(
               foregroundColor: gold,
               side: const BorderSide(color: gold),
               padding: const EdgeInsets.all(16),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+          heading('ADMIN COIN LIMITS', '${adminLimits.length} configured'),
+          const SizedBox(height: 10),
+          if (adminLimits.isEmpty)
+            empty('No Admin Limits Set',
+                'Owner यहाँ Admin की Coin Limit set कर सकता है।')
+          else
+            ...adminLimits.map((row) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: panel,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.security, color: gold),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Admin ID: ${value(row['admin_zoonl_id'])}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Text(
+                      'Limit: ${number(row['coin_limit'])}',
+                      style: const TextStyle(color: gold),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          const SizedBox(height: 20),
           heading('AGENCY APPLICATIONS',
               '${agencyApplications.length} requests'),
           const SizedBox(height: 10),
@@ -1643,17 +2176,15 @@ class _MainScreenState extends State<MainScreen> {
                           fontWeight: FontWeight.bold,
                         )),
                     const SizedBox(height: 5),
+                    Text(
+                      'Plan: ${value(row['portal_plan'])} • '
+                      'Fee: ${number(row['portal_fee_coins'])} Coins',
+                      style: const TextStyle(color: gold, fontSize: 12),
+                    ),
                     Text('Applicant: ${value(row['applicant_id'])}',
                         style: const TextStyle(color: muted)),
                     Text('Status: ${value(row['application_status'])}',
                         style: const TextStyle(color: muted)),
-                    Text(
-                      'Application ID: ${value(row['id'])}',
-                      style: const TextStyle(
-                        color: muted,
-                        fontSize: 10,
-                      ),
-                    ),
                   ],
                 ),
               );
