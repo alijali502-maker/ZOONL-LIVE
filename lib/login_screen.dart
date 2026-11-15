@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -98,8 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendPhoneOtp() async {
-    if (_countryCode.text.trim().isEmpty ||
-        _phone.text.trim().isEmpty) {
+    if (_countryCode.text.trim().isEmpty || _phone.text.trim().isEmpty) {
       _show('Country Code और Mobile Number भरें।');
       return;
     }
@@ -110,8 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!RegExp(r'^[0-9]{6,15}$')
-        .hasMatch(_phone.text.trim())) {
+    if (!RegExp(r'^[0-9]{6,15}$').hasMatch(_phone.text.trim())) {
       _show('सही Mobile Number लिखें।');
       return;
     }
@@ -123,6 +120,10 @@ class _LoginScreenState extends State<LoginScreen> {
       await _supabase.auth.signInWithOtp(
         phone: _fullPhone,
         shouldCreateUser: _register,
+        data: {
+          if (_register && _name.text.trim().isNotEmpty)
+            'display_name': _name.text.trim(),
+        },
       );
 
       if (mounted) {
@@ -247,6 +248,160 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _liveStreamerWelcomeBanner() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF5A238C),
+            Color(0xFF28123D),
+            Color(0xFF130B20),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFFE6C47A).withOpacity(0.55),
+          width: 1.3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF9636F5).withOpacity(0.28),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF2E63),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.fiber_manual_record, size: 10, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      'LIVE STAGE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6C47A).withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFE6C47A).withOpacity(0.45),
+                  ),
+                ),
+                child: const Text(
+                  'CREATOR VIP',
+                  style: TextStyle(
+                    color: Color(0xFFE6C47A),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                height: 92,
+                width: 92,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFE6C47A), Color(0xFFDA65C8), Color(0xFF9636F5)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFDA65C8).withOpacity(0.4),
+                      blurRadius: 18,
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(3),
+                child: const CircleAvatar(
+                  backgroundColor: Color(0xFF1A102B),
+                  child: Icon(
+                    Icons.face_retouching_natural,
+                    size: 46,
+                    color: Color(0xFFFFC6EB),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFE6C47A),
+                ),
+                child: const Icon(
+                  Icons.mic,
+                  size: 15,
+                  color: Color(0xFF191026),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'ZOONL LIVE',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Welcome to Live Streamer & Creator Arena',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFE6C47A),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _register
+                ? 'Create your creator account & get your permanent ZOONL ID'
+                : 'Sign in to enter live rooms, gifts & VIP stage',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _emailForm() {
     return Form(
       key: _formKey,
@@ -285,17 +440,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   () => _hidePassword = !_hidePassword,
                 ),
                 icon: Icon(
-                  _hidePassword
-                      ? Icons.visibility_off
-                      : Icons.visibility,
+                  _hidePassword ? Icons.visibility_off : Icons.visibility,
                   color: Colors.white70,
                 ),
               ),
             ),
-            validator: (v) =>
-                (v ?? '').length >= 6
-                    ? null
-                    : 'Password कम से कम 6 characters का रखें',
+            validator: (v) => (v ?? '').length >= 6
+                ? null
+                : 'Password कम से कम 6 characters का रखें',
           ),
           if (!_register)
             Align(
@@ -445,134 +597,115 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF090713),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(25),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  height: 88,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFF211331),
-                  ),
-                  child: const Icon(
-                    Icons.graphic_eq_rounded,
-                    size: 48,
-                    color: Color(0xFFD4A0FF),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'ZOONL LIVE',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _register ? 'Create your account' : 'Welcome back',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _modeButton(
-                        'EMAIL',
-                        !_phoneMode,
-                        () => setState(() {
-                          _phoneMode = false;
-                          _otpSent = false;
-                        }),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _modeButton(
-                        'PHONE OTP',
-                        _phoneMode,
-                        () => setState(() {
-                          _phoneMode = true;
-                          _otpSent = false;
-                        }),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                if (_phoneMode) _phoneForm() else _emailForm(),
-                const SizedBox(height: 15),
-                TextButton(
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() {
-                            _register = !_register;
-                            _password.clear();
-                            _otp.clear();
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF23113A),
+              Color(0xFF090713),
+              Color(0xFF06040D),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _liveStreamerWelcomeBanner(),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _modeButton(
+                          'EMAIL',
+                          !_phoneMode,
+                          () => setState(() {
+                            _phoneMode = false;
                             _otpSent = false;
                           }),
-                  child: Text(
-                    _register
-                        ? 'Already registered? Login'
-                        : 'New user? Create an account',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFFD0A4FF),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                const Row(
-                  children: [
-                    Expanded(child: Divider(color: Color(0xFF49365F))),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'OR CONTINUE WITH',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 10,
                         ),
                       ),
-                    ),
-                    Expanded(child: Divider(color: Color(0xFF49365F))),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                _socialButton(
-                  'Continue with Google',
-                  Icons.g_mobiledata,
-                  OAuthProvider.google,
-                ),
-                const SizedBox(height: 10),
-                _socialButton(
-                  'Continue with Facebook',
-                  Icons.facebook,
-                  OAuthProvider.facebook,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Your permanent ZOONL ID is assigned by the registration system.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
-                    height: 1.5,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _modeButton(
+                          'PHONE OTP',
+                          _phoneMode,
+                          () => setState(() {
+                            _phoneMode = true;
+                            _otpSent = false;
+                          }),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  if (_phoneMode) _phoneForm() else _emailForm(),
+                  const SizedBox(height: 14),
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() {
+                              _register = !_register;
+                              _password.clear();
+                              _otp.clear();
+                              _otpSent = false;
+                            }),
+                    child: Text(
+                      _register
+                          ? 'Already registered? Login'
+                          : 'New user? Create an account',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFFD0A4FF),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider(color: Color(0xFF49365F))),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          'OR CONTINUE WITH',
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: Color(0xFF49365F))),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  _socialButton(
+                    'Continue with Google',
+                    Icons.g_mobiledata,
+                    OAuthProvider.google,
+                  ),
+                  const SizedBox(height: 10),
+                  _socialButton(
+                    'Continue with Facebook',
+                    Icons.facebook,
+                    OAuthProvider.facebook,
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Your permanent ZOONL ID is assigned by the registration system.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -606,5 +739,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-                      
