@@ -247,7 +247,7 @@ class _MainScreenState extends State<MainScreen> {
           .select()
           .order('created_at', ascending: false)
           .limit(100);
-      adminLimits = List>.from(rows);
+      adminLimits = List>.from(rows as List);
     } catch (_) {
       adminLimits = [];
     }
@@ -301,7 +301,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('is_live', true)
           .order('created_at', ascending: false)
           .limit(50);
-      rooms = List>.from(result);
+      rooms = List>.from(result as List);
     } catch (_) {
       rooms = [];
     }
@@ -315,7 +315,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('is_active', true)
           .order('coin_price')
           .limit(100);
-      gifts = List>.from(result);
+      gifts = List>.from(result as List);
     } catch (_) {
       gifts = [];
     }
@@ -329,7 +329,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('user_id', userId)
           .order('created_at', ascending: false)
           .limit(50);
-      transactions = List>.from(result);
+      transactions = List>.from(result as List);
     } catch (_) {
       transactions = [];
     }
@@ -343,7 +343,7 @@ class _MainScreenState extends State<MainScreen> {
           .eq('user_id', userId)
           .order('started_at', ascending: false)
           .limit(10);
-      memberships = List>.from(result);
+      memberships = List>.from(result as List);
     } catch (_) {
       memberships = [];
     }
@@ -360,7 +360,7 @@ class _MainScreenState extends State<MainScreen> {
           .select()
           .order('created_at', ascending: false)
           .limit(100);
-      agencyApplications = List>.from(result);
+      agencyApplications = List>.from(result as List);
     } catch (_) {
       agencyApplications = [];
     }
@@ -383,7 +383,7 @@ class _MainScreenState extends State<MainScreen> {
     final e = error.toString().toUpperCase();
 
     if (e.contains('TOPUP_PERMISSION_DENIED')) {
-      return 'Owner ने Top-up की अनुमति नहीं दी है।';
+      return 'Owner نے Top-up کی अनुमति नहीं दी है।';
     }
     if (e.contains('ADMIN_COIN_LIMIT_EXCEEDED')) {
       return 'Admin Coin Limit पूरी हो चुकी है। Owner से limit बढ़वाएं।';
@@ -583,7 +583,6 @@ class _MainScreenState extends State<MainScreen> {
                   },
                 );
 
-                // Save/update coin limit for this admin
                 await db.from('owner_admin_permissions').upsert({
                   'admin_zoonl_id': adminId,
                   'permission_key': 'manage_topups',
@@ -1027,7 +1026,6 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final showControl = isOwner || canManageTopups;
 
-    // Index 6: ZoonlFeatureHub, Index 7: Control Page (Owner/Admin)
     final pages = <Widget>[
       homePage(),
       livePage(),
@@ -2003,7 +2001,7 @@ class _MainScreenState extends State<MainScreen> {
               .select()
               .eq('applicant_id', userId)
               .order('created_at', ascending: false)
-              .then((r) => List>.from(r)),
+              .then((r) => List>.from(r as List)),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
