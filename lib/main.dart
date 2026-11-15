@@ -130,7 +130,6 @@ class _MainScreenState extends State<MainScreen> {
     return input.toString();
   }
 
-  /// Dynamic ID Level Theme (Page + Chat Strip + ID Badge)
   Color get levelAccentColor {
     if (isOwner || zoonlId == '10001') return gold;
     if (userLevel >= 70) return const Color(0xFFFF4D6D);
@@ -403,7 +402,6 @@ class _MainScreenState extends State<MainScreen> {
     return 'अनुरोध पूरा नहीं हुआ: $error';
   }
 
-  /// Admin Coin Limit Check + Top-up
   Future<void> openTopupDialog() async {
     if (!canManageTopups) {
       message('आपको Top-up की अनुमति नहीं है।');
@@ -546,7 +544,6 @@ class _MainScreenState extends State<MainScreen> {
     descriptionController.dispose();
   }
 
-  /// Owner Settings: Grant/Revoke Admin + Set Admin Coin Limit
   Future<void> openAdminPermissionDialog() async {
     if (!isOwner) return;
 
@@ -654,7 +651,6 @@ class _MainScreenState extends State<MainScreen> {
     limitController.dispose();
   }
 
-  /// Owner / Admin Entry Effect Reward & Grant Control
   Future<void> openGrantEntryDialog() async {
     if (!isOwner && !canManageTopups) {
       message('Entry reward/grant केवल Owner या Authorized Admin कर सकता है।');
@@ -780,7 +776,6 @@ class _MainScreenState extends State<MainScreen> {
     targetIdController.dispose();
   }
 
-  /// Paid Agency Portal Application (Coins Deduction Flow)
   Future<void> applyForAgency() async {
     final nameController = TextEditingController();
     final contactController = TextEditingController();
@@ -1115,7 +1110,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Dynamic ID Badge + ID Number Box (with Owner Special Look)
   Widget idBadgeWithNumberWidget() {
     final displayId = zoonlId.isEmpty ? 'Not available' : zoonlId;
     final specialOwner = isOwner || zoonlId == '10001';
@@ -1179,7 +1173,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Chatting Patti (Chat Strip) with Dynamic ID Level Color
   Widget chatStripWidget({required String senderName, required String chatText}) {
     final specialOwner = isOwner || zoonlId == '10001';
     return Container(
@@ -1430,7 +1423,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Main Owner VIP Special Entry + Pre-Set Frame Card
   Widget ownerIdentityCard() {
     return Container(
       margin: const EdgeInsets.only(top: 14),
@@ -1815,7 +1807,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Premium Profile System with Dynamic ID Level Colors & Frame
   Widget profilePage() {
     final name = value(
       profile['display_name'],
@@ -1949,7 +1940,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Paid Agency Portal Page
   Widget agencyPage() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
@@ -2038,7 +2028,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  /// Premium VIP Owner Dashboard & Admin Coin Limit Control
   Widget controlPage() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(17, 14, 17, 100),
