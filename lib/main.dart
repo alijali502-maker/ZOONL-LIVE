@@ -382,7 +382,7 @@ class _MainScreenState extends State<MainScreen> {
     final e = error.toString().toUpperCase();
 
     if (e.contains('TOPUP_PERMISSION_DENIED')) {
-      return 'Owner نے Top-up کی अनुमति नहीं दी है।';
+      return 'Owner ने Top-up की अनुमति नहीं दी है।';
     }
     if (e.contains('ADMIN_COIN_LIMIT_EXCEEDED')) {
       return 'Admin Coin Limit पूरी हो चुकी है। Owner से limit बढ़वाएं।';
