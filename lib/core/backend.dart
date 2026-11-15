@@ -6,7 +6,7 @@ class Backend {
 
   static User? get currentUser => client.auth.currentUser;
 
-  static Future initialize({
+  static Future<void> initialize({
     required String supabaseUrl,
     required String supabaseAnonKey,
   }) async {
@@ -16,18 +16,18 @@ class Backend {
     );
   }
 
-  static Future fetchZoonlLiveFeed() async {
+  static Future<List<dynamic>> fetchZoonlLiveFeed() async {
     final response = await client
         .from('zoonl_live_feed')
         .select()
         .order('created_at', ascending: false);
     if (response is List) {
-      return List.from(response);
+      return List<dynamic>.from(response);
     }
     return [];
   }
 
-  static Future sendZoonlLiveGift({
+  static Future<dynamic> sendZoonlLiveGift({
     required String senderId,
     required String receiverId,
     required String giftCode,
@@ -42,7 +42,7 @@ class Backend {
     return response;
   }
 
-  static Future equipZoonlCosmetic({
+  static Future<dynamic> equipZoonlCosmetic({
     required String userId,
     required String itemCode,
   }) async {
@@ -54,5 +54,6 @@ class Backend {
     return response;
   }
 }
+
 
 
