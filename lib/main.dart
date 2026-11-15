@@ -1985,25 +1985,26 @@ class _MainScreenState extends State<MainScreen> {
         const SizedBox(height: 20),
         heading('My Application', 'Your submitted agency requests'),
         const SizedBox(height: 10),
-        FutureBuilder<List>>(
-          future: db
-              .from('agency_applications')
-              .select()
-              .eq('applicant_id', userId)
-              .order('created_at', ascending: false)
-              .then((r) => List>.from(r as List)),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final rows = snapshot.data ?? [];
-            if (rows.isEmpty) {
-              return empty('No Application',
-                  'आपकी Agency Application यहाँ दिखाई देगी।');
-            }
-            return Column(
-              children: rows.map((row) {
-                return Container(
+                  FutureBuilder<List>>(
+            future: db
+                .from('agency_applications')
+                .select()
+                .eq('applicant_id', userId)
+                .order('created_at', ascending: false)
+                .then((r) => List>.from(r as List)),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final rows = snapshot.data ?? [];
+              if (rows.isEmpty) {
+                return empty('No Application',
+                    'आपकी Agency Application यहाँ दिखाई देगी।');
+              }
+              return Column(
+                children: rows.map((row) {
+                  return Container(
+
                   margin: const EdgeInsets.only(bottom: 9),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
