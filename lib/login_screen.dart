@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final VoidCallback? onAuthenticated;
+
+  const LoginScreen({
+    super.key,
+    this.onAuthenticated,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -41,6 +46,11 @@ class _LoginScreenState extends State<LoginScreen> {
       );
   }
 
+  void _authenticated() {
+    if (!mounted) return;
+    widget.onAuthenticated?.call();
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -67,13 +77,16 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else {
           _show('Account बन गया।');
+          _authenticated();
         }
       } else {
         await _supabase.auth.signInWithPassword(
           email: email,
           password: _password.text,
         );
+
         _show('Login सफल हुआ।');
+        _authenticated();
       }
     } on AuthException catch (e) {
       final m = e.message.toLowerCase();
@@ -97,7 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendPhoneOtp() async {
-    if (_countryCode.text.trim().isEmpty || _phone.text.trim().isEmpty) {
+    if (_countryCode.text.trim().isEmpty ||
+        _phone.text.trim().isEmpty) {
       _show('Country Code और Mobile Number भरें।');
       return;
     }
@@ -108,7 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!RegExp(r'^[0-9]{6,15}$').hasMatch(_phone.text.trim())) {
+    if (!RegExp(r'^[0-9]{6,15}$')
+        .hasMatch(_phone.text.trim())) {
       _show('सही Mobile Number लिखें।');
       return;
     }
@@ -158,6 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       _show('Mobile Number Verification सफल हुआ।');
+      _authenticated();
     } on AuthException catch (e) {
       _show(e.message);
     } catch (e) {
@@ -207,7 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFBD78FF)),
+      prefixIcon: Icon(
+        icon,
+        color: const Color(0xFFBD78FF),
+      ),
       filled: true,
       fillColor: const Color(0xFF191426),
       border: OutlineInputBorder(
@@ -216,7 +235,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Color(0xFF302342)),
+        borderSide: const BorderSide(
+          color: Color(0xFF302342),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
@@ -279,7 +300,10 @@ class _LoginScreenState extends State<LoginScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFF2E63),
                   borderRadius: BorderRadius.circular(20),
@@ -287,7 +311,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.fiber_manual_record, size: 10, color: Colors.white),
+                    Icon(
+                      Icons.fiber_manual_record,
+                      size: 10,
+                      color: Colors.white,
+                    ),
                     SizedBox(width: 5),
                     Text(
                       'LIVE STAGE',
@@ -303,7 +331,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE6C47A).withOpacity(0.16),
                   borderRadius: BorderRadius.circular(20),
@@ -333,7 +364,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFE6C47A), Color(0xFFDA65C8), Color(0xFF9636F5)],
+                    colors: [
+                      Color(0xFFE6C47A),
+                      Color(0xFFDA65C8),
+                      Color(0xFF9636F5),
+                    ],
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -412,7 +447,10 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _name,
               style: const TextStyle(color: Colors.white),
-              decoration: _input('Full Name', Icons.person_outline),
+              decoration: _input(
+                'Full Name',
+                Icons.person_outline,
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -421,7 +459,10 @@ class _LoginScreenState extends State<LoginScreen> {
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
             style: const TextStyle(color: Colors.white),
-            decoration: _input('Email Address', Icons.email_outlined),
+            decoration: _input(
+              'Email Address',
+              Icons.email_outlined,
+            ),
             validator: (v) {
               final s = (v ?? '').trim();
               return s.contains('@') && s.contains('.')
@@ -434,13 +475,18 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _password,
             obscureText: _hidePassword,
             style: const TextStyle(color: Colors.white),
-            decoration: _input('Password', Icons.lock_outline).copyWith(
+            decoration: _input(
+              'Password',
+              Icons.lock_outline,
+            ).copyWith(
               suffixIcon: IconButton(
                 onPressed: () => setState(
                   () => _hidePassword = !_hidePassword,
                 ),
                 icon: Icon(
-                  _hidePassword ? Icons.visibility_off : Icons.visibility,
+                  _hidePassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
                   color: Colors.white70,
                 ),
               ),
@@ -456,7 +502,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _loading ? null : _forgotPassword,
                 child: const Text(
                   'Forgot password?',
-                  style: TextStyle(color: Color(0xFFC58AFF)),
+                  style: TextStyle(
+                    color: Color(0xFFC58AFF),
+                  ),
                 ),
               ),
             ),
@@ -479,7 +527,10 @@ class _LoginScreenState extends State<LoginScreen> {
             TextField(
               controller: _name,
               style: const TextStyle(color: Colors.white),
-              decoration: _input('Full Name', Icons.person_outline),
+              decoration: _input(
+                'Full Name',
+                Icons.person_outline,
+              ),
             ),
             const SizedBox(height: 16),
           ],
@@ -520,7 +571,10 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _otp,
             keyboardType: TextInputType.number,
             style: const TextStyle(color: Colors.white),
-            decoration: _input('Enter OTP', Icons.password),
+            decoration: _input(
+              'Enter OTP',
+              Icons.password,
+            ),
           ),
           const SizedBox(height: 15),
           _primaryButton('VERIFY OTP', _verifyPhoneOtp),
@@ -535,14 +589,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
             child: const Text(
               'Change Number',
-              style: TextStyle(color: Color(0xFFC58AFF)),
+              style: TextStyle(
+                color: Color(0xFFC58AFF),
+              ),
             ),
           ),
           TextButton(
             onPressed: _loading ? null : _sendPhoneOtp,
             child: const Text(
               'Resend OTP',
-              style: TextStyle(color: Color(0xFFC58AFF)),
+              style: TextStyle(
+                color: Color(0xFFC58AFF),
+              ),
             ),
           ),
         ],
@@ -550,7 +608,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _primaryButton(String label, VoidCallback action) {
+  Widget _primaryButton(
+    String label,
+    VoidCallback action,
+  ) {
     return SizedBox(
       height: 54,
       child: ElevatedButton(
@@ -644,7 +705,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  if (_phoneMode) _phoneForm() else _emailForm(),
+                  if (_phoneMode)
+                    _phoneForm()
+                  else
+                    _emailForm(),
                   const SizedBox(height: 14),
                   TextButton(
                     onPressed: _loading
@@ -668,9 +732,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   const Row(
                     children: [
-                      Expanded(child: Divider(color: Color(0xFF49365F))),
+                      Expanded(
+                        child: Divider(
+                          color: Color(0xFF49365F),
+                        ),
+                      ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                        ),
                         child: Text(
                           'OR CONTINUE WITH',
                           style: TextStyle(
@@ -679,7 +749,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Color(0xFF49365F))),
+                      Expanded(
+                        child: Divider(
+                          color: Color(0xFF49365F),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
