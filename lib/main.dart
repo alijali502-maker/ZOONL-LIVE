@@ -86,7 +86,8 @@ class ZoonlStore extends ChangeNotifier {
   String supportEmail = 'support@zoonllive.com';
   String supportContact = '+971-50-111-10001';
 
-  final List> ownerRewardLibrary = >[
+  final List> ownerRewardLibrary =
+      >[
     <String, dynamic>{
       'id': 'r1',
       'type': 'Frame',
@@ -180,7 +181,11 @@ class ZoonlStore extends ChangeNotifier {
       <String, dynamic>{'id': 'M-1', 'tier': 'SVIP', 'active': true},
     ];
     agencyApplications = >[
-      <String, dynamic>{'id': 'AG-1', 'agencyCode': 'AG-1001', 'status': 'APPROVED'},
+      <String, dynamic>{
+        'id': 'AG-1',
+        'agencyCode': 'AG-1001',
+        'status': 'APPROVED',
+      },
     ];
 
     streamers.addAll(>[
@@ -598,7 +603,8 @@ class ZoonlStore extends ChangeNotifier {
       currentUser['coins'] = bal - giftCoins;
     }
 
-    currentUser['sentCoins'] = ((currentUser['sentCoins'] as int?) ?? 0) + giftCoins;
+    currentUser['sentCoins'] =
+        ((currentUser['sentCoins'] as int?) ?? 0) + giftCoins;
     currentUser['level'] = resolveUserLevel(currentUser['sentCoins'] as int);
 
     streamer['receivedCoins'] =
@@ -681,7 +687,8 @@ class ZoonlStore extends ChangeNotifier {
         blacklist.add(targetUserId);
       }
     } else if (actorIsAdmin) {
-      final bool hasVipOrSvip = actorVipTier == 'VIP' || actorVipTier == 'SVIP';
+      final bool hasVipOrSvip =
+          actorVipTier == 'VIP' || actorVipTier == 'SVIP';
       if (action == 'MUTE' && hasVipOrSvip && !muted.contains(targetUserId)) {
         muted.add(targetUserId);
       }
@@ -1549,7 +1556,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               Wrap(
                 spacing: 8,
-                children: <String>['6P', '3P', '2P', 'TRAIN', '4GRID'].map((String m) {
+                children: <String>['6P', '3P', '2P', 'TRAIN', '4GRID']
+                    .map((String m) {
                   return ChoiceChip(
                     label: Text(m),
                     selected: pkModeSelected == m,
@@ -1838,7 +1846,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 children: <Widget>[
                   OutlinedButton(
                     onPressed: () => setState(() => kycFrontUploaded = true),
-                    child: Text(kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front'),
+                    child:
+                        Text(kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front'),
                   ),
                   OutlinedButton(
                     onPressed: () => setState(() => kycBackUploaded = true),
