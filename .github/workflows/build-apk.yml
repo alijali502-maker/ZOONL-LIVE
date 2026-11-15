@@ -45,15 +45,10 @@ jobs:
 
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-
           permission = '<uses-permission android:name="android.permission.INTERNET"/>'
 
           if permission not in s:
-              s = s.replace(
-                  '<application',
-                  permission + '\n    <application',
-                  1
-              )
+              s = s.replace('<application', permission + '\n    <application', 1)
               p.write_text(s)
 
           print("Internet permission configured.")
@@ -79,7 +74,7 @@ jobs:
           EOF
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release -t lib/app_entry.dart
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -88,4 +83,3 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 7
-
