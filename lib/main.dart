@@ -1680,7 +1680,7 @@ class _MainScreenState extends State<MainScreen> {
             empty('No Transactions',
                 'आपकी Wallet History यहाँ दिखाई देगी।')
           else
-            ...transactions.map(transactionCard),
+            ...transactions.map((row) => transactionCard(Map<String, dynamic>.from(row as Map))),
         ],
       ),
     );
