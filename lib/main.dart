@@ -30,7 +30,345 @@ class ZoonlApp extends StatelessWidget {
     );
   }
 }
+  void checkTrialExpiryAndMoveToBackup() {
+    final dynamic rawExpiry = currentUser['trialExpiresAt'];
+    if (rawExpiry is! String || rawExpiry.isEmpty) return;
 
+    final DateTime? expiry = DateTime.tryParse(rawExpiry);
+    if (expiry == null || DateTime.now().isBefore(expiry)) return;
+
+    currentUser['vipTier'] = 'NONE';
+
+    for (final Map<String, dynamic> item in backupStore) {
+      if (item['fromTrial'] == true &&
+          item['id'].toString().contains(
+                currentUser['id'].toString(),
+              )) {
+        item['equipped'] = false;
+        item['expiredToBackup'] = true;
+      }
+    }
+
+    currentUser['trialExpiresAt'] = null;
+    notifyListeners();
+  }
+
+  int resolveUserLevel(int sentCoins) {
+    const List<int> thresholds = <int>[
+      0, 50000, 100000, 160000, 230000,
+      310000, 400000, 500000, 620000, 750000,
+      1000000, 1300000, 1600000, 1900000, 2200000,
+      2700000, 3200000, 3700000, 4200000, 4700000,
+    ];
+
+    if (sentCoins <= 0) return 1;
+
+    for (int i = 1; i < thresholds.length; i++) {
+      if (sentCoins < thresholds[i]) return i;
+    }
+
+    int level = 20;
+    int accumulated = thresholds.last;
+
+    while (level < 100) {
+      final int step = level < 50 ? 1500000 : 3500000;
+      if (sentCoins < accumulated + step) break;
+      accumulated += step;
+      level++;
+    }
+
+    return min(100, level);
+  }
+
+  Map<String, dynamic> resolveColorStar(int sentCoins) {
+    if (sentCoins >= 2000000) {
+      return <String, dynamic>{
+        'stars': 5,
+        'label': 'BIG STAR',
+        'color': const Color(0xFFFF2E93),
+      };
+    } else if (sentCoins >= 1000000) {
+      return <String, dynamic>{
+        'stars': 4,
+        'label': '4 STAR',
+        'color': const Color(0xFFFF9100),
+      };
+    } else if (sentCoins >= 200000) {
+      return <String, dynamic>{
+        'stars': 3,
+        'label': '3 STAR',
+        'color': const Color(0xFF00E5FF),
+      };
+    } else if (sentCoins >= 50000) {
+      return <String, dynamic>{
+        'stars': 2,
+        'label': '2 STAR',
+        'color': const Color(0xFF7C4DFF),
+      };
+    } else if (sentCoins >= 10000) {
+      return <String, dynamic>{
+        'stars': 1,
+        'label': '1 STAR',
+        'color': const Color(0xFFFFD54F),
+      };
+    }
+
+    return <String, dynamic>{
+      'stars': 0,
+      'label': 'NO STAR',
+      'color': Colors.white38,
+    };
+  }
+
+  Map<String, dynamic> resolveStreamerCrownOrDemon(
+    int sentCoins,
+  ) {
+    if (sentCoins < 30000) {
+      return <String, dynamic>{
+        'kind': 'HEART',
+        'count': 1,
+        'title': 'Mini Heart',
+        'color': const Color(0xFFFF5C8A),
+      };
+    }
+
+    if (sentCoins < 150000) {
+      final int demonCount = sentCoins < 80000 ? 1 : 2;
+      return <String, dynamic>{
+        'kind': 'DEMON',
+        'count': demonCount,
+        'title': '$demonCount Demon',
+        'color': const Color(0xFFFF3D57),
+      };
+    }
+
+    int crown = 1;
+    if (sentCoins >= 45000000) {
+      crown = 40;
+    } else if (sentCoins >= 35000000) {
+      crown = 32;
+    } else if (sentCoins >= 20000000) {
+      crown = 24;
+    } else if (sentCoins >= 10000000) {
+      crown = 16;
+    } else if (sentCoins >= 5000000) {
+      crown = 10;
+    } else if (sentCoins >= 2500000) {
+      crown = 6;
+    } else if (sentCoins >= 1000000) {
+      crown = 3;
+    } else if (sentCoins >= 500000) {
+      crown = 2;
+    }
+
+    return <String, dynamic>{
+      'kind': 'CROWN',
+      'count': min(40, crown),
+      'title': '$crown Crown',
+      'color': const Color(0xFFFFD700),
+    };
+  }
+
+  // Local gift accounting is permitted only in clearly marked TEST mode.
+  // LIVE mode must use a trusted server transaction/RPC.
+  bool sendGift({
+    required Map<String, dynamic> streamer,
+    required String giftName,
+    required int giftCoins,
+  }) {
+    if (!isTestMode) return false;
+
+    final String senderId =
+        currentUser['id']?.toString() ?? '';
+
+    if (senderId.isEmpty ||
+        giftName.trim().isEmpty ||
+        giftCoins <= 0 ||
+        isPermanentlyBannedByOwner(senderId) ||
+        !streamers.contains(streamer)) {
+      return false;
+    }
+
+    final int currentCoins =
+        (currentUser['coins'] as num?)?.toInt() ?? 0;
+
+    if (currentCoins < giftCoins) return false;
+
+    currentUser['coins'] = currentCoins - giftCoins;
+
+    final int senderSentCoins =
+        (currentUser['sentCoins'] as num?)?.toInt() ?? 0;
+    currentUser['sentCoins'] = senderSentCoins + giftCoins;
+    currentUser['level'] =
+        resolveUserLevel(senderSentCoins + giftCoins);
+
+    final int received =
+        (streamer['receivedCoins'] as num?)?.toInt() ?? 0;
+    streamer['receivedCoins'] = received + giftCoins;
+
+    final int daily =
+        (streamer['dailyReceiving'] as num?)?.toInt() ?? 0;
+    streamer['dailyReceiving'] = daily + giftCoins;
+
+    final double payoutGain = giftCoins * 0.65 / 100.0;
+    final double streamerBalance =
+        (streamer['walletBalance'] as num?)?.toDouble() ?? 0.0;
+    streamer['walletBalance'] = streamerBalance + payoutGain;
+
+    final List<Map<String, dynamic>> history = _convertMaps(
+      (streamer['giftersHistory'] as List<dynamic>?) ??
+          <dynamic>[],
+    );
+
+    history.insert(0, <String, dynamic>{
+      'userId': senderId,
+      'name': currentUser['name']?.toString() ?? 'User',
+      'coins': giftCoins,
+      'period': 'DAILY',
+      'createdAt': DateTime.now().toIso8601String(),
+      'mode': 'TEST',
+    });
+
+    streamer['giftersHistory'] = history;
+
+    final Map<String, dynamic> crownInfo =
+        resolveStreamerCrownOrDemon(received + giftCoins);
+
+    final Map<String, dynamic> banner = <String, dynamic>{
+      'senderName': currentUser['name'],
+      'senderLevel': currentUser['level'],
+      'giftName': giftName,
+      'streamerName': streamer['name'],
+      'streamerCrown': crownInfo['title'],
+      'crownColor': crownInfo['color'],
+      'mode': 'TEST',
+    };
+
+    if (activeGlobalGiftBanner == null) {
+      activeGlobalGiftBanner = banner;
+    } else {
+      _giftTickerQueue.add(banner);
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  // Test Coins are explicitly marked test credits, never real currency.
+  bool addTestCoins(int amount) {
+    if (!isTestMode || amount <= 0) return false;
+
+    final int currentCoins =
+        (currentUser['coins'] as num?)?.toInt() ?? 0;
+    currentUser['coins'] = currentCoins + amount;
+    notifyListeners();
+    return true;
+  }
+
+  bool canStartLive() {
+    if (isOwner) return true;
+    if (currentUser['isVerifiedStreamer'] == true) return true;
+    return ((currentUser['level'] as num?)?.toInt() ?? 1) >= 5;
+  }
+
+  void toggleLiveStatus({
+    required bool goLive,
+    String mode = 'VIDEO',
+  }) {
+    if (goLive && !canStartLive()) return;
+
+    final String safeMode =
+        mode.toUpperCase() == 'AUDIO' ? 'AUDIO' : 'VIDEO';
+
+    currentUser['isLive'] = goLive;
+    currentUser['liveMode'] = safeMode;
+    currentUser['offlineSince'] =
+        goLive ? null : DateTime.now();
+
+    notifyListeners();
+  }
+
+  void moderateUser({
+    required Map<String, dynamic> streamer,
+    required String targetUserId,
+    required String action,
+    required bool actorIsStreamer,
+    required bool actorIsAdmin,
+    required String actorVipTier,
+  }) {
+    if (targetUserId.trim().isEmpty ||
+        targetUserId == streamer['userId']?.toString()) {
+      return;
+    }
+
+    final bool owner = isOwner;
+    final bool streamerOwner =
+        currentUser['id']?.toString() ==
+            streamer['userId']?.toString();
+
+    final List<dynamic> admins =
+        streamer['roomAdmins'] as List<dynamic>? ?? <dynamic>[];
+
+    final bool verifiedRoomAdmin = admins
+        .map((dynamic id) => id.toString())
+        .contains(currentUser['id']?.toString());
+
+    final bool canActAsStreamer = owner || streamerOwner;
+    final bool canActAsAdmin =
+        !canActAsStreamer && verifiedRoomAdmin && actorIsAdmin;
+
+    final List<String> muted = List<String>.from(
+      (streamer['mutedUsers'] as List<dynamic>?) ?? <dynamic>[],
+    );
+    final List<String> blacklist = List<String>.from(
+      (streamer['blacklist'] as List<dynamic>?) ?? <dynamic>[],
+    );
+    final List<String> booted = List<String>.from(
+      (streamer['bootedUsers'] as List<dynamic>?) ?? <dynamic>[],
+    );
+
+    if (canActAsStreamer) {
+      switch (action) {
+        case 'MUTE':
+          if (!muted.contains(targetUserId)) muted.add(targetUserId);
+          break;
+        case 'UNMUTE':
+          muted.remove(targetUserId);
+          break;
+        case 'BLACKLIST':
+          if (!blacklist.contains(targetUserId)) {
+            blacklist.add(targetUserId);
+          }
+          break;
+        case 'BOOT':
+          if (!booted.contains(targetUserId)) {
+            booted.add(targetUserId);
+          }
+          break;
+      }
+    } else if (canActAsAdmin) {
+      final bool hasVip =
+          actorVipTier == 'VIP' || actorVipTier == 'SVIP';
+      if (hasVip && action == 'MUTE' &&
+          !muted.contains(targetUserId)) {
+        muted.add(targetUserId);
+      } else if (hasVip && action == 'UNMUTE') {
+        muted.remove(targetUserId);
+      }
+    }
+
+    streamer['mutedUsers'] = muted;
+    streamer['blacklist'] = blacklist;
+    streamer['bootedUsers'] = booted;
+    notifyListeners();
+  }
+
+  void disposeStore() {
+    _tickerTimer?.cancel();
+    _tickerTimer = null;
+    super.dispose();
+  }
+}
 enum ZoonlAppMode {
   test,
   live,
