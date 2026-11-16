@@ -32,6 +32,29 @@ class Backend {
     );
   }
 
+  // Fetch the authenticated user's profile
+  static Future<Map<String, dynamic>?> fetchMyProfile() async {
+    final user = currentUser;
+
+    if (user == null) {
+      throw StateError('पहले Login करना जरूरी है।');
+    }
+
+    try {
+      final response = await client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      return response;
+    } on PostgrestException {
+      rethrow;
+    } catch (e) {
+      throw Exception('Profile लोड नहीं हो सकी: $e');
+    }
+  }
+
   // Fetch ZOONL LIVE Feed
   static Future<List<Map<String, dynamic>>>
       fetchZoonlLiveFeed() async {
@@ -49,7 +72,9 @@ class Backend {
     }
   }
 
-  // Send ZOONL LIVE Gift
+  // Send Gift
+  // Wallet debit and receiver credit must be handled by
+  // a secure server-side transaction, not by this client.
   static Future<List<Map<String, dynamic>>>
       sendZoonlLiveGift({
     required String senderId,
@@ -57,51 +82,10 @@ class Backend {
     required String giftCode,
     required int coins,
   }) async {
-    final sender = senderId.trim();
-    final receiver = receiverId.trim();
-    final code = giftCode.trim();
-
-    if (sender.isEmpty ||
-        receiver.isEmpty ||
-        code.isEmpty) {
-      throw ArgumentError(
-        'Sender ID, Receiver ID और Gift Code जरूरी हैं।',
-      );
-    }
-
-    if (sender == receiver) {
-      throw ArgumentError(
-        'आप खुद को Gift नहीं भेज सकते।',
-      );
-    }
-
-    if (coins <= 0) {
-      throw ArgumentError(
-        'Gift Coins की संख्या शून्य से अधिक होनी चाहिए।',
-      );
-    }
-
-    if (currentUser == null) {
-      throw StateError('पहले Login करना जरूरी है।');
-    }
-
-    try {
-      final response = await client
-          .from('zoonl_live_gifts')
-          .insert({
-            'sender_id': sender,
-            'receiver_id': receiver,
-            'gift_code': code,
-            'coins': coins,
-          })
-          .select();
-
-      return List<Map<String, dynamic>>.from(response);
-    } on PostgrestException {
-      rethrow;
-    } catch (e) {
-      throw Exception('Gift भेजने में समस्या हुई: $e');
-    }
+    throw UnsupportedError(
+      'Gift transaction अभी सुरक्षित Server-side Wallet '
+      'से जुड़ी नहीं है। Gift भेजना फिलहाल उपलब्ध नहीं है।',
+    );
   }
 
   // Equip ZOONL Cosmetic
@@ -119,7 +103,9 @@ class Backend {
       );
     }
 
-    if (currentUser == null) {
+    final user = currentUser;
+
+    if (user == null) {
       throw StateError('पहले Login करना जरूरी है।');
     }
 
