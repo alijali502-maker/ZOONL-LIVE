@@ -1,3 +1,4 @@
+
 name: zoonl_live
 description: "ZOONL LIVE — connect with people around the world."
 publish_to: 'none'
@@ -10,13 +11,15 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.8 
+  cupertino_icons: ^1.0.8
   supabase_flutter: ^2.9.0
   livekit_client: ^2.4.9
   flutter_dotenv: ^5.2.1
   permission_handler: ^11.3.1
   video_player: ^2.9.2
   just_audio: ^0.9.42
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
