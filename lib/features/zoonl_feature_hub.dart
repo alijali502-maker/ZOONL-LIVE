@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../core/backend.dart';
 
@@ -56,10 +57,14 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   Map<String, dynamic> _toMap(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
+
     if (raw is Map) {
-      return raw.map((k, v) => MapEntry(k.toString(), v));
+      return raw.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
     }
-    return {};
+
+    return <String, dynamic>{};
   }
 
   @override
@@ -69,21 +74,27 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   }
 
   Future<void> _loadZoonlFeed() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoadingFeed = true;
       _feedError = null;
     });
+
     try {
       final items = await Backend.fetchZoonlLiveFeed();
+
       if (!mounted) return;
+
       setState(() {
         _zoonlFeedItems = items;
         _isLoadingFeed = false;
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
+
       setState(() {
-        _feedError = e.toString();
+        _feedError = error.toString();
         _isLoadingFeed = false;
       });
     }
@@ -91,21 +102,34 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   Future<void> _equipItem(Map<String, dynamic> item) async {
     final userId = Backend.currentUser?.id;
-    final code = item['code']?.toString() ?? '';
-    final name = item['name']?.toString() ?? 'ZOONL LIVE Item';
+    final code = item['code']?.toString().trim() ?? '';
+    final name = item['name']?.toString().trim().isNotEmpty == true
+        ? item['name'].toString()
+        : 'ZOONL LIVE Item';
 
     if (userId == null) {
-      notice('Please login first to equip $name');
+      notice('Please login first to equip $name.');
+      return;
+    }
+
+    if (code.isEmpty) {
+      notice('This item does not have a valid item code.');
       return;
     }
 
     try {
-      await Backend.equipZoonlCosmetic(userId: userId, itemCode: code);
+      await Backend.equipZoonlCosmetic(
+        userId: userId,
+        itemCode: code,
+      );
+
       if (!mounted) return;
+
       notice('Equipped: $name');
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      notice('Equip failed: $e');
+
+      notice('Equip failed: $error');
     }
   }
 
@@ -117,6 +141,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
   void notice(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -141,64 +166,104 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
         ),
         actions: [
           IconButton(
-            onPressed: _loadZoonlFeed,
+            onPressed: _isLoadingFeed ? null : _loadZoonlFeed,
             icon: const Icon(Icons.refresh, color: _gold),
             tooltip: 'Reload ZOONL LIVE Feed',
           ),
         ],
       ),
-      body: Row(
-        children: [
-          SizedBox(
-            width: 112,
-            child: ListView.builder(
-              itemCount: sections.length,
-              itemBuilder: (context, index) {
-                final active = selected == index;
-                return InkWell(
-                  onTap: () => setState(() => selected = index),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 5,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 13,
-                      horizontal: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: active ? _purple.withOpacity(.25) : _panel,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: active ? _purple : Colors.transparent,
-                      ),
-                    ),
-                    child: Text(
-                      sections[index],
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: active ? _gold : _muted,
-                        fontWeight:
-                            active ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(14),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 600;
+
+          if (isNarrow) {
+            return Column(
               children: [
-                _heading(sections[selected]),
-                const SizedBox(height: 14),
-                _buildSection(),
+                SizedBox(
+                  height: 72,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: sections.length,
+                    itemBuilder: (context, index) {
+                      return _sectionTab(index, horizontal: true);
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: _sectionContent(),
+                ),
               ],
-            ),
+            );
+          }
+
+          return Row(
+            children: [
+              SizedBox(
+                width: 150,
+                child: ListView.builder(
+                  itemCount: sections.length,
+                  itemBuilder: (context, index) {
+                    return _sectionTab(index);
+                  },
+                ),
+              ),
+              Expanded(
+                child: _sectionContent(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _sectionContent() {
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      children: [
+        _heading(sections[selected]),
+        const SizedBox(height: 14),
+        _buildSection(),
+      ],
+    );
+  }
+
+  Widget _sectionTab(int index, {bool horizontal = false}) {
+    final active = selected == index;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selected = index;
+        });
+      },
+      child: Container(
+        width: horizontal ? 125 : double.infinity,
+        margin: const EdgeInsets.symmetric(
+          horizontal: 6,
+          vertical: 5,
+        ),
+        padding: const EdgeInsets.symmetric(
+          vertical: 13,
+          horizontal: 7,
+        ),
+        decoration: BoxDecoration(
+          color: active ? _purple.withOpacity(.25) : _panel,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? _purple : Colors.transparent,
           ),
-        ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          sections[index],
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            color: active ? _gold : _muted,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -208,10 +273,15 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF56328D), _panel],
+          colors: [
+            Color(0xFF56328D),
+            _panel,
+          ],
         ),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: _gold.withOpacity(.35)),
+        border: Border.all(
+          color: _gold.withOpacity(.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +297,10 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           const SizedBox(height: 6),
           Text(
             'ZOONL LIVE • Loaded Items: ${_zoonlFeedItems.length}',
-            style: const TextStyle(color: _muted, fontSize: 11),
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -281,22 +354,39 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
         _searchField('Admin ZOONL ID'),
         ...permissions.keys.map(
           (permission) => SwitchListTile(
-            value: permissions[permission]!,
+            value: permissions[permission] ?? false,
             activeColor: _purple,
-            title: Text(permission, style: const TextStyle(color: Colors.white)),
+            title: Text(
+              permission,
+              style: const TextStyle(color: Colors.white),
+            ),
             onChanged: widget.isOwner
-                ? (value) => setState(
-                      () => permissions[permission] = value,
-                    )
+                ? (value) {
+                    setState(() {
+                      permissions[permission] = value;
+                    });
+                  }
                 : null,
           ),
         ),
         _action(
           'SAVE ADMIN PERMISSIONS',
-          () => notice(
-            'Permission controls are displayed. Backend save integration is pending.',
-          ),
+          () {
+            notice(
+              'Permissions are currently local only. '
+              'Secure backend saving is not connected.',
+            );
+          },
         ),
+        if (!widget.isOwner)
+          const Text(
+            'Owner authorization is required to change Admin permissions.',
+            style: TextStyle(
+              color: _muted,
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
+          ),
       ],
     );
   }
@@ -334,19 +424,28 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'Agency commission, hosts, top-ups and activity reports.',
           Icons.analytics,
         ),
-        _action('NEW AGENCY APPLICATION', () {
-          _formDialog('Agency Application', [
-            'Proposed Agency Name',
-            'Contact Details',
-            'Country',
-          ]);
-        }),
-        _action('CREATE AGENCY REGISTRATION CODE', () {
-          _formDialog('Registration Code', [
-            'Agency ID',
+        _action(
+          'NEW AGENCY APPLICATION',
+          () => _formDialog(
+            'Agency Application',
+            [
+              'Proposed Agency Name',
+              'Contact Details',
+              'Country',
+            ],
+          ),
+        ),
+        _action(
+          'CREATE AGENCY REGISTRATION CODE',
+          () => _formDialog(
             'Registration Code',
-          ]);
-        }),
+            [
+              'Agency ID',
+              'Registration Code',
+            ],
+          ),
+        ),
+        _integrationNotice(),
       ],
     );
   }
@@ -378,18 +477,23 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'Live hours, earnings, ranking and reports.',
           Icons.dashboard,
         ),
-        _action('APPLY AS DIRECT HOST', () {
-          _formDialog('Direct Host Application', [
-            'Full Name',
-            'Country',
-            'Phone Number',
-            'Date of Birth',
-            'ID Document Type',
-            'ID Front Image',
-            'ID Back Image',
-            'Selfie Verification',
-          ]);
-        }),
+        _action(
+          'APPLY AS DIRECT HOST',
+          () => _formDialog(
+            'Direct Host Application',
+            [
+              'Full Name',
+              'Country',
+              'Phone Number',
+              'Date of Birth',
+              'ID Document Type',
+              'ID Front Image',
+              'ID Back Image',
+              'Selfie Verification',
+            ],
+          ),
+        ),
+        _integrationNotice(),
       ],
     );
   }
@@ -427,14 +531,19 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'At least 2 live hours per qualifying day for 20 days.',
           Icons.card_giftcard,
         ),
-        _action('RECORD HOST ADVANCE', () {
-          _formDialog('Host Advance', [
-            'Host ZOONL ID',
-            'Advance Amount',
-            'Date',
-            'Description',
-          ]);
-        }),
+        _action(
+          'RECORD HOST ADVANCE',
+          () => _formDialog(
+            'Host Advance',
+            [
+              'Host ZOONL ID',
+              'Advance Amount',
+              'Date',
+              'Description',
+            ],
+          ),
+        ),
+        _integrationNotice(),
       ],
     );
   }
@@ -472,6 +581,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'Battle scores, winner announcements and rankings.',
           Icons.leaderboard,
         ),
+        _integrationNotice(),
       ],
     );
   }
@@ -509,6 +619,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'PRIME membership status and benefits.',
           Icons.workspace_premium,
         ),
+        _integrationNotice(),
       ],
     );
   }
@@ -516,7 +627,11 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   Widget _backpack() {
     final backpackItems = _zoonlFeedItems
         .map(_toMap)
-        .where((e) => e['feed_type'] == 'GIFT' || e['feed_type'] == 'AVATAR_FRAME')
+        .where(
+          (item) =>
+              item['feed_type'] == 'GIFT' ||
+              item['feed_type'] == 'AVATAR_FRAME',
+        )
         .toList();
 
     return Column(
@@ -533,10 +648,20 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
             child: CircularProgressIndicator(color: _gold),
           )
         else if (_feedError != null)
-          _featureCard('FEED ERROR', 'Could not load ZOONL LIVE feed', _feedError!, Icons.error)
+          _featureCard(
+            'FEED ERROR',
+            'Could not load ZOONL LIVE feed',
+            _feedError!,
+            Icons.error,
+          )
+        else if (backpackItems.isEmpty)
+          _emptyFeed()
         else
           ...backpackItems.map(
-            (item) => _zoonlItemTile(item, showEquip: item['feed_type'] != 'GIFT'),
+            (item) => _zoonlItemTile(
+              item,
+              showEquip: item['feed_type'] != 'GIFT',
+            ),
           ),
       ],
     );
@@ -545,11 +670,13 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
   Widget _themes() {
     final themeItems = _zoonlFeedItems
         .map(_toMap)
-        .where((e) =>
-            e['feed_type'] == 'PROFILE_BG' ||
-            e['feed_type'] == 'ENTRY_EFFECT' ||
-            e['feed_type'] == 'ID_BADGE' ||
-            e['feed_type'] == 'CHAT_BUBBLE')
+        .where(
+          (item) =>
+              item['feed_type'] == 'PROFILE_BG' ||
+              item['feed_type'] == 'ENTRY_EFFECT' ||
+              item['feed_type'] == 'ID_BADGE' ||
+              item['feed_type'] == 'CHAT_BUBBLE',
+        )
         .toList();
 
     return Column(
@@ -566,14 +693,38 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
             child: CircularProgressIndicator(color: _gold),
           )
         else if (_feedError != null)
-          _featureCard('FEED ERROR', 'Could not load ZOONL LIVE themes', _feedError!, Icons.error)
+          _featureCard(
+            'FEED ERROR',
+            'Could not load ZOONL LIVE themes',
+            _feedError!,
+            Icons.error,
+          )
+        else if (themeItems.isEmpty)
+          _emptyFeed()
         else
-          ...themeItems.map((item) => _zoonlItemTile(item, showEquip: true)),
+          ...themeItems.map(
+            (item) => _zoonlItemTile(
+              item,
+              showEquip: true,
+            ),
+          ),
       ],
     );
   }
 
-  Widget _zoonlItemTile(Map<String, dynamic> item, {required bool showEquip}) {
+  Widget _emptyFeed() {
+    return _featureCard(
+      'NO ITEMS AVAILABLE',
+      'Your feed is currently empty',
+      'Items will appear here when they are available in the feed.',
+      Icons.inventory_2_outlined,
+    );
+  }
+
+  Widget _zoonlItemTile(
+    Map<String, dynamic> item, {
+    required bool showEquip,
+  }) {
     final name = item['name']?.toString() ?? 'ZOONL LIVE Item';
     final feedType = item['feed_type']?.toString() ?? '';
     final coins = item['coin_price']?.toString() ?? '0';
@@ -586,11 +737,17 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _purple.withOpacity(.3)),
+        border: Border.all(
+          color: _purple.withOpacity(.3),
+        ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, color: _pink, size: 24),
+          const Icon(
+            Icons.auto_awesome,
+            color: _pink,
+            size: 24,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -598,26 +755,40 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(color: _gold, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: _gold,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   '$feedType • Coins: $coins',
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                  ),
                 ),
                 if (colors.isNotEmpty)
                   Text(
                     'Colors: $colors',
-                    style: const TextStyle(color: _muted, fontSize: 10),
+                    style: const TextStyle(
+                      color: _muted,
+                      fontSize: 10,
+                    ),
                   ),
               ],
             ),
           ),
           if (showEquip)
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _purple),
+              style: FilledButton.styleFrom(
+                backgroundColor: _purple,
+              ),
               onPressed: () => _equipItem(item),
-              child: const Text('EQUIP', style: TextStyle(fontSize: 11)),
+              child: const Text(
+                'EQUIP',
+                style: TextStyle(fontSize: 11),
+              ),
             ),
         ],
       ),
@@ -645,7 +816,31 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
           'Permission changes and management history.',
           Icons.security,
         ),
+        _integrationNotice(),
       ],
+    );
+  }
+
+  Widget _integrationNotice() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8, bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _gold.withOpacity(.3),
+        ),
+      ),
+      child: const Text(
+        'Backend workflow is not connected in this screen yet. '
+        'No application, payment, permission or report is saved by these UI controls.',
+        style: TextStyle(
+          color: _muted,
+          fontSize: 11,
+        ),
+      ),
     );
   }
 
@@ -662,11 +857,17 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: _purple.withOpacity(.25)),
+        border: Border.all(
+          color: _purple.withOpacity(.25),
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: _gold, size: 29),
+          Icon(
+            icon,
+            color: _gold,
+            size: 29,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -708,8 +909,10 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: searchController,
+        style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(color: _muted),
           filled: true,
           fillColor: _panel,
           border: OutlineInputBorder(
@@ -735,53 +938,71 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
     );
   }
 
-  void _formDialog(String title, List<String> fields) {
-    final controllers = [
-      for (var i = 0; i < fields.length; i++) TextEditingController(),
+  Future<void> _formDialog(
+    String title,
+    List<String> fields,
+  ) async {
+    final controllers = <TextEditingController>[
+      for (var i = 0; i < fields.length; i++)
+        TextEditingController(),
     ];
 
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: _panel,
-        title: Text(title, style: const TextStyle(color: _gold)),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var i = 0; i < fields.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: TextField(
-                      controller: controllers[i],
-                      decoration: InputDecoration(
-                        labelText: fields[i],
-                        border: const OutlineInputBorder(),
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: _panel,
+          title: Text(
+            title,
+            style: const TextStyle(color: _gold),
+          ),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < fields.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: TextField(
+                        controller: controllers[i],
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: fields[i],
+                          labelStyle: const TextStyle(color: _muted),
+                          border: const OutlineInputBorder(),
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('CANCEL'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('SUBMIT'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('CANCEL'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              notice(
-                '$title form submitted.',
-              );
-            },
-            child: const Text('SUBMIT'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    }
+
+    if (mounted) {
+      notice(
+        '$title: UI form closed. Backend submission is not connected.',
+      );
+    }
   }
 }
