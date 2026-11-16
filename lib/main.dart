@@ -2430,4 +2430,334 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         ),
       ],
     );
+  }  Widget _buildSupportAiScreen() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        GestureDetector(
+          onTap: () {
+            setState(() => aiExpanded = !aiExpanded);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1134),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFE6C47A),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Row(
+                      children: <Widget>[
+                        const Icon(
+                          Icons.smart_toy,
+                          color: Color(0xFFE6C47A),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          aiExpanded
+                              ? 'ZOONL AI Assistant'
+                              : 'AI Support (Tap to Open)',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Icon(
+                      aiExpanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                    ),
+                  ],
+                ),
+                if (aiExpanded) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: <Widget>[
+                      const Text('Female Voice: '),
+                      Switch(
+                        value: femaleVoiceEnabled,
+                        onChanged: (bool value) {
+                          setState(() {
+                            femaleVoiceEnabled = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  Text(
+                    selectedAiAnswer,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  const SizedBox(height: 10),
+                  ...aiQuickPrompts.map(
+                    (Map<String, String> item) {
+                      return ListTile(
+                        dense: true,
+                        title: Text(item['q'] ?? ''),
+                        trailing: const Icon(
+                          Icons.volume_up,
+                          size: 18,
+                          color: Color(0xFFE6C47A),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            selectedAiAnswer = item['a'] ?? '';
+                          });
+                        },
+                      );
+                    },
+                  ),
+                  const Text(
+                    'Voice playback requires voice-service integration.',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _luxuryCard(
+          title: 'Support Team Contacts',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Support Email: ${store.supportEmail}'),
+              Text('Support Contact: ${store.supportContact}'),
+              Text(
+                'Official Hosting Email: ${store.officialHostingEmail}',
+              ),
+              Text(
+                'Official Hosting Contact: ${store.officialHostingContact}',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
+
+  Widget _buildProfileAndSettingsScreen() {
+    final bool isOwner = store.isOwner;
+    final bool isLive = store.currentUser['isLive'] == true;
+
+    final dynamic offlineValue =
+        store.currentUser['offlineSince'];
+    final DateTime? offlineSince =
+        offlineValue is DateTime ? offlineValue : null;
+
+    final List<dynamic> linkedAccounts =
+        store.currentUser['linkedAccounts'] as List<dynamic>? ??
+            <dynamic>[];
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title:
+              '${store.currentUser['name']} (User ID: ${store.currentUser['id']})',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Level: ${store.currentUser['level']} • VIP: ${store.currentUser['vipTier']}',
+              ),
+              Text(
+                isLive
+                    ? 'Status: LIVE'
+                    : 'Status: OFFLINE ${offlineSince != null ? "(Since ${offlineSince.hour}:${offlineSince.minute.toString().padLeft(2, '0')})" : ""}',
+                style: TextStyle(
+                  color: isLive
+                      ? Colors.greenAccent
+                      : Colors.orangeAccent,
+                ),
+              ),
+              SwitchListTile(
+                title: const Text('Friend List Public / Private'),
+                value:
+                    store.currentUser['friendListPublic'] == true,
+                onChanged: (bool value) {
+                  if (store.isLiveMode) {
+                    _showMessage(
+                      'Profile settings require server integration.',
+                    );
+                    return;
+                  }
+                  store.currentUser['friendListPublic'] = value;
+                  store.notifyListeners();
+                },
+              ),
+              Text(
+                'Linked Accounts: ${linkedAccounts.join(", ")}',
+              ),
+              Text(
+                'Country: ${store.currentUser['country'] ?? 'Not set'}',
+              ),
+              Text(
+                'Bio: ${store.currentUser['bio'] ?? ''}',
+              ),
+            ],
+          ),
+        ),
+        if (isOwner)
+          _luxuryCard(
+            title: 'Owner 10001 Sovereign Control',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Owner access requires a trusted authenticated server role. Public ID alone is not authorization.',
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (store.isLiveMode) {
+                      _showMessage(
+                        'Owner ban must be processed by the secure server.',
+                      );
+                      return;
+                    }
+                    store.ownerPermanentBan(
+                      'TEST-USER',
+                      reason: 'TEST permanent ban',
+                    );
+                    _showMessage(
+                      'TEST ban applied to local test session.',
+                    );
+                  },
+                  icon: const Icon(Icons.gpp_bad),
+                  label: const Text(
+                    'Permanent Ban (TEST session)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildThreeDotModerationButton(
+    Map<String, dynamic> streamer,
+    String targetUserId,
+  ) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert),
+      onSelected: (String action) {
+        if (store.isLiveMode) {
+          _showMessage(
+            'Moderation in LIVE mode requires server authorization.',
+          );
+          return;
+        }
+
+        final List<dynamic> admins =
+            streamer['roomAdmins'] as List<dynamic>? ??
+                <dynamic>[];
+
+        store.moderateUser(
+          streamer: streamer,
+          targetUserId: targetUserId,
+          action: action,
+          actorIsStreamer:
+              store.currentUser['id']?.toString() ==
+                  streamer['userId']?.toString(),
+          actorIsAdmin: admins
+              .map((dynamic id) => id.toString())
+              .contains(
+                store.currentUser['id']?.toString(),
+              ),
+          actorVipTier:
+              store.currentUser['vipTier']?.toString() ?? 'NONE',
+        );
+      },
+      itemBuilder: (_) =>
+          const <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'MUTE',
+          child: Text('Mute Chat'),
+        ),
+        PopupMenuItem<String>(
+          value: 'UNMUTE',
+          child: Text('Unmute Chat'),
+        ),
+        PopupMenuItem<String>(
+          value: 'BLACKLIST',
+          child: Text('Blacklist (Streamer Only)'),
+        ),
+        PopupMenuItem<String>(
+          value: 'BOOT',
+          child: Text('Boot from Room'),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyState(String title, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: _luxuryCard(
+          title: title,
+          child: Text(
+            message,
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _luxuryCard({
+    required String title,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF120D24),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF3A2766),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFFE6C47A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
