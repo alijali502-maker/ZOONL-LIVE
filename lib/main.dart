@@ -1,10 +1,16 @@
-import 'dart:async';
-import 'dart:math';
+import 'app_entry.dart' as entry;
+import 'core/app_config.dart';
+import 'core/backend.dart';
 
-import 'package:flutter/material.dart';
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-void main() {
-  runApp(const ZoonlApp());
+  await Backend.initialize(
+    supabaseUrl: AppConfig.supabaseUrl,
+    supabaseAnonKey: AppConfig.supabaseAnonKey,
+  );
+
+  runApp(const entry.ZoonlEntryApp());
 }
 
 class ZoonlApp extends StatelessWidget {
@@ -30,7 +36,7 @@ class ZoonlApp extends StatelessWidget {
     );
   }
 }
-  void checkTrialExpiryAndMoveToBackup() {
+  void checkTrialExpiryAndMoveToBackup()
     final dynamic rawExpiry = currentUser['trialExpiresAt'];
     if (rawExpiry is! String || rawExpiry.isEmpty) return;
 
@@ -52,8 +58,8 @@ class ZoonlApp extends StatelessWidget {
     currentUser['trialExpiresAt'] = null;
     notifyListeners();
   }
-
-  int resolveUserLevel(int sentCoins) {
+}
+  int resolveUserLevel(int sentCoins) 
     const List<int> thresholds = <int>[
       0, 50000, 100000, 160000, 230000,
       310000, 400000, 500000, 620000, 750000,
@@ -80,32 +86,32 @@ class ZoonlApp extends StatelessWidget {
     return min(100, level);
   }
 
-  Map<String, dynamic> resolveColorStar(int sentCoins) {
-    if (sentCoins >= 2000000) {
-      return <String, dynamic>{
+  Map<String, dynamic> resolveColorStar(int  sentCoins) 
+    if (sentCoins >= 2000000) 
+      return <String, dynamic>
         'stars': 5,
         'label': 'BIG STAR',
         'color': const Color(0xFFFF2E93),
       };
-    } else if (sentCoins >= 1000000) {
+    } else if (sentCoins >= 1000000) 
       return <String, dynamic>{
         'stars': 4,
         'label': '4 STAR',
         'color': const Color(0xFFFF9100),
       };
-    } else if (sentCoins >= 200000) {
+    } else if (sentCoins >= 200000) 
       return <String, dynamic>{
         'stars': 3,
         'label': '3 STAR',
         'color': const Color(0xFF00E5FF),
       };
-    } else if (sentCoins >= 50000) {
+    } else if (sentCoins >= 50000) 
       return <String, dynamic>{
         'stars': 2,
         'label': '2 STAR',
         'color': const Color(0xFF7C4DFF),
       };
-    } else if (sentCoins >= 10000) {
+    } else if (sentCoins >= 10000) 
       return <String, dynamic>{
         'stars': 1,
         'label': '1 STAR',
@@ -1370,8 +1376,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     agencyTrackCtrl.dispose();
     super.dispose();
   }
-
-  void _showMessage(String message) {
+}
+  void _showMessage(String message) 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -1383,9 +1389,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     }
     return null;
   }
-
+}
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context)
     if (widget.bottomIndex == 1) return _buildInboxScreen();
     if (widget.bottomIndex == 2) {
       return _buildWalletAndEarningScreen();
@@ -1408,8 +1414,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         return _buildVipHubSection();
     }
   }
-
-  Widget _buildShortVideoSection() {
+{
+  Widget _buildShortVideoSection() 
     const List<String> filters = <String>[
       'VIP Velvet Glow',
       'Golden Rose LUT',
@@ -1530,8 +1536,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               children: <Widget>[
                 Expanded(child: Text('${video['caption']}')),
                 TextButton.icon(
-                  onPressed: () {
-                    if (store.isLiveMode) {
+                  onPressed: () 
+                    if (store.isLiveMode) 
                       _showMessage(
                         'Likes require the production backend.',
                       );
@@ -1603,7 +1609,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   'DAILY',
                   'WEEKLY',
                   'MONTHLY',
-                ].map((String period) {
+                ].map((String period) 
                   return ChoiceChip(
                     label: Text(period),
                     selected: historyPeriod == period,
@@ -2038,7 +2044,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   crossAxisSpacing: 8,
                 ),
                 itemCount: seats.length,
-                itemBuilder: (_, int index) {
+                itemBuilder: (_, int index) 
                   final Map<String, dynamic> seat = seats[index];
                   return Container(
                     decoration: BoxDecoration(
@@ -2086,8 +2092,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           Icons.check_circle,
                           color: Colors.greenAccent,
                         ),
-                        onPressed: () {
-                          if (store.isLiveMode) {
+                        onPressed: () 
+                          if (store.isLiveMode) 
                             _showMessage(
                               'Accepting a call requires server verification.',
                             );
@@ -2108,7 +2114,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           Icons.cancel,
                           color: Colors.redAccent,
                         ),
-                        onPressed: () {
+                        onPressed: () 
                           if (store.isLiveMode) return;
                           (audioRoom['pendingCallRequests']
                                   as List<dynamic>)
@@ -2127,7 +2133,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  Widget _buildVipHubSection() {
+  Widget _buildVipHubSection() 
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
@@ -2155,7 +2161,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   style: TextStyle(color: Colors.white60),
                 ),
               ...store.backupStore.map(
-                (Map<String, dynamic> item) {
+                (Map<String, dynamic> item) 
                   return ListTile(
                     title: Text(
                       '${item['name']} (${item['type']})',
@@ -2235,7 +2241,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  Widget _buildWalletAndEarningScreen() {
+  Widget _buildWalletAndEarningScreen() 
     final int nowDay = DateTime.now().day;
     final bool inPayoutWindow =
         nowDay >= 1 && nowDay <= 5;
@@ -2328,13 +2334,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   'Saudi Arabia',
                   'India',
                   'Other',
-                ].map((String country) {
+                ].map((String country) 
                   return DropdownMenuItem<String>(
                     value: country,
                     child: Text(country),
                   );
                 }).toList(),
-                onChanged: (String? value) {
+                onChanged: (String? value) 
                   setState(() {
                     kycCountry = value ?? 'Pakistan';
                   });
@@ -2430,8 +2436,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         ),
       ],
     );
-  }  Widget _buildSupportAiScreen() {
-    return ListView(
+      Widget _buildSupportAiScreen() 
+     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         GestureDetector(
@@ -2486,7 +2492,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       Switch(
                         value: femaleVoiceEnabled,
                         onChanged: (bool value) {
-                          setState(() {
+                          setState(() 
                             femaleVoiceEnabled = value;
                           });
                         },
@@ -2623,7 +2629,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
                   onPressed: () {
-                    if (store.isLiveMode) {
+                    if (store.isLiveMode) 
                       _showMessage(
                         'Owner ban must be processed by the secure server.',
                       );
