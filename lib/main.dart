@@ -1267,4 +1267,621 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       SnackBar(content: Text(message)),
     );
   }
+}class ZoonlCompleteBody extends StatefulWidget {
+  final int topTabIndex;
+  final int bottomIndex;
+  final VoidCallback onSwitchToLive;
+
+  const ZoonlCompleteBody({
+    super.key,
+    required this.topTabIndex,
+    required this.bottomIndex,
+    required this.onSwitchToLive,
+  });
+
+  @override
+  State<ZoonlCompleteBody> createState() =>
+      _ZoonlCompleteBodyState();
 }
+
+class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
+  final ZoonlStore store = ZoonlStore.instance;
+
+  String selectedVideoFilter = 'VIP Velvet Glow';
+  bool recordingShort = false;
+
+  final TextEditingController shortCaptionCtrl =
+      TextEditingController();
+
+  double skinSmooth = 0.75;
+  double faceSize = 0.50;
+  double eyeSize = 0.65;
+
+  String eyeLens = 'Crystal Hazel';
+  String eyeColor = 'Amber Gold';
+  String makeupPreset = 'Royal Glamour';
+
+  bool micMuted = false;
+  bool camMuted = false;
+
+  String pkModeSelected = '6P';
+  String historyPeriod = 'DAILY';
+
+  String kycCountry = 'Pakistan';
+  String kycDob = '';
+
+  bool kycFrontUploaded = false;
+  bool kycBackUploaded = false;
+  bool kycCardSelfieUploaded = false;
+
+  final TextEditingController payoutAccountCtrl =
+      TextEditingController();
+
+  final TextEditingController agencyTrackCtrl =
+      TextEditingController();
+
+  bool registrationSubmitted = false;
+  bool aiExpanded = false;
+  bool femaleVoiceEnabled = true;
+
+  String selectedAiAnswer =
+      'ZOONL LIVE Support. Select a topic below.';
+
+  final List<Map<String, String>> aiQuickPrompts =
+      <Map<String, String>>[
+    <String, String>{
+      'q': '65% Earning & payout rule',
+      'a': 'Streamer earnings must be calculated from verified server-side gift transactions. Real payouts require an approved server ledger.',
+    },
+    <String, String>{
+      'q': 'Direct Hosting vs Agency registration',
+      'a': 'Direct hosting and agency registration require server-side application review and approval.',
+    },
+    <String, String>{
+      'q': 'Level 1 vs Level 5 Live rule',
+      'a': 'Verified Streamers may qualify at Level 1. Normal accounts need the configured minimum level.',
+    },
+    <String, String>{
+      'q': 'Admin Mute & Blacklist rule',
+      'a': 'Room moderation permissions must be checked against trusted server-side room roles.',
+    },
+    <String, String>{
+      'q': 'Private Room',
+      'a': 'Private rooms require server-generated access keys, invitations and server-side validation.',
+    },
+    <String, String>{
+      'q': 'Crown / Demon and Color Star',
+      'a': 'Stars and streamer crown levels are calculated from verified coin activity.',
+    },
+    <String, String>{
+      'q': 'New ID trial',
+      'a': 'Trial rewards must have an expiry and must not create real Coins or wallet credit.',
+    },
+    <String, String>{
+      'q': 'Owner permanent ban',
+      'a': 'Owner actions require a trusted server-side Owner role. A public account ID is not authorization.',
+    },
+  ];
+
+  @override
+  void dispose() {
+    shortCaptionCtrl.dispose();
+    payoutAccountCtrl.dispose();
+    agencyTrackCtrl.dispose();
+    super.dispose();
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Map<String, dynamic>? _findStreamer(String mode) {
+    for (final Map<String, dynamic> streamer in store.streamers) {
+      if (streamer['mode'] == mode) return streamer;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.bottomIndex == 1) return _buildInboxScreen();
+    if (widget.bottomIndex == 2) {
+      return _buildWalletAndEarningScreen();
+    }
+    if (widget.bottomIndex == 3) return _buildSupportAiScreen();
+    if (widget.bottomIndex == 4) {
+      return _buildProfileAndSettingsScreen();
+    }
+
+    switch (widget.topTabIndex) {
+      case 0:
+        return _buildShortVideoSection();
+      case 1:
+        return _buildLiveSection();
+      case 2:
+        return _buildPkSection();
+      case 3:
+        return _buildAudioSection();
+      default:
+        return _buildVipHubSection();
+    }
+  }
+
+  Widget _buildShortVideoSection() {
+    const List<String> filters = <String>[
+      'VIP Velvet Glow',
+      'Golden Rose LUT',
+      'Neon Cyber',
+      'Soft Porcelain',
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title: 'Short Video Studio (Filter • Record • Post)',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 8,
+                children: filters.map((String filter) {
+                  return ChoiceChip(
+                    label: Text(filter),
+                    selected: selectedVideoFilter == filter,
+                    onSelected: (_) {
+                      setState(() {
+                        selectedVideoFilter = filter;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: shortCaptionCtrl,
+                decoration: const InputDecoration(
+                  hintText: 'Video caption...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: <Widget>[
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        recordingShort = !recordingShort;
+                      });
+                      _showMessage(
+                        'Camera recording requires camera integration.',
+                      );
+                    },
+                    icon: Icon(
+                      recordingShort
+                          ? Icons.stop
+                          : Icons.fiber_manual_record,
+                    ),
+                    label: Text(
+                      recordingShort
+                          ? 'Stop Recording'
+                          : 'Record Video',
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        if (store.isLiveMode) {
+                          _showMessage(
+                            'Short upload requires the production storage service.',
+                          );
+                          return;
+                        }
+
+                        final String caption =
+                            shortCaptionCtrl.text.trim();
+
+                        store.shortVideos.insert(
+                          0,
+                          <String, dynamic>{
+                            'id':
+                                'TEST-SV-${DateTime.now().millisecondsSinceEpoch}',
+                            'author':
+                                store.currentUser['name'] ?? 'Test User',
+                            'authorId':
+                                store.currentUser['id'] ?? '',
+                            'caption': caption.isEmpty
+                                ? 'Test short video'
+                                : caption,
+                            'filter': selectedVideoFilter,
+                            'likes': 0,
+                            'mode': 'TEST',
+                          },
+                        );
+
+                        shortCaptionCtrl.clear();
+                        store.notifyListeners();
+                        _showMessage('Short added in TEST mode.');
+                      },
+                      icon: const Icon(Icons.cloud_upload),
+                      label: const Text('Post Short'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (store.shortVideos.isEmpty)
+          _emptyState(
+            'No short videos yet',
+            'Uploaded videos will appear here.',
+          ),
+        ...store.shortVideos.map((Map<String, dynamic> video) {
+          return _luxuryCard(
+            title:
+                '${video['author']} • Filter: ${video['filter']}',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Expanded(child: Text('${video['caption']}')),
+                TextButton.icon(
+                  onPressed: () {
+                    if (store.isLiveMode) {
+                      _showMessage(
+                        'Likes require the production backend.',
+                      );
+                      return;
+                    }
+                    video['likes'] =
+                        ((video['likes'] as num?)?.toInt() ?? 0) + 1;
+                    store.notifyListeners();
+                  },
+                  icon: const Icon(
+                    Icons.favorite,
+                    color: Colors.pinkAccent,
+                  ),
+                  label: Text('${video['likes']}'),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildLiveSection() {
+    final Map<String, dynamic>? activeStreamer =
+        _findStreamer('VIDEO');
+
+    if (activeStreamer == null) {
+      return _emptyState(
+        'No video streamer available',
+        'Live streamers will appear here when supplied by the server or added to the TEST session.',
+      );
+    }
+
+    final Map<String, dynamic> crownInfo =
+        store.resolveStreamerCrownOrDemon(
+      (activeStreamer['receivedCoins'] as num?)?.toInt() ?? 0,
+    );
+
+    final Map<String, dynamic> starInfo = store.resolveColorStar(
+      (store.currentUser['sentCoins'] as num?)?.toInt() ?? 0,
+    );
+
+    final List<dynamic> allGifters =
+        (activeStreamer['giftersHistory'] as List<dynamic>?) ??
+            <dynamic>[];
+
+    final List<dynamic> filteredGifters = allGifters.where(
+      (dynamic gifter) =>
+          gifter is Map && gifter['period'] == historyPeriod,
+    ).toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title:
+              '${activeStreamer['name']} (ID: ${activeStreamer['userId']}) • ${crownInfo['title']}',
+          trailing: _buildThreeDotModerationButton(
+            activeStreamer,
+            activeStreamer['userId'].toString(),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 6,
+                children: <String>[
+                  'DAILY',
+                  'WEEKLY',
+                  'MONTHLY',
+                ].map((String period) {
+                  return ChoiceChip(
+                    label: Text(period),
+                    selected: historyPeriod == period,
+                    onSelected: (_) {
+                      setState(() => historyPeriod = period);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Top 10 & All Senders ($historyPeriod): '
+                '${filteredGifters.take(10).map((dynamic g) => '${g['name']} (${g['coins']})').join(', ')}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFFE6C47A),
+                ),
+              ),
+              const Divider(height: 18),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      height: 170,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1235),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFE6C47A),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: <Widget>[
+                          Text(
+                            'Streamer Live (${camMuted ? "Cam Off" : "Cam On"} • ${micMuted ? "Mic Off" : "Mic On"})',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text('Color Star: ${starInfo['label']}'),
+                          Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceEvenly,
+                            children: <Widget>[
+                              IconButton(
+                                icon: Icon(
+                                  micMuted
+                                      ? Icons.mic_off
+                                      : Icons.mic,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    micMuted = !micMuted;
+                                  });
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  camMuted
+                                      ? Icons.videocam_off
+                                      : Icons.videocam,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    camMuted = !camMuted;
+                                  });
+                                },
+                              ),
+                              Switch(
+                                value:
+                                    activeStreamer['videoCallOpen'] == true,
+                                onChanged: (bool value) {
+                                  if (store.isLiveMode) {
+                                    _showMessage(
+                                      'Call settings require server authorization.',
+                                    );
+                                    return;
+                                  }
+                                  activeStreamer['videoCallOpen'] = value;
+                                  store.notifyListeners();
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (activeStreamer['videoCallOpen'] == true)
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        height: 170,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF100A24),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0xFF7C4DFF),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: <Widget>[
+                            const Text(
+                              'Side Guest',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            Text(
+                              '${activeStreamer['guestName'] ?? 'No Guest'}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            DropdownButton<String>(
+                              isExpanded: true,
+                              value: <String>['VIDEO', 'AUDIO']
+                                      .contains(
+                                activeStreamer['guestCallMode'],
+                              )
+                                  ? activeStreamer['guestCallMode']
+                                      as String
+                                  : 'VIDEO',
+                              items: const <DropdownMenuItem<String>>[
+                                DropdownMenuItem(
+                                  value: 'VIDEO',
+                                  child: Text('Video Call'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'AUDIO',
+                                  child: Text('Audio Call'),
+                                ),
+                              ],
+                              onChanged: (String? value) {
+                                if (value == null ||
+                                    store.isLiveMode) {
+                                  return;
+                                }
+                                activeStreamer['guestCallMode'] = value;
+                                store.notifyListeners();
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'VIP Beauty Filter Controls',
+                style: TextStyle(
+                  color: Color(0xFFE6C47A),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Slider(
+                value: skinSmooth,
+                onChanged: (double value) {
+                  setState(() => skinSmooth = value);
+                },
+              ),
+              Slider(
+                value: faceSize,
+                onChanged: (double value) {
+                  setState(() => faceSize = value);
+                },
+              ),
+              Slider(
+                value: eyeSize,
+                onChanged: (double value) {
+                  setState(() => eyeSize = value);
+                },
+              ),
+              Wrap(
+                spacing: 8,
+                children: <Widget>[
+                  Chip(label: Text('Lens: $eyeLens')),
+                  Chip(label: Text('Eye Color: $eyeColor')),
+                  Chip(label: Text('Makeup: $makeupPreset')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildGiftControls(activeStreamer),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGiftControls(Map<String, dynamic> streamer) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text(
+          'Original Gift System',
+          style: TextStyle(
+            color: Color(0xFFE6C47A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text('Available Coins: ${store.currentUser['coins'] ?? 0}'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            _giftButton(streamer, 'Rose', 100),
+            _giftButton(streamer, 'Heart', 1000),
+            _giftButton(streamer, 'Diamond', 10000),
+            _giftButton(streamer, 'Royal Castle', 200000),
+          ],
+        ),
+        if (store.isLiveMode)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'LIVE MODE: Gifts require a verified server transaction. No local balance will be changed.',
+              style: TextStyle(
+                color: Colors.orangeAccent,
+                fontSize: 11,
+              ),
+            ),
+          )
+        else
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text(
+              'TEST MODE: Gift transactions update only this test session.',
+              style: TextStyle(
+                color: Color(0xFFE6C47A),
+                fontSize: 11,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _giftButton(
+    Map<String, dynamic> streamer,
+    String giftName,
+    int coins,
+  ) {
+    return OutlinedButton(
+      onPressed: () {
+        if (store.isLiveMode) {
+          _showMessage(
+            'LIVE gift sending is waiting for server transaction integration.',
+          );
+          return;
+        }
+
+        final bool sent = store.sendGift(
+          streamer: streamer,
+          giftName: giftName,
+          giftCoins: coins,
+        );
+
+        _showMessage(
+          sent
+              ? '$giftName sent in TEST mode.'
+              : 'Insufficient test Coins or invalid test session.',
+        );
+      },
+      child: Text('$giftName • $coins'),
+    );
+  }
