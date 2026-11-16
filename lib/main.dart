@@ -1,6 +1,7 @@
 
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 void main() {
@@ -41,8 +42,12 @@ class ZoonlStore extends ChangeNotifier {
 
   static const String ownerId = '10001';
 
+  // Owner authority must come from a trusted authenticated role.
+  // The public ZOONL ID is not, by itself, proof of Owner permission.
+  bool get isOwner => currentUser['isOwner'] == true;
+
   Map<String, dynamic> currentUser = <String, dynamic>{
-    'id': '10001',
+    'id': ownerId,
     'name': 'ZOONL Sovereign Owner',
     'isOwner': true,
     'isVerifiedStreamer': true,
@@ -60,7 +65,7 @@ class ZoonlStore extends ChangeNotifier {
       'Email Auth',
       'Phone SMS',
       'Google',
-      'Device Key'
+      'Device Key',
     ],
     'payoutLocked': true,
     'payoutMethod': 'Official Owner Vault',
@@ -68,6 +73,7 @@ class ZoonlStore extends ChangeNotifier {
     'registrationType': 'OWNER',
     'approved': true,
     'isLive': false,
+    'liveMode': 'VIDEO',
     'offlineSince': null,
   };
 
@@ -171,30 +177,23 @@ class ZoonlStore extends ChangeNotifier {
 
   Map<String, dynamic>? activeGlobalGiftBanner;
   Timer? _tickerTimer;
-
   Map<String, dynamic>? pendingNewIdWelcome;
 
   void syncRemoteLists(
     List<dynamic> rawMemberships,
     List<dynamic> rawApps,
   ) {
-    memberships = List<Map<String, dynamic>>.from(
-      rawMemberships.map(
-        (dynamic item) => item is Map<String, dynamic>
-            ? item
-            : Map<String, dynamic>.from(item as Map),
-      ),
-    );
-
-    agencyApplications = List<Map<String, dynamic>>.from(
-      rawApps.map(
-        (dynamic item) => item is Map<String, dynamic>
-            ? item
-            : Map<String, dynamic>.from(item as Map),
-      ),
-    );
-
+    memberships = _convertMaps(rawMemberships);
+    agencyApplications = _convertMaps(rawApps);
     notifyListeners();
+  }
+
+  List<Map<String, dynamic>> _convertMaps(List<dynamic> source) {
+    return source.map((dynamic item) {
+      if (item is Map<String, dynamic>) return item;
+      if (item is Map) return Map<String, dynamic>.from(item);
+      throw FormatException('Invalid list item: $item');
+    }).toList();
   }
 
   void _initDefaults() {
@@ -238,6 +237,7 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>['90012'],
         'mutedUsers': <String>[],
+        'bootedUsers': <String>[],
         'giftersHistory': <Map<String, dynamic>>[
           <String, dynamic>{
             'userId': '77101',
@@ -307,6 +307,7 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>[],
         'mutedUsers': <String>[],
+        'bootedUsers': <String>[],
         'giftersHistory': <Map<String, dynamic>>[],
       },
       <String, dynamic>{
@@ -328,6 +329,7 @@ class ZoonlStore extends ChangeNotifier {
         'blacklist': <String>[],
         'roomAdmins': <String>[],
         'mutedUsers': <String>[],
+        'bootedUsers': <String>[],
         'giftersHistory': <Map<String, dynamic>>[],
       },
     ]);
@@ -395,7 +397,6 @@ class ZoonlStore extends ChangeNotifier {
 
   void _startGlobalTicker() {
     _tickerTimer?.cancel();
-
     _tickerTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) {
@@ -404,7 +405,6 @@ class ZoonlStore extends ChangeNotifier {
         } else {
           activeGlobalGiftBanner = null;
         }
-
         notifyListeners();
       },
     );
@@ -414,19 +414,25 @@ class ZoonlStore extends ChangeNotifier {
     return _ownerPermanentBannedIds.contains(targetId);
   }
 
+  String? ownerBanReason(String targetId) {
+    return _ownerBanReasons[targetId];
+  }
+
   void ownerPermanentBan(
     String targetId, {
     String reason = 'Rule violation / Fraud',
   }) {
-    if (currentUser['id'] != ownerId) return;
-    if (targetId == ownerId) return;
+    if (!isOwner || targetId == ownerId || targetId.trim().isEmpty) {
+      return;
+    }
 
     _ownerPermanentBannedIds.add(targetId);
     _ownerBanReasons[targetId] = reason;
 
     streamers.removeWhere(
-      (Map<String, dynamic> s) =>
-          s['userId'] == targetId || s['id'] == targetId,
+      (Map<String, dynamic> streamer) =>
+          streamer['userId']?.toString() == targetId ||
+          streamer['id']?.toString() == targetId,
     );
 
     notifyListeners();
@@ -437,8 +443,17 @@ class ZoonlStore extends ChangeNotifier {
     required String name,
     required bool asStreamer,
   }) {
-    if (isPermanentlyBannedByOwner(newId)) return;
+    final String cleanId = newId.trim();
+    final String cleanName = name.trim();
 
+    if (cleanId.isEmpty ||
+        cleanName.isEmpty ||
+        cleanId == ownerId ||
+        isPermanentlyBannedByOwner(cleanId)) {
+      return;
+    }
+
+    // A normal registration can never create or claim the Owner account.
     final DateTime expiry = DateTime.now().add(
       const Duration(days: 5),
     );
@@ -448,9 +463,9 @@ class ZoonlStore extends ChangeNotifier {
         : '';
 
     currentUser = <String, dynamic>{
-      'id': newId,
-      'name': name,
-      'isOwner': newId == ownerId,
+      'id': cleanId,
+      'name': cleanName,
+      'isOwner': false,
       'isVerifiedStreamer': asStreamer,
       'streamerId': autoStreamerCode,
       'level': 1,
@@ -458,7 +473,7 @@ class ZoonlStore extends ChangeNotifier {
       'coins': 5000,
       'diamonds': 0,
       'walletBalance': 0.0,
-      'vipTier': 'SVIP',
+      'vipTier': 'NONE',
       'isNewId': true,
       'trialExpiresAt': expiry.toIso8601String(),
       'friendListPublic': true,
@@ -469,12 +484,13 @@ class ZoonlStore extends ChangeNotifier {
       'registrationType': asStreamer ? 'DIRECT' : 'USER',
       'approved': !asStreamer,
       'isLive': false,
+      'liveMode': 'VIDEO',
       'offlineSince': null,
     };
 
     backupStore.addAll(<Map<String, dynamic>>[
       <String, dynamic>{
-        'id': 'trial_frame_$newId',
+        'id': 'trial_frame_$cleanId',
         'type': 'Frame',
         'name': 'Welcome 5D Royal Frame',
         'equipped': true,
@@ -482,7 +498,7 @@ class ZoonlStore extends ChangeNotifier {
         'expiresAt': expiry.toIso8601String(),
       },
       <String, dynamic>{
-        'id': 'trial_entry_$newId',
+        'id': 'trial_entry_$cleanId',
         'type': 'Entry',
         'name': 'Welcome 5D Grand Entry',
         'equipped': true,
@@ -490,7 +506,7 @@ class ZoonlStore extends ChangeNotifier {
         'expiresAt': expiry.toIso8601String(),
       },
       <String, dynamic>{
-        'id': 'trial_bg_$newId',
+        'id': 'trial_bg_$cleanId',
         'type': 'Background',
         'name': 'Welcome 5D VIP Back-Aura',
         'equipped': true,
@@ -502,7 +518,7 @@ class ZoonlStore extends ChangeNotifier {
     pendingNewIdWelcome = <String, dynamic>{
       'title': 'ZOONL LIVE Welcome Concert Gift',
       'subtitle':
-          'Application ki taraf se aapko 5 din ke liye Frame, Entry, SVIP aur Background mil gaya hai!',
+          'Aapko 5 din ke liye Frame, Entry, SVIP aur Background trial mila hai.',
       'items': <String>[
         '5D Frame',
         '5D Special Entry',
@@ -515,24 +531,26 @@ class ZoonlStore extends ChangeNotifier {
   }
 
   void checkTrialExpiryAndMoveToBackup() {
-    final String? expStr = currentUser['trialExpiresAt'] as String?;
+    final dynamic rawExpiry = currentUser['trialExpiresAt'];
+    if (rawExpiry is! String || rawExpiry.isEmpty) return;
 
-    if (expStr == null) return;
+    final DateTime? expiry = DateTime.tryParse(rawExpiry);
+    if (expiry == null || DateTime.now().isBefore(expiry)) return;
 
-    final DateTime? expiry = DateTime.tryParse(expStr);
-
-    if (expiry != null && DateTime.now().isAfter(expiry)) {
+    if (currentUser['vipTier'] != 'NONE') {
       currentUser['vipTier'] = 'NONE';
-
-      for (final Map<String, dynamic> item in backupStore) {
-        if (item['fromTrial'] == true) {
-          item['equipped'] = false;
-          item['expiredToBackup'] = true;
-        }
-      }
-
-      notifyListeners();
     }
+
+    for (final Map<String, dynamic> item in backupStore) {
+      if (item['fromTrial'] == true &&
+          item['id'].toString().contains(currentUser['id'].toString())) {
+        item['equipped'] = false;
+        item['expiredToBackup'] = true;
+      }
+    }
+
+    currentUser['trialExpiresAt'] = null;
+    notifyListeners();
   }
 
   int resolveUserLevel(int sentCoins) {
@@ -559,23 +577,23 @@ class ZoonlStore extends ChangeNotifier {
       4700000,
     ];
 
-    if (sentCoins <= thresholds[0]) return 1;
+    if (sentCoins <= 0) return 1;
 
     for (int i = 1; i < thresholds.length; i++) {
       if (sentCoins < thresholds[i]) return i;
     }
 
-    int lvl = 20;
-    int acc = thresholds.last;
+    int level = 20;
+    int accumulated = thresholds.last;
 
-    while (lvl < 100 && sentCoins >= acc) {
-      final int step = lvl < 50 ? 1500000 : 3500000;
-      acc += step;
-
-      if (sentCoins >= acc) lvl++;
+    while (level < 100) {
+      final int step = level < 50 ? 1500000 : 3500000;
+      if (sentCoins < accumulated + step) break;
+      accumulated += step;
+      level++;
     }
 
-    return min(100, lvl);
+    return min(100, level);
   }
 
   Map<String, dynamic> resolveColorStar(int sentCoins) {
@@ -626,45 +644,43 @@ class ZoonlStore extends ChangeNotifier {
         'title': 'Mini Heart',
         'color': const Color(0xFFFF5C8A),
       };
-    } else if (sentCoins < 150000) {
-      final int d = sentCoins < 80000 ? 1 : 2;
+    }
 
+    if (sentCoins < 150000) {
+      final int demonCount = sentCoins < 80000 ? 1 : 2;
       return <String, dynamic>{
         'kind': 'DEMON',
-        'count': d,
-        'title': '$d Demon',
+        'count': demonCount,
+        'title': '$demonCount Demon',
         'color': const Color(0xFFFF3D57),
       };
-    } else {
-      int crown = 1;
-
-      if (sentCoins >= 45000000) {
-        crown = 40;
-      } else if (sentCoins >= 35000000) {
-        crown = 32;
-      } else if (sentCoins >= 20000000) {
-        crown = 24;
-      } else if (sentCoins >= 10000000) {
-        crown = 16;
-      } else if (sentCoins >= 5000000) {
-        crown = 10;
-      } else if (sentCoins >= 2500000) {
-        crown = 6;
-      } else if (sentCoins >= 1000000) {
-        crown = 3;
-      } else if (sentCoins >= 500000) {
-        crown = 2;
-      }
-
-      crown = min(40, crown);
-
-      return <String, dynamic>{
-        'kind': 'CROWN',
-        'count': crown,
-        'title': '$crown Crown',
-        'color': const Color(0xFFFFD700),
-      };
     }
+
+    int crown = 1;
+    if (sentCoins >= 45000000) {
+      crown = 40;
+    } else if (sentCoins >= 35000000) {
+      crown = 32;
+    } else if (sentCoins >= 20000000) {
+      crown = 24;
+    } else if (sentCoins >= 10000000) {
+      crown = 16;
+    } else if (sentCoins >= 5000000) {
+      crown = 10;
+    } else if (sentCoins >= 2500000) {
+      crown = 6;
+    } else if (sentCoins >= 1000000) {
+      crown = 3;
+    } else if (sentCoins >= 500000) {
+      crown = 2;
+    }
+
+    return <String, dynamic>{
+      'kind': 'CROWN',
+      'count': min(40, crown),
+      'title': '$crown Crown',
+      'color': const Color(0xFFFFD700),
+    };
   }
 
   void sendGift({
@@ -672,57 +688,63 @@ class ZoonlStore extends ChangeNotifier {
     required String giftName,
     required int giftCoins,
   }) {
-    final String senderId = currentUser['id'] as String;
+    final String senderId = currentUser['id']?.toString() ?? '';
 
-    if (isPermanentlyBannedByOwner(senderId)) return;
-
-    if (currentUser['id'] != ownerId) {
-      final int bal = (currentUser['coins'] as int?) ?? 0;
-
-      if (bal < giftCoins) return;
-
-      currentUser['coins'] = bal - giftCoins;
+    if (senderId.isEmpty ||
+        giftName.trim().isEmpty ||
+        giftCoins <= 0 ||
+        isPermanentlyBannedByOwner(senderId)) {
+      return;
     }
 
-    currentUser['sentCoins'] =
-        ((currentUser['sentCoins'] as int?) ?? 0) + giftCoins;
+    if (!streamers.contains(streamer)) return;
 
-    currentUser['level'] = resolveUserLevel(
-      currentUser['sentCoins'] as int,
-    );
+    final int currentCoins =
+        (currentUser['coins'] as num?)?.toInt() ?? 0;
 
-    streamer['receivedCoins'] =
-        ((streamer['receivedCoins'] as int?) ?? 0) + giftCoins;
+    // Owner's unlimited balance is a privilege, not a fake wallet credit.
+    if (!isOwner) {
+      if (currentCoins < giftCoins) return;
+      currentUser['coins'] = currentCoins - giftCoins;
+    }
 
-    streamer['dailyReceiving'] =
-        ((streamer['dailyReceiving'] as int?) ?? 0) + giftCoins;
+    final int senderSentCoins =
+        (currentUser['sentCoins'] as num?)?.toInt() ?? 0;
+    currentUser['sentCoins'] = senderSentCoins + giftCoins;
+    currentUser['level'] =
+        resolveUserLevel(senderSentCoins + giftCoins);
 
-    final double payoutGain = (giftCoins * 0.65) / 100.0;
+    final int received =
+        (streamer['receivedCoins'] as num?)?.toInt() ?? 0;
+    streamer['receivedCoins'] = received + giftCoins;
 
-    streamer['walletBalance'] =
-        ((streamer['walletBalance'] as double?) ?? 0.0) + payoutGain;
+    final int daily =
+        (streamer['dailyReceiving'] as num?)?.toInt() ?? 0;
+    streamer['dailyReceiving'] = daily + giftCoins;
 
-    currentUser['walletBalance'] =
-        ((currentUser['walletBalance'] as double?) ?? 0.0) + payoutGain;
+    // Only the receiving streamer receives the earning balance.
+    final double payoutGain = giftCoins * 0.65 / 100.0;
+    final double streamerBalance =
+        (streamer['walletBalance'] as num?)?.toDouble() ?? 0.0;
+    streamer['walletBalance'] = streamerBalance + payoutGain;
 
     final List<Map<String, dynamic>> history =
-        List<Map<String, dynamic>>.from(
+        _convertMaps(
       (streamer['giftersHistory'] as List<dynamic>?) ?? <dynamic>[],
     );
 
     history.insert(0, <String, dynamic>{
       'userId': senderId,
-      'name': currentUser['name'],
+      'name': currentUser['name']?.toString() ?? 'User',
       'coins': giftCoins,
       'period': 'DAILY',
+      'createdAt': DateTime.now().toIso8601String(),
     });
 
     streamer['giftersHistory'] = history;
 
     final Map<String, dynamic> crownInfo =
-        resolveStreamerCrownOrDemon(
-      streamer['receivedCoins'] as int,
-    );
+        resolveStreamerCrownOrDemon(received + giftCoins);
 
     final Map<String, dynamic> banner = <String, dynamic>{
       'senderName': currentUser['name'],
@@ -743,10 +765,9 @@ class ZoonlStore extends ChangeNotifier {
   }
 
   bool canStartLive() {
-    if (currentUser['id'] == ownerId) return true;
+    if (isOwner) return true;
     if (currentUser['isVerifiedStreamer'] == true) return true;
-
-    return ((currentUser['level'] as int?) ?? 1) >= 5;
+    return ((currentUser['level'] as num?)?.toInt() ?? 1) >= 5;
   }
 
   void toggleLiveStatus({
@@ -755,7 +776,12 @@ class ZoonlStore extends ChangeNotifier {
   }) {
     if (goLive && !canStartLive()) return;
 
+    final String safeMode = mode.toUpperCase() == 'AUDIO'
+        ? 'AUDIO'
+        : 'VIDEO';
+
     currentUser['isLive'] = goLive;
+    currentUser['liveMode'] = safeMode;
     currentUser['offlineSince'] = goLive ? null : DateTime.now();
 
     notifyListeners();
@@ -769,45 +795,72 @@ class ZoonlStore extends ChangeNotifier {
     required bool actorIsAdmin,
     required String actorVipTier,
   }) {
+    if (targetUserId.trim().isEmpty ||
+        targetUserId == streamer['userId']?.toString()) {
+      return;
+    }
+
+    final bool owner = isOwner;
+    final bool streamerOwner =
+        currentUser['id']?.toString() ==
+        streamer['userId']?.toString();
+
+    // Do not trust a caller-supplied streamer flag by itself.
+    final bool canActAsStreamer = owner || streamerOwner;
+    final bool canActAsAdmin = actorIsAdmin &&
+        ((streamer['roomAdmins'] as List<dynamic>?)
+                ?.map((dynamic id) => id.toString())
+                .contains(currentUser['id']?.toString()) ??
+            false);
+
     final List<String> muted = List<String>.from(
       (streamer['mutedUsers'] as List<dynamic>?) ?? <dynamic>[],
     );
-
     final List<String> blacklist = List<String>.from(
       (streamer['blacklist'] as List<dynamic>?) ?? <dynamic>[],
     );
+    final List<String> booted = List<String>.from(
+      (streamer['bootedUsers'] as List<dynamic>?) ?? <dynamic>[],
+    );
 
-    if (actorIsStreamer || currentUser['id'] == ownerId) {
-      if (action == 'MUTE' && !muted.contains(targetUserId)) {
-        muted.add(targetUserId);
+    if (canActAsStreamer) {
+      switch (action) {
+        case 'MUTE':
+          if (!muted.contains(targetUserId)) muted.add(targetUserId);
+          break;
+        case 'UNMUTE':
+          muted.remove(targetUserId);
+          break;
+        case 'BLACKLIST':
+          if (!blacklist.contains(targetUserId)) {
+            blacklist.add(targetUserId);
+          }
+          break;
+        case 'BOOT':
+          if (!booted.contains(targetUserId)) booted.add(targetUserId);
+          break;
       }
-
-      if (action == 'UNMUTE') {
-        muted.remove(targetUserId);
-      }
-
-      if (action == 'BLACKLIST' && !blacklist.contains(targetUserId)) {
-        blacklist.add(targetUserId);
-      }
-    } else if (actorIsAdmin) {
-      final bool hasVipOrSvip =
+    } else if (canActAsAdmin) {
+      final bool hasVip =
           actorVipTier == 'VIP' || actorVipTier == 'SVIP';
-
-      if (action == 'MUTE' &&
-          hasVipOrSvip &&
-          !muted.contains(targetUserId)) {
+      if (hasVip && action == 'MUTE' && !muted.contains(targetUserId)) {
         muted.add(targetUserId);
-      }
-
-      if (action == 'UNMUTE' && hasVipOrSvip) {
+      } else if (hasVip && action == 'UNMUTE') {
         muted.remove(targetUserId);
       }
     }
 
     streamer['mutedUsers'] = muted;
     streamer['blacklist'] = blacklist;
+    streamer['bootedUsers'] = booted;
 
     notifyListeners();
+  }
+
+  void disposeStore() {
+    _tickerTimer?.cancel();
+    _tickerTimer = null;
+    super.dispose();
   }
 }
 
@@ -827,7 +880,6 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   @override
   void initState() {
     super.initState();
-
     store.checkTrialExpiryAndMoveToBackup();
     store.addListener(_onStoreChanged);
   }
@@ -886,14 +938,8 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
   Widget _buildGlobalGiftBanner(Map<String, dynamic> banner) {
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 4,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 6,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: <Color>[
@@ -917,7 +963,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              'Lv.${banner['senderLevel']} ${banner['senderName']} -> ${banner['giftName']} -> ${banner['streamerName']} [${banner['streamerCrown']}]',
+              'Lv.${banner['senderLevel']} ${banner['senderName']} → '
+              '${banner['giftName']} → ${banner['streamerName']} '
+              '[${banner['streamerCrown']}]',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -950,7 +998,6 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (BuildContext context, int index) {
           final bool active = topTabIndex == index;
-
           return ChoiceChip(
             label: Text(labels[index]),
             selected: active,
@@ -960,9 +1007,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               color: active ? Colors.white : const Color(0xFFE6C47A),
               fontWeight: FontWeight.bold,
             ),
-            onSelected: (_) {
-              setState(() => topTabIndex = index);
-            },
+            onSelected: (_) => setState(() => topTabIndex = index),
           );
         },
       ),
@@ -1022,13 +1067,14 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         ),
                         subtitle: const Text(
                           'LIVE NOW',
-                          style: TextStyle(
-                            color: Color(0xFF00E676),
-                          ),
+                          style: TextStyle(color: Color(0xFF00E676)),
                         ),
                         onTap: () {
                           Navigator.pop(context);
-                          setState(() => topTabIndex = 1);
+                          setState(() {
+                            bottomIndex = 0;
+                            topTabIndex = 1;
+                          });
                         },
                       );
                     }),
@@ -1050,10 +1096,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             ],
           ),
           boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Colors.black54,
-              blurRadius: 8,
-            ),
+            BoxShadow(color: Colors.black54, blurRadius: 8),
           ],
         ),
         child: Stack(
@@ -1112,7 +1155,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ),
               const SizedBox(height: 10),
               Text(
-                welcome['title'] as String,
+                welcome['title']?.toString() ?? 'Welcome to ZOONL LIVE',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -1121,7 +1164,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ),
               const SizedBox(height: 8),
               Text(
-                welcome['subtitle'] as String,
+                welcome['subtitle']?.toString() ?? '',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white),
               ),
@@ -1154,15 +1197,11 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         children: <Widget>[
           IconButton(
             icon: const Icon(Icons.home_filled),
-            onPressed: () {
-              setState(() => bottomIndex = 0);
-            },
+            onPressed: () => setState(() => bottomIndex = 0),
           ),
           IconButton(
             icon: const Icon(Icons.mail_outline),
-            onPressed: () {
-              setState(() => bottomIndex = 1);
-            },
+            onPressed: () => setState(() => bottomIndex = 1),
           ),
           GestureDetector(
             onTap: _openCenterLiveStartSheet,
@@ -1182,11 +1221,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ),
               child: const Row(
                 children: <Widget>[
-                  Icon(
-                    Icons.videocam,
-                    color: Colors.black,
-                    size: 20,
-                  ),
+                  Icon(Icons.videocam, color: Colors.black, size: 20),
                   SizedBox(width: 4),
                   Text(
                     'LIVE',
@@ -1200,24 +1235,16 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             ),
           ),
           IconButton(
-            icon: const Icon(
-              Icons.account_balance_wallet_outlined,
-            ),
-            onPressed: () {
-              setState(() => bottomIndex = 2);
-            },
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            onPressed: () => setState(() => bottomIndex = 2),
           ),
           IconButton(
             icon: const Icon(Icons.support_agent),
-            onPressed: () {
-              setState(() => bottomIndex = 3);
-            },
+            onPressed: () => setState(() => bottomIndex = 3),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () {
-              setState(() => bottomIndex = 4);
-            },
+            onPressed: () => setState(() => bottomIndex = 4),
           ),
         ],
       ),
@@ -1228,7 +1255,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF140E28),
-      builder: (_) {
+      builder: (BuildContext sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -1248,22 +1275,17 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   Icons.live_tv,
                   color: Color(0xFFE6C47A),
                 ),
-                title: const Text(
-                  '1. Live Section (Video Broad)',
-                ),
+                title: const Text('1. Live Section (Video Broadcast)'),
                 subtitle: const Text(
                   'Verified Streamer Lv.1+ | Normal User Lv.5+',
                 ),
                 onTap: () {
-                  Navigator.pop(context);
-
-                  if (!store.canStartLive()) return;
-
-                  store.toggleLiveStatus(
-                    goLive: true,
-                    mode: 'VIDEO',
-                  );
-
+                  Navigator.pop(sheetContext);
+                  if (!store.canStartLive()) {
+                    _showMessage('Live ke liye Level 5 ya verified streamer status chahiye.');
+                    return;
+                  }
+                  store.toggleLiveStatus(goLive: true, mode: 'VIDEO');
                   setState(() {
                     bottomIndex = 0;
                     topTabIndex = 1;
@@ -1275,22 +1297,17 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   Icons.graphic_eq,
                   color: Color(0xFF7C4DFF),
                 ),
-                title: const Text(
-                  '2. Audio Section (6 / 8 Seats)',
-                ),
+                title: const Text('2. Audio Section (6 / 8 Seats)'),
                 subtitle: const Text(
                   'Streamer + / Call Join Accept-Reject Control',
                 ),
                 onTap: () {
-                  Navigator.pop(context);
-
-                  if (!store.canStartLive()) return;
-
-                  store.toggleLiveStatus(
-                    goLive: true,
-                    mode: 'AUDIO',
-                  );
-
+                  Navigator.pop(sheetContext);
+                  if (!store.canStartLive()) {
+                    _showMessage('Live ke liye Level 5 ya verified streamer status chahiye.');
+                    return;
+                  }
+                  store.toggleLiveStatus(goLive: true, mode: 'AUDIO');
                   setState(() {
                     bottomIndex = 0;
                     topTabIndex = 3;
@@ -1302,39 +1319,28 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   Icons.vpn_key,
                   color: Colors.amberAccent,
                 ),
-                title: const Text(
-                  '3. Private Room (Key + Inbox Invite)',
-                ),
+                title: const Text('3. Private Room (Key + Inbox Invite)'),
                 subtitle: const Text(
-                  'Hidden Publicly • Max 2–3 People • Audio/Video/Gift',
+                  'Private Room service connection required',
                 ),
                 onTap: () {
-                  Navigator.pop(context);
-
-                  final String keyCode =
-                      'KEY-${Random().nextInt(9000) + 1000}';
-
-                  store.privateRooms.add(<String, dynamic>{
-                    'roomId': 'PR-${Random().nextInt(99999)}',
-                    'hostId': store.currentUser['id'],
-                    'key': keyCode,
-                    'maxSeats': 3,
-                  });
-
-                  store.inboxMessages.add(<String, dynamic>{
-                    'from': store.currentUser['name'],
-                    'fromId': store.currentUser['id'],
-                    'text': 'Private Room Invite — Key: $keyCode',
-                    'privateKey': keyCode,
-                  });
-
-                  store.notifyListeners();
+                  Navigator.pop(sheetContext);
+                  _showMessage(
+                    'Private Room abhi secure server key service se connected nahi hai. Local key create nahi ki gayi.',
+                  );
                 },
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
@@ -1387,15 +1393,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   bool kycCardSelfieUploaded = false;
 
   final TextEditingController payoutAccountCtrl =
-      TextEditingController(
-    text: 'EasyPaisa - 03001234567',
-  );
+      TextEditingController(text: 'EasyPaisa - 03001234567');
 
   final TextEditingController agencyTrackCtrl =
       TextEditingController();
 
   bool registrationSubmitted = false;
-
   bool aiExpanded = false;
   bool femaleVoiceEnabled = true;
 
@@ -1407,42 +1410,42 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     <String, String>{
       'q': '65% Earning & 1–5 Payout rule kya hai?',
       'a':
-          'Streamer ko sending/diamonds ka 65% wallet mein milta hai. Mahina khatam hone ke baad 1 se 5 tareekh ke beech withdraw request lagti hai aur 5 din ke andar payout milta hai.',
+          'Streamer ko gift value ka 65% earning calculation ke mutabiq milta hai. Real payout ke liye server-side ledger aur approved payout system zaroori hai.',
     },
     <String, String>{
       'q': 'Direct Hosting vs Agency/Track registration?',
       'a':
-          'Earning folder mein step-by-step KYC (Front, Back, Card selfie, DOB, Country) aur payout account lock karke direct apply karein, ya Agency/Track number darj karke agency route se register karein.',
+          'Direct hosting ya agency route ke liye KYC aur payout details submit hoti hain. Approval server par verify hona chahiye.',
     },
     <String, String>{
       'q': 'Level 1 vs Level 5 Live rule kya hai?',
       'a':
-          'Verified Streamer Level 1 se live aa sakta hai, jabke normal user ko live broad ke liye kam az kam Level 5 chahiye.',
+          'Verified Streamer Level 1 se live aa sakta hai, jabke normal user ko live broadcast ke liye kam az kam Level 5 chahiye.',
     },
     <String, String>{
       'q': 'Admin Mute & Blacklist ka rule?',
       'a':
-          'Streamer bina shart Mute/Blacklist/Boot kar sakta hai. Streamer ka banaya hua Admin sirf VIP/SVIP hone par Mute kar sakta hai; Admin Blacklist nahi kar sakta.',
+          'Streamer Mute, Unmute, Blacklist aur Boot kar sakta hai. Streamer ka Admin VIP/SVIP hone par Mute aur Unmute kar sakta hai.',
     },
     <String, String>{
       'q': 'Private Room kaise kaam karta hai?',
       'a':
-          'Center LIVE button se Private Room chunein. Yeh bahar public feed mein nahi dikhta; Key generate karke Inbox mein friend ko bhejein. Max 2–3 log audio/video/gift kar sakte hain.',
+          'Private Room ke liye secure server-generated key, invitation aur server-side validation zaroori hai.',
     },
     <String, String>{
       'q': 'Crown / Demon aur Color Star kaise badalte hain?',
       'a':
-          '10k=1 Star, 50k=2 Star, 200k=3 Star, 1M=4 Star, 2M=Big Star. Streamer par pehle Heart/Demon aur phir auto-replace hokar 1 se 40 Crown tak lagta hai.',
+          '10k=1 Star, 50k=2 Star, 200k=3 Star, 1M=4 Star, 2M=Big Star. Streamer par Heart/Demon aur phir Crown level apply hota hai.',
     },
     <String, String>{
       'q': 'New ID 5-Day Trial ka kya hota hai?',
       'a':
-          'Nayi ID pehle login par 5 din ke liye Frame, Special Entry, SVIP aur Background leti hai; expire hone par sab Backup Store mein chala jata hai.',
+          'Nayi ID ko 5 din ke liye trial rewards diye ja sakte hain. Expiry ke baad trial rewards disable hone chahiye.',
     },
     <String, String>{
       'q': 'Owner 10001 Permanent Ban kaise kaam karta hai?',
       'a':
-          'Fraud ya rule violation par sirf Owner 10001 permanent ban/block laga sakta hai; yeh kisi aur ko nazar nahi aata aur koi change nahi kar sakta.',
+          'Permanent ban sirf trusted Owner permission ke zariye server par apply hona chahiye. Public ID akeli authority ka proof nahi hai.',
     },
   ];
 
@@ -1454,16 +1457,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     super.dispose();
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Map<String, dynamic>? _findStreamer(String mode) {
+    for (final Map<String, dynamic> streamer in store.streamers) {
+      if (streamer['mode'] == mode) return streamer;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.bottomIndex == 1) return _buildInboxScreen();
-    if (widget.bottomIndex == 2) {
-      return _buildWalletAndEarningScreen();
-    }
+    if (widget.bottomIndex == 2) return _buildWalletAndEarningScreen();
     if (widget.bottomIndex == 3) return _buildSupportAiScreen();
-    if (widget.bottomIndex == 4) {
-      return _buildProfileAndSettingsScreen();
-    }
+    if (widget.bottomIndex == 4) return _buildProfileAndSettingsScreen();
 
     switch (widget.topTabIndex) {
       case 0:
@@ -1497,12 +1509,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               Wrap(
                 spacing: 8,
-                children: filters.map((String f) {
+                children: filters.map((String filter) {
                   return ChoiceChip(
-                    label: Text(f),
-                    selected: selectedVideoFilter == f,
+                    label: Text(filter),
+                    selected: selectedVideoFilter == filter,
                     onSelected: (_) {
-                      setState(() => selectedVideoFilter = f);
+                      setState(() => selectedVideoFilter = filter);
                     },
                   );
                 }).toList(),
@@ -1520,44 +1532,48 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 children: <Widget>[
                   ElevatedButton.icon(
                     onPressed: () {
-                      setState(() {
-                        recordingShort = !recordingShort;
-                      });
+                      setState(() => recordingShort = !recordingShort);
+                      _showMessage(
+                        'Camera recording service abhi connect nahi hai. Yeh sirf UI state hai.',
+                      );
                     },
                     icon: Icon(
-                      recordingShort
-                          ? Icons.stop
-                          : Icons.fiber_manual_record,
+                      recordingShort ? Icons.stop : Icons.fiber_manual_record,
                     ),
                     label: Text(
-                      recordingShort
-                          ? 'Stop Recording'
-                          : 'Record Video',
+                      recordingShort ? 'Stop Recording' : 'Record Video',
                     ),
                   ),
                   const SizedBox(width: 10),
-                  FilledButton.icon(
-                    onPressed: () {
-                      store.shortVideos.insert(
-                        0,
-                        <String, dynamic>{
-                          'id':
-                              'SV-${DateTime.now().millisecondsSinceEpoch}',
-                          'author': store.currentUser['name'],
-                          'authorId': store.currentUser['id'],
-                          'caption': shortCaptionCtrl.text.isEmpty
-                              ? 'New ZOONL Short'
-                              : shortCaptionCtrl.text,
-                          'filter': selectedVideoFilter,
-                          'likes': 0,
-                        },
-                      );
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final String caption =
+                            shortCaptionCtrl.text.trim();
 
-                      shortCaptionCtrl.clear();
-                      store.notifyListeners();
-                    },
-                    icon: const Icon(Icons.cloud_upload),
-                    label: const Text('Post Short Video'),
+                        store.shortVideos.insert(
+                          0,
+                          <String, dynamic>{
+                            'id': 'SV-${DateTime.now().millisecondsSinceEpoch}',
+                            'author': store.currentUser['name'],
+                            'authorId': store.currentUser['id'],
+                            'caption': caption.isEmpty
+                                ? 'New ZOONL Short'
+                                : caption,
+                            'filter': selectedVideoFilter,
+                            'likes': 0,
+                          },
+                        );
+
+                        shortCaptionCtrl.clear();
+                        store.notifyListeners();
+                        _showMessage(
+                          'Short local demo list mein add hui hai. Server upload abhi connected nahi.',
+                        );
+                      },
+                      icon: const Icon(Icons.cloud_upload),
+                      label: const Text('Post Short'),
+                    ),
                   ),
                 ],
               ),
@@ -1565,27 +1581,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         const SizedBox(height: 10),
-        ...store.shortVideos.map((Map<String, dynamic> vid) {
+        ...store.shortVideos.map((Map<String, dynamic> video) {
           return _luxuryCard(
-            title: '${vid['author']} • Filter: ${vid['filter']}',
+            title: '${video['author']} • Filter: ${video['filter']}',
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Expanded(
-                  child: Text('${vid['caption']}'),
-                ),
+                Expanded(child: Text('${video['caption']}')),
                 TextButton.icon(
                   onPressed: () {
-                    vid['likes'] =
-                        ((vid['likes'] as int?) ?? 0) + 1;
-
+                    video['likes'] =
+                        ((video['likes'] as num?)?.toInt() ?? 0) + 1;
                     store.notifyListeners();
                   },
                   icon: const Icon(
                     Icons.favorite,
                     color: Colors.pinkAccent,
                   ),
-                  label: Text('${vid['likes']}'),
+                  label: Text('${video['likes']}'),
                 ),
               ],
             ),
@@ -1596,21 +1609,33 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildLiveSection() {
-    final Map<String, dynamic> activeStreamer =
-        store.streamers.firstWhere(
-      (Map<String, dynamic> s) => s['mode'] == 'VIDEO',
-      orElse: () => store.streamers.first,
-    );
+    final Map<String, dynamic>? activeStreamer =
+        _findStreamer('VIDEO');
+
+    if (activeStreamer == null) {
+      return _emptyState(
+        'No video streamer available',
+        'Jab koi video streamer live hoga, woh yahan nazar aayega.',
+      );
+    }
 
     final Map<String, dynamic> crownInfo =
         store.resolveStreamerCrownOrDemon(
-      (activeStreamer['receivedCoins'] as int?) ?? 0,
+      (activeStreamer['receivedCoins'] as num?)?.toInt() ?? 0,
     );
 
-    final Map<String, dynamic> starInfo =
-        store.resolveColorStar(
-      (store.currentUser['sentCoins'] as int?) ?? 0,
+    final Map<String, dynamic> starInfo = store.resolveColorStar(
+      (store.currentUser['sentCoins'] as num?)?.toInt() ?? 0,
     );
+
+    final List<dynamic> allGifters =
+        (activeStreamer['giftersHistory'] as List<dynamic>?) ??
+            <dynamic>[];
+
+    final List<dynamic> filteredGifters = allGifters.where(
+      (dynamic gifter) => gifter is Map &&
+          gifter['period'] == historyPeriod,
+    ).toList();
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -1620,33 +1645,28 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               '${activeStreamer['name']} (ID: ${activeStreamer['userId']}) • ${crownInfo['title']}',
           trailing: _buildThreeDotModerationButton(
             activeStreamer,
-            activeStreamer['userId'] as String,
+            activeStreamer['userId'].toString(),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Row(
-                children: <String>[
-                  'DAILY',
-                  'WEEKLY',
-                  'MONTHLY',
-                ].map((String p) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(p),
-                      selected: historyPeriod == p,
-                      onSelected: (_) {
-                        setState(() => historyPeriod = p);
-                      },
-                    ),
+              Wrap(
+                spacing: 6,
+                children: <String>['DAILY', 'WEEKLY', 'MONTHLY']
+                    .map((String period) {
+                  return ChoiceChip(
+                    label: Text(period),
+                    selected: historyPeriod == period,
+                    onSelected: (_) {
+                      setState(() => historyPeriod = period);
+                    },
                   );
                 }).toList(),
               ),
               const SizedBox(height: 6),
               Text(
                 'Top 10 & All Senders ($historyPeriod): '
-                '${((activeStreamer['giftersHistory'] as List<dynamic>?) ?? <dynamic>[]).take(10).map((dynamic g) => '${g['name']} (${g['coins']})').join(', ')}',
+                '${filteredGifters.take(10).map((dynamic g) => '${g['name']} (${g['coins']})').join(', ')}',
                 style: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFFE6C47A),
@@ -1669,8 +1689,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         ),
                       ),
                       child: Column(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: <Widget>[
                           Text(
                             'Streamer Live (${camMuted ? "Cam Off" : "Cam On"} • ${micMuted ? "Mic Off" : "Mic On"})',
@@ -1678,23 +1697,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            'Color Star: ${starInfo['label']}',
-                          ),
+                          Text('Color Star: ${starInfo['label']}'),
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceEvenly,
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: <Widget>[
                               IconButton(
                                 icon: Icon(
-                                  micMuted
-                                      ? Icons.mic_off
-                                      : Icons.mic,
+                                  micMuted ? Icons.mic_off : Icons.mic,
                                 ),
                                 onPressed: () {
-                                  setState(() {
-                                    micMuted = !micMuted;
-                                  });
+                                  setState(() => micMuted = !micMuted);
                                 },
                               ),
                               IconButton(
@@ -1704,16 +1716,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                                       : Icons.videocam,
                                 ),
                                 onPressed: () {
-                                  setState(() {
-                                    camMuted = !camMuted;
-                                  });
+                                  setState(() => camMuted = !camMuted);
                                 },
                               ),
                               Switch(
-                                value:
-                                    activeStreamer['videoCallOpen'] == true,
-                                onChanged: (bool v) {
-                                  activeStreamer['videoCallOpen'] = v;
+                                value: activeStreamer['videoCallOpen'] == true,
+                                onChanged: (bool value) {
+                                  activeStreamer['videoCallOpen'] = value;
                                   store.notifyListeners();
                                 },
                               ),
@@ -1738,8 +1747,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           ),
                         ),
                         child: Column(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: <Widget>[
                             const Text(
                               'Side Guest',
@@ -1749,7 +1757,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                               ),
                             ),
                             Text(
-                              '${activeStreamer['guestName']}',
+                              '${activeStreamer['guestName'] ?? 'No Guest'}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
@@ -1757,25 +1765,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                             ),
                             DropdownButton<String>(
                               isExpanded: true,
-                              value:
-                                  activeStreamer['guestCallMode']
-                                          as String? ??
-                                      'VIDEO',
+                              value: <String>['VIDEO', 'AUDIO'].contains(
+                                activeStreamer['guestCallMode'],
+                              )
+                                  ? activeStreamer['guestCallMode'] as String
+                                  : 'VIDEO',
                               items: const <DropdownMenuItem<String>>[
-                                DropdownMenuItem<String>(
+                                DropdownMenuItem(
                                   value: 'VIDEO',
                                   child: Text('Video Call'),
                                 ),
-                                DropdownMenuItem<String>(
+                                DropdownMenuItem(
                                   value: 'AUDIO',
                                   child: Text('Audio Call'),
                                 ),
                               ],
-                              onChanged: (String? val) {
-                                if (val != null) {
-                                  activeStreamer['guestCallMode'] = val;
-                                  store.notifyListeners();
-                                }
+                              onChanged: (String? value) {
+                                if (value == null) return;
+                                activeStreamer['guestCallMode'] = value;
+                                store.notifyListeners();
                               },
                             ),
                           ],
@@ -1786,7 +1794,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'VIP Beauty Filter',
+                'VIP Beauty Filter Controls (UI only)',
                 style: TextStyle(
                   color: Color(0xFFE6C47A),
                   fontWeight: FontWeight.bold,
@@ -1794,20 +1802,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
               Slider(
                 value: skinSmooth,
-                onChanged: (double v) {
-                  setState(() => skinSmooth = v);
+                onChanged: (double value) {
+                  setState(() => skinSmooth = value);
                 },
               ),
               Slider(
                 value: faceSize,
-                onChanged: (double v) {
-                  setState(() => faceSize = v);
+                onChanged: (double value) {
+                  setState(() => faceSize = value);
                 },
               ),
               Slider(
                 value: eyeSize,
-                onChanged: (double v) {
-                  setState(() => eyeSize = v);
+                onChanged: (double value) {
+                  setState(() => eyeSize = value);
                 },
               ),
               Wrap(
@@ -1826,11 +1834,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     giftName: 'Royal Sovereign Castle',
                     giftCoins: 200000,
                   );
+                  _showMessage(
+                    'Local gift demo updated. Real coin transaction and animation require backend integration.',
+                  );
                 },
                 icon: const Icon(Icons.card_giftcard),
-                label: const Text(
-                  'Send Gift (200k Coins -> 65% Wallet + Global Patti)',
-                ),
+                label: const Text('Send Demo Gift (200k Coins)'),
               ),
             ],
           ),
@@ -1840,65 +1849,61 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildPkSection() {
+    final int slots = pkModeSelected == '6P'
+        ? 6
+        : pkModeSelected == '4GRID'
+            ? 4
+            : pkModeSelected == '3P'
+                ? 3
+                : 2;
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title:
-              'PK Battle Arena (6P • 3P • 2P • Friend Train • 4-Grid)',
+          title: 'PK Battle Arena (6P • 3P • 2P • Friend Train • 4-Grid)',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Wrap(
                 spacing: 8,
-                children: <String>[
-                  '6P',
-                  '3P',
-                  '2P',
-                  'TRAIN',
-                  '4GRID',
-                ].map((String m) {
+                children: <String>['6P', '3P', '2P', 'TRAIN', '4GRID']
+                    .map((String mode) {
                   return ChoiceChip(
-                    label: Text(m),
-                    selected: pkModeSelected == m,
+                    label: Text(mode),
+                    selected: pkModeSelected == mode,
                     onSelected: (_) {
-                      setState(() => pkModeSelected = m);
+                      setState(() => pkModeSelected = mode);
                     },
                   );
                 }).toList(),
               ),
               const SizedBox(height: 10),
-              Text('Active PK Mode: $pkModeSelected'),
+              Text('Selected PK Mode: $pkModeSelected'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: List<Widget>.generate(
-                  pkModeSelected == '6P'
-                      ? 6
-                      : pkModeSelected == '4GRID'
-                          ? 4
-                          : pkModeSelected == '3P'
-                              ? 3
-                              : 2,
-                  (int idx) {
-                    return Container(
-                      width: 140,
-                      height: 80,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1235),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0xFFE6C47A),
-                        ),
+                children: List<Widget>.generate(slots, (int index) {
+                  return Container(
+                    width: 140,
+                    height: 80,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1235),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE6C47A),
                       ),
-                      child: Text(
-                        'Slot ${idx + 1} ($pkModeSelected)',
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                    child: Text('Slot ${index + 1} ($pkModeSelected)'),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'PK invitations, live score sync and participant connections are not connected in this local screen.',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -1908,16 +1913,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildAudioSection() {
-    final Map<String, dynamic> audioRoom =
-        store.streamers.firstWhere(
-      (Map<String, dynamic> s) => s['mode'] == 'AUDIO',
-      orElse: () => store.streamers.first,
-    );
+    final Map<String, dynamic>? audioRoom = _findStreamer('AUDIO');
+
+    if (audioRoom == null) {
+      return _emptyState(
+        'No audio room available',
+        'Jab koi audio streamer live hoga, woh yahan nazar aayega.',
+      );
+    }
 
     final List<Map<String, dynamic>> seats =
-        List<Map<String, dynamic>>.from(
-      (audioRoom['seats'] as List<dynamic>?) ?? <dynamic>[],
-    );
+        (audioRoom['seats'] as List<dynamic>? ?? <dynamic>[])
+            .whereType<Map>()
+            .map((Map seat) => Map<String, dynamic>.from(seat))
+            .toList();
+
+    final List<dynamic> requests =
+        audioRoom['pendingCallRequests'] as List<dynamic>? ??
+            <dynamic>[];
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -1935,8 +1948,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
                 onPressed: () {
                   audioRoom['plusOpen'] =
-                      !(audioRoom['plusOpen'] == true);
-
+                      audioRoom['plusOpen'] != true;
                   store.notifyListeners();
                 },
               ),
@@ -1947,8 +1959,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
                 onPressed: () {
                   audioRoom['callRequestOpen'] =
-                      !(audioRoom['callRequestOpen'] == true);
-
+                      audioRoom['callRequestOpen'] != true;
                   store.notifyListeners();
                 },
               ),
@@ -1966,9 +1977,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   crossAxisSpacing: 8,
                 ),
                 itemCount: seats.length,
-                itemBuilder: (_, int i) {
-                  final Map<String, dynamic> seat = seats[i];
-
+                itemBuilder: (_, int index) {
+                  final Map<String, dynamic> seat = seats[index];
                   return Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF191133),
@@ -1998,13 +2008,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 },
               ),
               const SizedBox(height: 10),
-              ...((audioRoom['pendingCallRequests']
-                          as List<dynamic>?) ??
-                      <dynamic>[])
-                  .map((dynamic req) {
+              ...requests.map((dynamic request) {
+                if (request is! Map) return const SizedBox.shrink();
+
                 return ListTile(
                   title: Text(
-                    'Call Join Request: ${req['name']}',
+                    'Call Join Request: ${request['name']}',
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -2015,10 +2024,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           color: Colors.greenAccent,
                         ),
                         onPressed: () {
-                          ((audioRoom['pendingCallRequests']
-                                  as List<dynamic>))
-                              .remove(req);
-
+                          final List<dynamic> current =
+                              audioRoom['pendingCallRequests']
+                                  as List<dynamic>;
+                          current.remove(request);
+                          _showMessage(
+                            'Request accepted locally. LiveKit seat connection is not yet attached.',
+                          );
                           store.notifyListeners();
                         },
                       ),
@@ -2028,10 +2040,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           color: Colors.redAccent,
                         ),
                         onPressed: () {
-                          ((audioRoom['pendingCallRequests']
-                                  as List<dynamic>))
-                              .remove(req);
-
+                          (audioRoom['pendingCallRequests']
+                                  as List<dynamic>)
+                              .remove(request);
                           store.notifyListeners();
                         },
                       ),
@@ -2061,21 +2072,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: () {
-                  store.currentUser['vipTier'] = 'SVIP';
-                  store.notifyListeners();
+                  _showMessage(
+                    'VIP/SVIP payment service connected nahi hai. Payment ke baghair VIP activate nahi kiya jayega.',
+                  );
                 },
-                child: const Text('VIP / SVIP Top-Up Activate'),
+                child: const Text('VIP / SVIP Top-Up'),
               ),
               const SizedBox(height: 8),
-              ...store.backupStore.map((Map<String, dynamic> b) {
+              ...store.backupStore.map((Map<String, dynamic> item) {
                 return ListTile(
-                  title: Text(
-                    '${b['name']} (${b['type']})',
-                  ),
+                  title: Text('${item['name']} (${item['type']})'),
                   trailing: Switch(
-                    value: b['equipped'] == true,
-                    onChanged: (bool v) {
-                      b['equipped'] = v;
+                    value: item['equipped'] == true,
+                    onChanged: (bool value) {
+                      item['equipped'] = value;
                       store.notifyListeners();
                     },
                   ),
@@ -2085,21 +2095,18 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         _luxuryCard(
-          title:
-              'Private Rooms (Hidden Publicly • Key + Inbox Invite)',
+          title: 'Private Rooms (Secure Server Connection Required)',
           child: Column(
             children: store.privateRooms.map(
-              (Map<String, dynamic> pr) {
+              (Map<String, dynamic> room) {
                 return ListTile(
                   leading: const Icon(
                     Icons.lock,
                     color: Color(0xFFE6C47A),
                   ),
-                  title: Text(
-                    'Private Room ${pr['roomId']} (Key: ${pr['key']})',
-                  ),
+                  title: Text('Private Room ${room['roomId']}'),
                   subtitle: const Text(
-                    'Max 2–3 People • Audio + Video + Gifting',
+                    'Room key and access must be verified by the server.',
                   ),
                 );
               },
@@ -2114,21 +2121,17 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: store.inboxMessages.map(
-        (Map<String, dynamic> m) {
+        (Map<String, dynamic> message) {
           return _luxuryCard(
-            title: 'From: ${m['from']} (ID: ${m['fromId']})',
+            title:
+                'From: ${message['from']} (ID: ${message['fromId']})',
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                Expanded(
-                  child: Text('${m['text']}'),
-                ),
-                if (m['privateKey'] != null)
+                Expanded(child: Text('${message['text']}')),
+                if (message['privateKey'] != null)
                   ElevatedButton(
                     onPressed: widget.onSwitchToLive,
-                    child: Text(
-                      'Enter Key (${m['privateKey']})',
-                    ),
+                    child: const Text('Open Room'),
                   ),
               ],
             ),
@@ -2140,8 +2143,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
   Widget _buildWalletAndEarningScreen() {
     final int nowDay = DateTime.now().day;
-    final bool inPayoutWindow =
-        nowDay >= 1 && nowDay <= 5;
+    final bool inPayoutWindow = nowDay >= 1 && nowDay <= 5;
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -2153,22 +2155,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               Text('Coins: ${store.currentUser['coins']}'),
               Text(
-                '65% Streamer Wallet Balance: \$${((store.currentUser['walletBalance'] as double?) ?? 0.0).toStringAsFixed(2)}',
+                'Streamer Wallet Balance: \$'
+                '${((store.currentUser['walletBalance'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2)}',
               ),
               Text(
                 inPayoutWindow
-                    ? 'Payout Window Open (1–5 Tareekh) — 5 din ke andar payout milega.'
-                    : 'Payout Window: Mahina khatam hone ke baad 1 se 5 tareekh tak request lagayein (5 din ke andar payout).',
-                style: const TextStyle(
-                  color: Color(0xFFE6C47A),
-                ),
+                    ? 'Payout Window Open (1–5 Tareekh).'
+                    : 'Payout Window: Mahina khatam hone ke baad 1 se 5 tareekh tak.',
+                style: const TextStyle(color: Color(0xFFE6C47A)),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Displayed balance is local demo data. Actual payout requires server ledger verification.',
+                style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
             ],
           ),
         ),
         _luxuryCard(
-          title:
-              'Earning Folder — Step-by-Step Direct / Agency Registration',
+          title: 'Earning Folder — Direct / Agency Registration',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -2180,18 +2185,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   'Saudi Arabia',
                   'India',
                   'Other',
-                ].map(
-                  (String c) {
-                    return DropdownMenuItem<String>(
-                      value: c,
-                      child: Text(c),
-                    );
-                  },
-                ).toList(),
-                onChanged: (String? v) {
-                  setState(() {
-                    kycCountry = v ?? 'Pakistan';
-                  });
+                ].map((String country) {
+                  return DropdownMenuItem<String>(
+                    value: country,
+                    child: Text(country),
+                  );
+                }).toList(),
+                onChanged: (String? value) {
+                  setState(() => kycCountry = value ?? 'Pakistan');
                 },
                 decoration: const InputDecoration(
                   labelText: 'Country / Nationality',
@@ -2203,31 +2204,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 spacing: 8,
                 children: <Widget>[
                   OutlinedButton(
-                    onPressed: () {
-                      setState(() => kycFrontUploaded = true);
-                    },
+                    onPressed: () => _showMessage(
+                      'ID Front upload ke liye secure file picker/storage integration chahiye. Abhi file upload nahi hui.',
+                    ),
                     child: Text(
-                      kycFrontUploaded
-                          ? 'Front ID ✓'
-                          : 'Upload ID Front',
+                      kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front',
                     ),
                   ),
                   OutlinedButton(
-                    onPressed: () {
-                      setState(() => kycBackUploaded = true);
-                    },
+                    onPressed: () => _showMessage(
+                      'ID Back upload ke liye secure file picker/storage integration chahiye. Abhi file upload nahi hui.',
+                    ),
                     child: Text(
-                      kycBackUploaded
-                          ? 'Back ID ✓'
-                          : 'Upload ID Back',
+                      kycBackUploaded ? 'Back ID ✓' : 'Upload ID Back',
                     ),
                   ),
                   OutlinedButton(
-                    onPressed: () {
-                      setState(
-                        () => kycCardSelfieUploaded = true,
-                      );
-                    },
+                    onPressed: () => _showMessage(
+                      'Card selfie upload ke liye secure file picker/storage integration chahiye. Abhi file upload nahi hui.',
+                    ),
                     child: Text(
                       kycCardSelfieUploaded
                           ? 'Card Selfie ✓'
@@ -2241,30 +2236,33 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 controller: payoutAccountCtrl,
                 enabled: !registrationSubmitted,
                 decoration: const InputDecoration(
-                  labelText:
-                      'Mobile Wallet (e.g., EasyPaisa) / Bank Account (Locked on Submit)',
+                  labelText: 'Mobile Wallet / Bank Account',
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: agencyTrackCtrl,
+                enabled: !registrationSubmitted,
                 decoration: const InputDecoration(
                   labelText: 'Optional Agency / Track Number',
                 ),
               ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    registrationSubmitted = true;
-                    store.currentUser['payoutLocked'] = true;
-                    store.currentUser['payoutAccount'] =
-                        payoutAccountCtrl.text;
-                  });
-                },
+                onPressed: registrationSubmitted
+                    ? null
+                    : () {
+                        if (payoutAccountCtrl.text.trim().isEmpty) {
+                          _showMessage('Payout account enter karein.');
+                          return;
+                        }
+                        _showMessage(
+                          'KYC application backend se connected nahi hai. Abhi details submit ya lock nahi hui.',
+                        );
+                      },
                 child: Text(
                   registrationSubmitted
-                      ? 'Registration Submitted & Account Locked ✓'
+                      ? 'Registration Submitted'
                       : 'Submit Registration',
                 ),
               ),
@@ -2280,9 +2278,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         GestureDetector(
-          onTap: () {
-            setState(() => aiExpanded = !aiExpanded);
-          },
+          onTap: () => setState(() => aiExpanded = !aiExpanded),
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -2296,8 +2292,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: <Widget>[
                     Row(
                       children: <Widget>[
@@ -2308,7 +2303,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         const SizedBox(width: 8),
                         Text(
                           aiExpanded
-                              ? 'ZOONL AI Assistant (Female Voice)'
+                              ? 'ZOONL AI Assistant'
                               : 'AI Support (Tap to Open)',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
@@ -2317,9 +2312,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       ],
                     ),
                     Icon(
-                      aiExpanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                      aiExpanded ? Icons.expand_less : Icons.expand_more,
                     ),
                   ],
                 ),
@@ -2330,10 +2323,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       const Text('Female Voice: '),
                       Switch(
                         value: femaleVoiceEnabled,
-                        onChanged: (bool v) {
-                          setState(() {
-                            femaleVoiceEnabled = v;
-                          });
+                        onChanged: (bool value) {
+                          setState(() => femaleVoiceEnabled = value);
                         },
                       ),
                     ],
@@ -2343,23 +2334,28 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     style: const TextStyle(color: Colors.white),
                   ),
                   const SizedBox(height: 10),
-                  ...aiQuickPrompts.map(
-                    (Map<String, String> item) {
-                      return ListTile(
-                        dense: true,
-                        title: Text(item['q'] ?? ''),
-                        trailing: const Icon(
-                          Icons.volume_up,
-                          size: 18,
-                          color: Color(0xFFE6C47A),
-                        ),
-                        onTap: () {
-                          setState(() {
-                            selectedAiAnswer = item['a'] ?? '';
-                          });
-                        },
-                      );
-                    },
+                  ...aiQuickPrompts.map((Map<String, String> item) {
+                    return ListTile(
+                      dense: true,
+                      title: Text(item['q'] ?? ''),
+                      trailing: const Icon(
+                        Icons.volume_up,
+                        size: 18,
+                        color: Color(0xFFE6C47A),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          selectedAiAnswer = item['a'] ?? '';
+                        });
+                      },
+                    );
+                  }),
+                  const Text(
+                    'Voice playback is not connected in this file.',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ],
@@ -2374,12 +2370,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               Text('Support Email: ${store.supportEmail}'),
               Text('Support Contact: ${store.supportContact}'),
-              Text(
-                'Official Hosting Email: ${store.officialHostingEmail}',
-              ),
-              Text(
-                'Official Hosting Contact: ${store.officialHostingContact}',
-              ),
+              Text('Official Hosting Email: ${store.officialHostingEmail}'),
+              Text('Official Hosting Contact: ${store.officialHostingContact}'),
             ],
           ),
         ),
@@ -2388,14 +2380,15 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildProfileAndSettingsScreen() {
-    final bool isOwner =
-        store.currentUser['id'] == ZoonlStore.ownerId;
-
-    final bool isLive =
-        store.currentUser['isLive'] == true;
-
+    final bool isOwner = store.isOwner;
+    final bool isLive = store.currentUser['isLive'] == true;
+    final dynamic offlineValue = store.currentUser['offlineSince'];
     final DateTime? offlineSince =
-        store.currentUser['offlineSince'] as DateTime?;
+        offlineValue is DateTime ? offlineValue : null;
+
+    final List<dynamic> linkedAccounts =
+        store.currentUser['linkedAccounts'] as List<dynamic>? ??
+            <dynamic>[];
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -2412,54 +2405,43 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Text(
                 isLive
                     ? 'Status: LIVE'
-                    : 'Status: OFFLINE ${offlineSince != null ? "(Since ${offlineSince.hour}:${offlineSince.minute})" : ""}',
+                    : 'Status: OFFLINE ${offlineSince != null ? "(Since ${offlineSince.hour}:${offlineSince.minute.toString().padLeft(2, '0')})" : ""}',
                 style: TextStyle(
-                  color: isLive
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
+                  color: isLive ? Colors.greenAccent : Colors.orangeAccent,
                 ),
               ),
-              const SizedBox(height: 8),
               SwitchListTile(
-                title: const Text(
-                  'Friend List Public / Private',
-                ),
-                value:
-                    store.currentUser['friendListPublic'] == true,
-                onChanged: (bool v) {
-                  store.currentUser['friendListPublic'] = v;
+                title: const Text('Friend List Public / Private'),
+                value: store.currentUser['friendListPublic'] == true,
+                onChanged: (bool value) {
+                  store.currentUser['friendListPublic'] = value;
                   store.notifyListeners();
                 },
               ),
-              Text(
-                'Linked Accounts: ${(store.currentUser['linkedAccounts'] as List<dynamic>).join(", ")}',
-              ),
+              Text('Linked Accounts: ${linkedAccounts.join(", ")}'),
             ],
           ),
         ),
         if (isOwner)
           _luxuryCard(
-            title:
-                'Owner 10001 Sovereign Control (Permanent Ban & Limits)',
+            title: 'Owner 10001 Sovereign Control',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 const Text(
-                  'Unlimited Coins: ACTIVE (No restriction on Owner 10001)',
+                  'Owner identity: trusted role flag required. Public ID alone is not authorization.',
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton.icon(
                   onPressed: () {
                     store.ownerPermanentBan(
                       '99901',
-                      reason:
-                          'Permanent Streamer/Fraud Ban by Owner 10001',
+                      reason: 'Permanent Streamer/Fraud Ban by Owner',
                     );
+                    _showMessage('Owner ban request processed locally.');
                   },
                   icon: const Icon(Icons.gpp_bad),
-                  label: const Text(
-                    'Permanent Ban Fraud/Streamer ID (Owner Only)',
-                  ),
+                  label: const Text('Permanent Ban (Owner Only)'),
                 ),
               ],
             ),
@@ -2475,17 +2457,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert),
       onSelected: (String action) {
+        final List<dynamic> admins =
+            streamer['roomAdmins'] as List<dynamic>? ?? <dynamic>[];
+
         store.moderateUser(
           streamer: streamer,
           targetUserId: targetUserId,
           action: action,
           actorIsStreamer:
-              store.currentUser['id'] == streamer['userId'],
-          actorIsAdmin:
-              (streamer['roomAdmins'] as List<dynamic>)
-                  .contains(store.currentUser['id']),
+              store.currentUser['id']?.toString() ==
+              streamer['userId']?.toString(),
+          actorIsAdmin: admins
+              .map((dynamic id) => id.toString())
+              .contains(store.currentUser['id']?.toString()),
           actorVipTier:
-              store.currentUser['vipTier'] as String? ?? 'NONE',
+              store.currentUser['vipTier']?.toString() ?? 'NONE',
         );
       },
       itemBuilder: (_) => const <PopupMenuEntry<String>>[
@@ -2506,6 +2492,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           child: Text('Boot from Room'),
         ),
       ],
+    );
+  }
+
+  Widget _emptyState(String title, String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: _luxuryCard(
+          title: title,
+          child: Text(
+            message,
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+      ),
     );
   }
 
