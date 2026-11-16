@@ -1,15 +1,13 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Backend {
-  static SupabaseClient get client =>
-      Supabase.instance.client;
+  static SupabaseClient get client => Supabase.instance.client;
 
-  static User? get currentUser =>
-      client.auth.currentUser;
+  static User? get currentUser => client.auth.currentUser;
 
-  static bool get isLoggedIn =>
-      currentUser != null;
+  static String? get currentUserId => currentUser?.id;
+
+  static bool get isLoggedIn => currentUser != null;
 
   static Stream<AuthState> get authChanges =>
       client.auth.onAuthStateChange;
@@ -32,16 +30,34 @@ class Backend {
     );
   }
 
+  // RPC / query responses can be a List or a single Map.
+  static List<Map<String, dynamic>> _asRows(dynamic response) {
+    if (response is List) {
+      return response
+          .whereType<Map>()
+          .map((Map row) => Map<String, dynamic>.from(row))
+          .toList();
+    }
+    if (response is Map) {
+      return <Map<String, dynamic>>[
+        Map<String, dynamic>.from(response),
+      ];
+    }
+    return <Map<String, dynamic>>[];
+  }
+
   // Fetch ZOONL LIVE Feed
-  static Future<List<Map<String, dynamic>>>
-      fetchZoonlLiveFeed() async {
+  static Future<List<Map<String, dynamic>>> fetchZoonlLiveFeed({
+    int limit = 50,
+  }) async {
     try {
-      final response = await client
+      final dynamic response = await client
           .from('zoonl_live_feed')
           .select()
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .limit(limit);
 
-      return List<Map<String, dynamic>>.from(response);
+      return _asRows(response);
     } on PostgrestException {
       rethrow;
     } catch (e) {
@@ -50,53 +66,45 @@ class Backend {
   }
 
   // Send ZOONL LIVE Gift
-  static Future<List<Map<String, dynamic>>>
-      sendZoonlLiveGift({
-    required String senderId,
+  //
+  // SECURITY: the sender is ALWAYS the logged-in user (auth.uid() on the
+  // server). Coins are NEVER sent by the client; the server looks up the
+  // price from the gift catalog, checks the balance and deducts it in
+  // one transaction. See supabase_zoonl_setup.sql.
+  static Future<List<Map<String, dynamic>>> sendZoonlLiveGift({
     required String receiverId,
     required String giftCode,
-    required int coins,
   }) async {
-    final sender = senderId.trim();
-    final receiver = receiverId.trim();
-    final code = giftCode.trim();
+    final String receiver = receiverId.trim();
+    final String code = giftCode.trim();
 
-    if (sender.isEmpty ||
-        receiver.isEmpty ||
-        code.isEmpty) {
+    if (receiver.isEmpty || code.isEmpty) {
       throw ArgumentError(
-        'Sender ID, Receiver ID और Gift Code जरूरी हैं।',
+        'Receiver ID और Gift Code जरूरी हैं।',
       );
     }
 
-    if (sender == receiver) {
+    final String? me = currentUserId;
+    if (me == null) {
+      throw StateError('पहले Login करना जरूरी है।');
+    }
+
+    if (me == receiver) {
       throw ArgumentError(
         'आप खुद को Gift नहीं भेज सकते।',
       );
     }
 
-    if (coins <= 0) {
-      throw ArgumentError(
-        'Gift Coins की संख्या शून्य से अधिक होनी चाहिए।',
-      );
-    }
-
-    if (currentUser == null) {
-      throw StateError('पहले Login करना जरूरी है।');
-    }
-
     try {
-      final response = await client
-          .from('zoonl_live_gifts')
-          .insert({
-            'sender_id': sender,
-            'receiver_id': receiver,
-            'gift_code': code,
-            'coins': coins,
-          })
-          .select();
+      final dynamic response = await client.rpc(
+        'send_zoonl_gift',
+        params: <String, dynamic>{
+          'p_receiver': receiver,
+          'p_gift_code': code,
+        },
+      );
 
-      return List<Map<String, dynamic>>.from(response);
+      return _asRows(response);
     } on PostgrestException {
       rethrow;
     } catch (e) {
@@ -105,35 +113,31 @@ class Backend {
   }
 
   // Equip ZOONL Cosmetic
-  static Future<List<Map<String, dynamic>>>
-      equipZoonlCosmetic({
-    required String userId,
+  //
+  // SECURITY: the server equips the item only if the logged-in user
+  // already owns it. The client cannot choose another user's ID.
+  static Future<List<Map<String, dynamic>>> equipZoonlCosmetic({
     required String itemCode,
   }) async {
-    final id = userId.trim();
-    final code = itemCode.trim();
+    final String code = itemCode.trim();
 
-    if (id.isEmpty || code.isEmpty) {
-      throw ArgumentError(
-        'User ID और Item Code जरूरी हैं।',
-      );
+    if (code.isEmpty) {
+      throw ArgumentError('Item Code जरूरी है।');
     }
 
-    if (currentUser == null) {
+    if (currentUserId == null) {
       throw StateError('पहले Login करना जरूरी है।');
     }
 
     try {
-      final response = await client
-          .from('zoonl_user_cosmetics')
-          .upsert({
-            'user_id': id,
-            'item_code': code,
-            'is_equipped': true,
-          })
-          .select();
+      final dynamic response = await client.rpc(
+        'equip_zoonl_cosmetic',
+        params: <String, dynamic>{
+          'p_item_code': code,
+        },
+      );
 
-      return List<Map<String, dynamic>>.from(response);
+      return _asRows(response);
     } on PostgrestException {
       rethrow;
     } catch (e) {
