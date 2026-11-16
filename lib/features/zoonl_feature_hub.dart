@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../core/backend.dart';
 
@@ -100,6 +99,8 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
     }
   }
 
+  // FIXED: Backend.equipZoonlCosmetic only takes itemCode.
+  // The server uses the logged-in user's ID itself (secure).
   Future<void> _equipItem(Map<String, dynamic> item) async {
     final userId = Backend.currentUser?.id;
     final code = item['code']?.toString().trim() ?? '';
@@ -119,7 +120,6 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
 
     try {
       await Backend.equipZoonlCosmetic(
-        userId: userId,
         itemCode: code,
       );
 
