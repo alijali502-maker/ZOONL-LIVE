@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_config.dart';
+import 'core/backend.dart';
 import 'login_screen.dart';
 import 'main.dart' as zoonl;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
+  await Backend.initialize(
+    supabaseUrl: AppConfig.supabaseUrl,
+    supabaseAnonKey: AppConfig.supabaseAnonKey,
   );
 
   runApp(const ZoonlEntryApp());
@@ -34,14 +35,14 @@ class ZoonlEntryApp extends StatelessWidget {
 class ZoonlAuthGate extends StatelessWidget {
   const ZoonlAuthGate({super.key});
 
+  const ZoonlAuthGate._();
+
   @override
   Widget build(BuildContext context) {
-    final client = Supabase.instance.client;
-
     return StreamBuilder<AuthState>(
-      stream: client.auth.onAuthStateChange,
+      stream: Backend.authChanges,
       builder: (context, snapshot) {
-        final user = client.auth.currentUser;
+        final user = Backend.currentUser;
 
         if (user == null) {
           return LoginScreen(
@@ -55,7 +56,9 @@ class ZoonlAuthGate extends StatelessWidget {
             if (profileSnapshot.connectionState ==
                 ConnectionState.waiting) {
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
               );
             }
 
@@ -74,7 +77,7 @@ class ZoonlAuthGate extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: () => client.auth.signOut(),
+                          onPressed: Backend.logout,
                           child: const Text('Log out'),
                         ),
                       ],
@@ -85,17 +88,33 @@ class ZoonlAuthGate extends StatelessWidget {
             }
 
             final profile = profileSnapshot.data!;
-            final userId = (profile['username'] ?? '').toString();
+            final userId =
+                (profile['username'] ?? '').toString().trim();
 
             if (userId.isEmpty) {
-              return const Scaffold(
+              return Scaffold(
                 body: Center(
-                  child: Text('User ID is not assigned yet.'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('User ID is not assigned yet.'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: Backend.logout,
+                          child: const Text('Log out'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             }
 
-            final isOwner = userId == zoonl.ZoonlStore.ownerId;
+            // Never grant Owner authority using a public username or ID.
+            // Owner access must be verified by a trusted server-side role.
+            const bool isOwner = false;
 
             zoonl.ZoonlStore.instance.currentUser = {
               'id': userId,
@@ -103,20 +122,23 @@ class ZoonlAuthGate extends StatelessWidget {
               'isOwner': isOwner,
               'isVerifiedStreamer': profile['is_verified'] == true,
               'level': profile['user_level'] ?? 1,
+
+              // Wallet values are not loaded from a verified ledger here.
               'coins': 0,
               'diamonds': 0,
               'sentCoins': 0,
               'walletBalance': 0.0,
+
               'vipTier': 'NONE',
               'isNewId': false,
               'trialExpiresAt': null,
               'friendListPublic': true,
               'linkedAccounts': ['Email Auth'],
-              'payoutLocked': !isOwner,
+              'payoutLocked': true,
               'payoutMethod': '',
               'payoutAccount': '',
-              'registrationType': isOwner ? 'OWNER' : 'USER',
-              'approved': true,
+              'registrationType': 'USER',
+              'approved': false,
               'isLive': false,
               'offlineSince': null,
               'avatarUrl': profile['avatar_url'],
@@ -132,15 +154,16 @@ class ZoonlAuthGate extends StatelessWidget {
     );
   }
 
-  Future<Map<String, dynamic>?> _loadProfile(String authUserId) async {
-    final result = await Supabase.instance.client
+  Future<Map<String, dynamic>?> _loadProfile(
+    String authUserId,
+  ) async {
+    return Backend.client
         .from('profiles')
         .select(
-          'id, username, display_name, avatar_url, country, language, bio, is_verified, user_level',
+          'id, username, display_name, avatar_url, country, '
+          'language, bio, is_verified, user_level',
         )
         .eq('id', authUserId)
         .maybeSingle();
-
-    return result;
   }
 }
