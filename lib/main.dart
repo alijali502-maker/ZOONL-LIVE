@@ -1884,4 +1884,550 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       },
       child: Text('$giftName • $coins'),
     );
+  }  Widget _buildPkSection() {
+    final int slots = pkModeSelected == '6P'
+        ? 6
+        : pkModeSelected == '4GRID'
+            ? 4
+            : pkModeSelected == '3P'
+                ? 3
+                : 2;
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title: 'PK Battle Arena',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 8,
+                children: <String>[
+                  '6P',
+                  '3P',
+                  '2P',
+                  'TRAIN',
+                  '4GRID',
+                ].map((String mode) {
+                  return ChoiceChip(
+                    label: Text(mode),
+                    selected: pkModeSelected == mode,
+                    onSelected: (_) {
+                      setState(() => pkModeSelected = mode);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 10),
+              Text('Selected PK Mode: $pkModeSelected'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List<Widget>.generate(slots, (int index) {
+                  return Container(
+                    width: 140,
+                    height: 80,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1235),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFE6C47A),
+                      ),
+                    ),
+                    child: Text(
+                      'Slot ${index + 1} ($pkModeSelected)',
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'PK invitations, live score sync and participant connections require the live-room service.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudioSection() {
+    final Map<String, dynamic>? audioRoom =
+        _findStreamer('AUDIO');
+
+    if (audioRoom == null) {
+      return _emptyState(
+        'No audio room available',
+        'Audio rooms will appear here when supplied by the server or added to a TEST session.',
+      );
+    }
+
+    final List<Map<String, dynamic>> seats =
+        (audioRoom['seats'] as List<dynamic>? ?? <dynamic>[])
+            .whereType<Map>()
+            .map(
+              (Map seat) => Map<String, dynamic>.from(seat),
+            )
+            .toList();
+
+    final List<dynamic> requests =
+        audioRoom['pendingCallRequests'] as List<dynamic>? ??
+            <dynamic>[];
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title:
+              '${audioRoom['name']} • Audio Room (${seats.length} Seats)',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              IconButton(
+                icon: const Icon(
+                  Icons.add_circle,
+                  color: Color(0xFFE6C47A),
+                ),
+                onPressed: () {
+                  if (store.isLiveMode) {
+                    _showMessage(
+                      'Audio seat changes require server authorization.',
+                    );
+                    return;
+                  }
+                  audioRoom['plusOpen'] =
+                      audioRoom['plusOpen'] != true;
+                  store.notifyListeners();
+                },
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.phone_in_talk,
+                  color: Color(0xFF00E676),
+                ),
+                onPressed: () {
+                  if (store.isLiveMode) {
+                    _showMessage(
+                      'Call requests require the live-room service.',
+                    );
+                    return;
+                  }
+                  audioRoom['callRequestOpen'] =
+                      audioRoom['callRequestOpen'] != true;
+                  store.notifyListeners();
+                },
+              ),
+            ],
+          ),
+          child: Column(
+            children: <Widget>[
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                ),
+                itemCount: seats.length,
+                itemBuilder: (_, int index) {
+                  final Map<String, dynamic> seat = seats[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF191133),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        const Icon(
+                          Icons.headset_mic,
+                          color: Color(0xFFE6C47A),
+                        ),
+                        Text(
+                          'Seat ${seat['seat']}',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        Text(
+                          '${seat['name']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+              ...requests.map((dynamic request) {
+                if (request is! Map) {
+                  return const SizedBox.shrink();
+                }
+
+                return ListTile(
+                  title: Text(
+                    'Call Join Request: ${request['name']}',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(
+                          Icons.check_circle,
+                          color: Colors.greenAccent,
+                        ),
+                        onPressed: () {
+                          if (store.isLiveMode) {
+                            _showMessage(
+                              'Accepting a call requires server verification.',
+                            );
+                            return;
+                          }
+                          final List<dynamic> current =
+                              audioRoom['pendingCallRequests']
+                                  as List<dynamic>;
+                          current.remove(request);
+                          _showMessage(
+                            'TEST request accepted locally.',
+                          );
+                          store.notifyListeners();
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.cancel,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () {
+                          if (store.isLiveMode) return;
+                          (audioRoom['pendingCallRequests']
+                                  as List<dynamic>)
+                              .remove(request);
+                          store.notifyListeners();
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVipHubSection() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title: 'VIP Top-Up & Backup Store',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Current VIP: ${store.currentUser['vipTier']} • Coins: ${store.currentUser['coins']}',
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  _showMessage(
+                    'VIP/SVIP activation requires verified payment and server approval.',
+                  );
+                },
+                child: const Text('VIP / SVIP Top-Up'),
+              ),
+              const SizedBox(height: 8),
+              if (store.backupStore.isEmpty)
+                const Text(
+                  'No saved rewards.',
+                  style: TextStyle(color: Colors.white60),
+                ),
+              ...store.backupStore.map(
+                (Map<String, dynamic> item) {
+                  return ListTile(
+                    title: Text(
+                      '${item['name']} (${item['type']})',
+                    ),
+                    trailing: Switch(
+                      value: item['equipped'] == true,
+                      onChanged: (bool value) {
+                        if (store.isLiveMode) {
+                          _showMessage(
+                            'Reward changes require server verification.',
+                          );
+                          return;
+                        }
+                        item['equipped'] = value;
+                        store.notifyListeners();
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'Private Rooms',
+          child: Column(
+            children: store.privateRooms.map(
+              (Map<String, dynamic> room) {
+                return ListTile(
+                  leading: const Icon(
+                    Icons.lock,
+                    color: Color(0xFFE6C47A),
+                  ),
+                  title: Text(
+                    'Private Room ${room['roomId']}',
+                  ),
+                  subtitle: const Text(
+                    'Room key and access must be verified by the server.',
+                  ),
+                );
+              },
+            ).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInboxScreen() {
+    if (store.inboxMessages.isEmpty) {
+      return _emptyState(
+        'Inbox is empty',
+        'New messages and room invitations will appear here.',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: store.inboxMessages.map(
+        (Map<String, dynamic> message) {
+          return _luxuryCard(
+            title:
+                'From: ${message['from']} (ID: ${message['fromId']})',
+            child: Row(
+              children: <Widget>[
+                Expanded(child: Text('${message['text']}')),
+                if (message['privateKey'] != null)
+                  ElevatedButton(
+                    onPressed: widget.onSwitchToLive,
+                    child: const Text('Open Room'),
+                  ),
+              ],
+            ),
+          );
+        },
+      ).toList(),
+    );
+  }
+
+  Widget _buildWalletAndEarningScreen() {
+    final int nowDay = DateTime.now().day;
+    final bool inPayoutWindow =
+        nowDay >= 1 && nowDay <= 5;
+
+    final int coins =
+        (store.currentUser['coins'] as num?)?.toInt() ?? 0;
+    final double walletBalance =
+        (store.currentUser['walletBalance'] as num?)?.toDouble() ??
+            0.0;
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: <Widget>[
+        _luxuryCard(
+          title: 'Wallet & 65% Streamer Earning',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Coins: $coins'),
+              Text(
+                'Streamer Wallet Balance: \$'
+                '${walletBalance.toStringAsFixed(2)}',
+              ),
+              Text(
+                inPayoutWindow
+                    ? 'Payout Window Open (1–5)'
+                    : 'Payout window: monthly, from day 1 to day 5.',
+                style: const TextStyle(
+                  color: Color(0xFFE6C47A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                store.isTestMode
+                    ? 'TEST MODE: This balance is test-session data only.'
+                    : 'LIVE MODE: Balance and payout must come from the verified server ledger.',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white60,
+                ),
+              ),
+              if (store.isTestMode) ...<Widget>[
+                const Divider(height: 20),
+                const Text(
+                  'Add test Coins for Gift System checks',
+                  style: TextStyle(
+                    color: Color(0xFFE6C47A),
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: <Widget>[
+                    OutlinedButton(
+                      onPressed: () {
+                        store.addTestCoins(1000);
+                        _showMessage('1,000 test Coins added.');
+                      },
+                      child: const Text('+1,000 TEST'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () {
+                        store.addTestCoins(10000);
+                        _showMessage('10,000 test Coins added.');
+                      },
+                      child: const Text('+10,000 TEST'),
+                    ),
+                    OutlinedButton(
+                      onPressed: () {
+                        store.addTestCoins(200000);
+                        _showMessage('200,000 test Coins added.');
+                      },
+                      child: const Text('+200,000 TEST'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'Earning Folder — Direct / Agency Registration',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              DropdownButtonFormField<String>(
+                initialValue: kycCountry,
+                items: const <String>[
+                  'Pakistan',
+                  'UAE',
+                  'Saudi Arabia',
+                  'India',
+                  'Other',
+                ].map((String country) {
+                  return DropdownMenuItem<String>(
+                    value: country,
+                    child: Text(country),
+                  );
+                }).toList(),
+                onChanged: (String? value) {
+                  setState(() {
+                    kycCountry = value ?? 'Pakistan';
+                  });
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Country',
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'KYC document submission is handled through the secure verification service.',
+              ),
+              Wrap(
+                spacing: 8,
+                children: <Widget>[
+                  OutlinedButton(
+                    onPressed: () => _showMessage(
+                      'Secure document upload service is required.',
+                    ),
+                    child: Text(
+                      kycFrontUploaded
+                          ? 'Front ID ✓'
+                          : 'Upload ID Front',
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _showMessage(
+                      'Secure document upload service is required.',
+                    ),
+                    child: Text(
+                      kycBackUploaded
+                          ? 'Back ID ✓'
+                          : 'Upload ID Back',
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _showMessage(
+                      'Secure document upload service is required.',
+                    ),
+                    child: Text(
+                      kycCardSelfieUploaded
+                          ? 'Photo ✓'
+                          : 'Upload Required Photo',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: payoutAccountCtrl,
+                enabled: !registrationSubmitted,
+                decoration: const InputDecoration(
+                  labelText: 'Payout Account',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: agencyTrackCtrl,
+                enabled: !registrationSubmitted,
+                decoration: const InputDecoration(
+                  labelText: 'Optional Agency / Track Number',
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: registrationSubmitted
+                    ? null
+                    : () {
+                        if (store.isLiveMode) {
+                          _showMessage(
+                            'KYC submission requires the secure server service.',
+                          );
+                          return;
+                        }
+                        if (payoutAccountCtrl.text.trim().isEmpty) {
+                          _showMessage(
+                            'Enter a payout account for this TEST form.',
+                          );
+                          return;
+                        }
+                        _showMessage(
+                          'TEST form is not submitted to a real KYC service.',
+                        );
+                      },
+                child: Text(
+                  registrationSubmitted
+                      ? 'Registration Submitted'
+                      : 'Submit Registration',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
