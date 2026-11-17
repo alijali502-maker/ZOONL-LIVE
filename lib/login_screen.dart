@@ -91,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final result = await _supabase.auth.signUp(
           email: email,
           password: password,
+          emailRedirectTo: _redirectTo,
           data: {
             if (_name.text.trim().isNotEmpty)
               'display_name': _name.text.trim(),
