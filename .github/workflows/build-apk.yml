@@ -56,8 +56,22 @@ jobs:
               if permission not in s:
                   s = s.replace('<application', permission + '\n    <application', 1)
 
+          deep_link = """        <intent-filter>
+                      <action android:name="android.intent.action.VIEW"/>
+                      <category android:name="android.intent.category.DEFAULT"/>
+                      <category android:name="android.intent.category.BROWSABLE"/>
+                      <data android:scheme="io.supabase.flutter" android:host="login-callback"/>
+                  </intent-filter>
+          """
+
+          if 'android:scheme="io.supabase.flutter"' not in s:
+              activity_end = s.find('</activity>')
+              if activity_end < 0:
+                  raise SystemExit("Main Android activity was not found.")
+              s = s[:activity_end] + deep_link + s[activity_end:]
+
           p.write_text(s)
-          print("Internet, Camera, Microphone, and audio permissions configured.")
+          print("Internet, Camera, Microphone, audio permissions, and Supabase OAuth deep link configured.")
           PY
 
       - name: Clean project
