@@ -1,18 +1,24 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
-  static SupabaseClient get _supabase =>
-      Supabase.instance.client;
+  static SupabaseClient get _supabase => Supabase.instance.client;
 
-  static User? get currentUser =>
-      _supabase.auth.currentUser;
+  static User? get currentUser => _supabase.auth.currentUser;
 
-  static bool get isLoggedIn =>
-      currentUser != null;
+  static bool get isLoggedIn => currentUser != null;
 
   static Stream<AuthState> get authChanges =>
       _supabase.auth.onAuthStateChange;
+
+  // ---------- Helpers ----------
+
+  static final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  static void _requireRedirect(String redirectTo) {
+    if (redirectTo.trim().isEmpty) {
+      throw ArgumentError('OAuth redirect URL जरूरी है।');
+    }
+  }
 
   // Email Login
   static Future<AuthResponse> login({
@@ -39,7 +45,7 @@ class AuthService {
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
-    if (normalizedEmail.isEmpty || password.length < 6) {
+    if (!_emailRegex.hasMatch(normalizedEmail) || password.length < 6) {
       throw ArgumentError(
         'सही Email और कम से कम 6 characters का Password दें।',
       );
@@ -51,8 +57,7 @@ class AuthService {
       email: normalizedEmail,
       password: password,
       data: {
-        if (name != null && name.isNotEmpty)
-          'display_name': name,
+        if (name != null && name.isNotEmpty) 'display_name': name,
       },
     );
   }
@@ -65,8 +70,7 @@ class AuthService {
   }) async {
     final normalizedPhone = phone.trim();
 
-    if (!RegExp(r'^\+[1-9][0-9]{6,14}$')
-        .hasMatch(normalizedPhone)) {
+    if (!RegExp(r'^\+[1-9][0-9]{6,14}$').hasMatch(normalizedPhone)) {
       throw ArgumentError(
         'International format में सही Phone Number दें। उदाहरण: +971501234567',
       );
@@ -108,9 +112,7 @@ class AuthService {
   static Future<bool> loginWithGoogle({
     required String redirectTo,
   }) async {
-    if (redirectTo.trim().isEmpty) {
-      throw ArgumentError('OAuth redirect URL जरूरी है।');
-    }
+    _requireRedirect(redirectTo);
 
     return _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
@@ -122,9 +124,7 @@ class AuthService {
   static Future<bool> loginWithFacebook({
     required String redirectTo,
   }) async {
-    if (redirectTo.trim().isEmpty) {
-      throw ArgumentError('OAuth redirect URL जरूरी है।');
-    }
+    _requireRedirect(redirectTo);
 
     return _supabase.auth.signInWithOAuth(
       OAuthProvider.facebook,
@@ -139,9 +139,12 @@ class AuthService {
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
 
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-        .hasMatch(normalizedEmail)) {
+    if (!_emailRegex.hasMatch(normalizedEmail)) {
       throw ArgumentError('सही Email Address दें।');
+    }
+
+    if (redirectTo.trim().isEmpty) {
+      throw ArgumentError('Redirect URL जरूरी है।');
     }
 
     await _supabase.auth.resetPasswordForEmail(
@@ -171,7 +174,8 @@ class AuthService {
   }
 
   // Link another supported identity to the current account.
-  // The provider must be supported and configured in Supabase.
+  // The provider must be supported and configured in Supabase,
+  // and "Manual Linking" must be enabled in the Supabase dashboard.
   static Future<bool> linkIdentity(
     OAuthProvider provider, {
     required String redirectTo,
@@ -180,9 +184,7 @@ class AuthService {
       throw StateError('पहले Login करना जरूरी है।');
     }
 
-    if (redirectTo.trim().isEmpty) {
-      throw ArgumentError('OAuth redirect URL जरूरी है।');
-    }
+    _requireRedirect(redirectTo);
 
     return _supabase.auth.linkIdentity(
       provider,
@@ -191,14 +193,24 @@ class AuthService {
   }
 
   // Unlink an identity from the current account.
-  static Future<User> unlinkIdentity(
+  static Future<void> unlinkIdentity(
     UserIdentity identity,
   ) async {
-    if (currentUser == null) {
+    final user = currentUser;
+
+    if (user == null) {
       throw StateError('पहले Login करना जरूरी है।');
     }
 
-    return _supabase.auth.unlinkIdentity(identity);
+    // Supabase requires at least 2 identities to unlink one.
+    final identities = user.identities;
+    if (identities != null && identities.length < 2) {
+      throw StateError(
+        'कम से कम एक Login method जुड़ा रहना जरूरी है।',
+      );
+    }
+
+    await _supabase.auth.unlinkIdentity(identity);
   }
 
   // Refresh current session
