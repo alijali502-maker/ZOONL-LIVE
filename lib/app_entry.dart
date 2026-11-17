@@ -1,4 +1,6 @@
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -181,16 +183,94 @@ class ZoonlAuthGate extends StatelessWidget {
     }
   }
 
+  static const String _profileColumns =
+      'id, username, display_name, avatar_url, country, '
+      'language, bio, is_verified, user_level';
+
+  String _newZoonlId() {
+    // Numeric public ID only. This value never grants Owner/Admin access.
+    return (Random.secure().nextInt(90000000) + 10000000).toString();
+  }
+
   Future<Map<String, dynamic>?> _loadProfile(
     String authUserId,
   ) async {
-    return Backend.client
+    final client = Backend.client;
+
+    Map<String, dynamic>? profile = await client
         .from('profiles')
-        .select(
-          'id, username, display_name, avatar_url, country, '
-          'language, bio, is_verified, user_level',
-        )
+        .select(_profileColumns)
         .eq('id', authUserId)
         .maybeSingle();
+
+    // A profile trigger may not have created the row. Try creating only
+    // this authenticated user's own profile, without changing DB policies.
+    if (profile == null) {
+      final String candidateId = _newZoonlId();
+      final metadataName =
+          Backend.currentUser?.userMetadata?['display_name']?.toString() ??
+              '';
+
+      try {
+        profile = await client
+            .from('profiles')
+            .insert({
+              'id': authUserId,
+              'username': candidateId,
+              'display_name': metadataName,
+            })
+            .select(_profileColumns)
+            .maybeSingle();
+      } on PostgrestException {
+        // If an Auth trigger created the row at the same time, read it again.
+        profile = await client
+            .from('profiles')
+            .select(_profileColumns)
+            .eq('id', authUserId)
+            .maybeSingle();
+
+        if (profile == null) rethrow;
+      }
+    }
+
+    if (profile == null) {
+      throw StateError(
+        'Profile row create/read failed. Check the profiles table policy.',
+      );
+    }
+
+    final existingId = profile['username']?.toString().trim() ?? '';
+    if (existingId.isNotEmpty) return profile;
+
+    // Existing accounts with an empty username receive a numeric ZOONL ID.
+    // A unique-constraint collision is retried with another candidate.
+    for (var attempt = 0; attempt < 8; attempt++) {
+      final candidateId = _newZoonlId();
+
+      try {
+        final updated = await client
+            .from('profiles')
+            .update({'username': candidateId})
+            .eq('id', authUserId)
+            .select(_profileColumns)
+            .maybeSingle();
+
+        if (updated != null &&
+            (updated['username']?.toString().trim().isNotEmpty ?? false)) {
+          return updated;
+        }
+
+        throw StateError(
+          'ZOONL ID update returned no profile row. Check profile update policy.',
+        );
+      } on PostgrestException catch (error) {
+        if (error.code == '23505') continue;
+        rethrow;
+      }
+    }
+
+    throw StateError(
+      'Unique ZOONL ID could not be assigned after several attempts.',
+    );
   }
 }
