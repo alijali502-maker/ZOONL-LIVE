@@ -181,7 +181,10 @@ class ZoonlStore extends ChangeNotifier {
     currentUser = <String, dynamic>{
       'id': user['id']?.toString() ?? '',
       'name': user['name']?.toString() ?? '',
-      'trustedRole': user['trustedRole']?.toString() ?? 'USER',
+      // Role is copied only from the server-verified Owner flag.
+      'trustedRole': user['isOwner'] == true
+          ? 'OWNER'
+          : (user['trustedRole']?.toString() ?? 'USER'),
       'isOwner': user['isOwner'] == true,
       'isVerifiedStreamer': user['isVerifiedStreamer'] == true,
       'streamerId': user['streamerId']?.toString() ?? '',
