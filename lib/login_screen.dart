@@ -1,5 +1,4 @@
-
-import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,6 +15,14 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // IMPORTANT: यह deep link आपके app के setup से मेल खाना चाहिए
+  // (AndroidManifest / Info.plist) और Supabase Dashboard ->
+  // Authentication -> URL Configuration -> Redirect URLs में add होना चाहिए।
+  static const String _mobileRedirect =
+      'io.supabase.flutter://login-callback/';
+
+  String? get _redirectTo => kIsWeb ? null : _mobileRedirect;
+
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _name = TextEditingController();
@@ -32,8 +39,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _phoneMode = false;
   bool _otpSent = false;
 
-  String get _normalizedCountryCode =>
-      _countryCode.text.trim().replaceAll(' ', '');
+  String get _normalizedCountryCode {
+    final code = _countryCode.text.trim().replaceAll(' ', '');
+    if (code.isEmpty || code.startsWith('+')) return code;
+    return '+$code';
+  }
 
   String get _normalizedPhone {
     var number = _phone.text.trim().replaceAll(RegExp(r'[\s-]'), '');
@@ -151,7 +161,14 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _otpSent = true);
       _show('OTP भेजने का अनुरोध सफल हुआ। SMS जाँचें।');
     } on AuthException catch (error) {
-      _show(error.message);
+      final message = error.message.toLowerCase();
+
+      if (message.contains('signups not allowed') ||
+          message.contains('user not found')) {
+        _show('यह Number registered नहीं है। पहले Account बनाएँ।');
+      } else {
+        _show(error.message);
+      }
     } catch (error) {
       _show('OTP भेजा नहीं जा सका: $error');
     } finally {
@@ -197,7 +214,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await _supabase.auth.signInWithOAuth(provider);
+      final launched = await _supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: _redirectTo,
+      );
+
+      if (!launched) {
+        _show('Login page खोला नहीं जा सका। दोबारा कोशिश करें।');
+      }
     } on AuthException catch (error) {
       _show(error.message);
     } catch (error) {
@@ -219,7 +243,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: _redirectTo,
+      );
       if (!mounted) return;
       _show('Password reset link के लिए Email जाँचें।');
     } on AuthException catch (error) {
@@ -751,9 +778,9 @@ class ZoonlLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final gold = const Color(0xFFFFD982);
-    final purple = const Color(0xFFB65CFF);
-    final pink = const Color(0xFFFF65C8);
+    const gold = Color(0xFFFFD982);
+    const purple = Color(0xFFB65CFF);
+    const pink = Color(0xFFFF65C8);
 
     final glow = Paint()
       ..color = purple.withOpacity(0.24)
@@ -854,13 +881,13 @@ class ZoonlLogoPainter extends CustomPainter {
     canvas.drawPath(zPath, zPaint);
 
     // Broadcast signal arcs.
-    final signalPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..color = pink;
-
     for (int i = 0; i < 3; i++) {
+      final signalPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..color = pink.withOpacity(1 - i * 0.22);
+
       final radius = 47.0 + i * 10;
       canvas.drawArc(
         Rect.fromCircle(
@@ -870,7 +897,7 @@ class ZoonlLogoPainter extends CustomPainter {
         -0.8,
         1.0,
         false,
-        signalPaint..color = pink.withOpacity(1 - i * 0.22),
+        signalPaint,
       );
     }
 
