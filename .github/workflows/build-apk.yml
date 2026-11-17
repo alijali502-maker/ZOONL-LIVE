@@ -45,13 +45,19 @@ jobs:
 
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
-          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.CAMERA"/>',
+              '<uses-permission android:name="android.permission.RECORD_AUDIO"/>',
+              '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>',
+          ]
 
-          if permission not in s:
-              s = s.replace('<application', permission + '\n    <application', 1)
-              p.write_text(s)
+          for permission in permissions:
+              if permission not in s:
+                  s = s.replace('<application', permission + '\n    <application', 1)
 
-          print("Internet permission configured.")
+          p.write_text(s)
+          print("Internet, Camera, Microphone, and audio permissions configured.")
           PY
 
       - name: Clean project
