@@ -64,7 +64,7 @@ class ZoonlStore extends ChangeNotifier {
   bool get isLiveMode => appMode == ZoonlAppMode.live;
 
   // Public ID is never proof of Owner authority.
-  bool get isOwner => currentUser['trustedRole'] == 'OWNER';
+  bool get isOwner => currentUser['isOwner'] == true;
 
   bool get canUseLocalTestTransactions => isTestMode;
 
@@ -182,6 +182,7 @@ class ZoonlStore extends ChangeNotifier {
       'id': user['id']?.toString() ?? '',
       'name': user['name']?.toString() ?? '',
       'trustedRole': user['trustedRole']?.toString() ?? 'USER',
+      'isOwner': user['isOwner'] == true,
       'isVerifiedStreamer': user['isVerifiedStreamer'] == true,
       'streamerId': user['streamerId']?.toString() ?? '',
       'level': (user['level'] as num?)?.toInt() ?? 1,
