@@ -89,82 +89,95 @@ class ZoonlAuthGate extends StatelessWidget {
 
             final profile = profileSnapshot.data!;
 
-            // Owner status is verified by Supabase, never by a client ID,
-            // username, or editable profile field.
-            bool isOwner = false;
-            try {
-              final dynamic ownerResult =
-                  await Backend.client.rpc('is_zoonl_owner');
-              isOwner = ownerResult == true;
-            } catch (_) {
-              // Fail closed: an RPC/schema error must never grant Owner.
-              isOwner = false;
-            }
+            // Owner status is checked asynchronously by the trusted
+            // Supabase function. Never grant Owner from a client-editable ID.
+            return FutureBuilder<bool>(
+              future: _loadOwnerStatus(),
+              builder: (context, ownerSnapshot) {
+                if (ownerSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
 
-            // The Owner's canonical ZOONL ID is 10001. For other accounts,
-            // keep using the assigned profile username.
-            final String profileUserId =
-                (profile['username'] ?? '').toString().trim();
-            final String userId =
-                isOwner ? '10001' : profileUserId;
+                final bool isOwner = ownerSnapshot.data == true;
 
-            if (userId.isEmpty) {
-              return Scaffold(
-                body: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('User ID is not assigned yet.'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: Backend.logout,
-                          child: const Text('Log out'),
+                // Owner's canonical ZOONL ID is 10001, but the Owner role
+                // itself comes only from the trusted Supabase RPC.
+                final String profileUserId =
+                    (profile['username'] ?? '').toString().trim();
+                final String userId = isOwner ? '10001' : profileUserId;
+
+                if (userId.isEmpty) {
+                  return Scaffold(
+                    body: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('User ID is not assigned yet.'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: Backend.logout,
+                              child: const Text('Log out'),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              );
-            }
+                  );
+                }
 
-            zoonl.ZoonlStore.instance.currentUser = {
-              'id': userId,
-              'name': (profile['display_name'] ?? '').toString(),
-              'isOwner': isOwner,
-              'isVerifiedStreamer': profile['is_verified'] == true,
-              'level': profile['user_level'] ?? 1,
+                zoonl.ZoonlStore.instance.currentUser = {
+                  'id': userId,
+                  'name': (profile['display_name'] ?? '').toString(),
+                  'isOwner': isOwner,
+                  'isVerifiedStreamer': profile['is_verified'] == true,
+                  'level': profile['user_level'] ?? 1,
 
-              // Wallet values are not loaded from a verified ledger here.
-              'coins': 0,
-              'diamonds': 0,
-              'sentCoins': 0,
-              'walletBalance': 0.0,
+                  // Wallet values are not loaded from a verified ledger here.
+                  'coins': 0,
+                  'diamonds': 0,
+                  'sentCoins': 0,
+                  'walletBalance': 0.0,
 
-              'vipTier': 'NONE',
-              'isNewId': false,
-              'trialExpiresAt': null,
-              'friendListPublic': true,
-              'linkedAccounts': ['Email Auth'],
-              'payoutLocked': true,
-              'payoutMethod': '',
-              'payoutAccount': '',
-              'registrationType': 'USER',
-              'approved': false,
-              'isLive': false,
-              'offlineSince': null,
-              'avatarUrl': profile['avatar_url'],
-              'country': profile['country'],
-              'language': profile['language'],
-              'bio': profile['bio'],
-            };
+                  'vipTier': 'NONE',
+                  'isNewId': false,
+                  'trialExpiresAt': null,
+                  'friendListPublic': true,
+                  'linkedAccounts': ['Email Auth'],
+                  'payoutLocked': true,
+                  'payoutMethod': '',
+                  'payoutAccount': '',
+                  'registrationType': 'USER',
+                  'approved': false,
+                  'isLive': false,
+                  'offlineSince': null,
+                  'avatarUrl': profile['avatar_url'],
+                  'country': profile['country'],
+                  'language': profile['language'],
+                  'bio': profile['bio'],
+                };
 
-            return const zoonl.ZoonlMainShell();
+                return const zoonl.ZoonlMainShell();
+              },
+            );
           },
         );
       },
     );
+  }
+
+  Future<bool> _loadOwnerStatus() async {
+    try {
+      final dynamic result =
+          await Backend.client.rpc('is_zoonl_owner');
+      return result == true;
+    } catch (_) {
+      // Fail closed: an RPC/schema error must never grant Owner.
+      return false;
+    }
   }
 
   Future<Map<String, dynamic>?> _loadProfile(
