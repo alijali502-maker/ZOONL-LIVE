@@ -118,7 +118,15 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (error) {
       final message = error.message.toLowerCase();
 
-      if (message.contains('already registered') ||
+      if (message.contains('signups not allowed') ||
+          message.contains('signup is disabled') ||
+          message.contains('signups are disabled')) {
+        _show(
+          'Supabase Auth में नए अकाउंट बनाने की अनुमति बंद है। '
+          'मौजूदा अकाउंट Login कर सकते हैं; नए ID के लिए Auth signup '
+          'अनुमति चालू होना जरूरी है।',
+        );
+      } else if (message.contains('already registered') ||
           message.contains('user already exists') ||
           message.contains('already been registered')) {
         _show('यह Email पहले से registered है। Login करें।');
@@ -164,7 +172,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final message = error.message.toLowerCase();
 
       if (message.contains('signups not allowed') ||
-          message.contains('user not found')) {
+          message.contains('signup is disabled') ||
+          message.contains('signups are disabled')) {
+        _show(
+          'Supabase Auth में नए अकाउंट बनाने की अनुमति बंद है। '
+          'नया Phone ID बनाने के लिए Auth signup अनुमति चालू होना जरूरी है।',
+        );
+      } else if (message.contains('user not found')) {
         _show('यह Number registered नहीं है। पहले Account बनाएँ।');
       } else {
         _show(error.message);
