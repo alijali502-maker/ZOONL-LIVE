@@ -88,8 +88,25 @@ class ZoonlAuthGate extends StatelessWidget {
             }
 
             final profile = profileSnapshot.data!;
-            final userId =
+
+            // Owner status is verified by Supabase, never by a client ID,
+            // username, or editable profile field.
+            bool isOwner = false;
+            try {
+              final dynamic ownerResult =
+                  await Backend.client.rpc('is_zoonl_owner');
+              isOwner = ownerResult == true;
+            } catch (_) {
+              // Fail closed: an RPC/schema error must never grant Owner.
+              isOwner = false;
+            }
+
+            // The Owner's canonical ZOONL ID is 10001. For other accounts,
+            // keep using the assigned profile username.
+            final String profileUserId =
                 (profile['username'] ?? '').toString().trim();
+            final String userId =
+                isOwner ? '10001' : profileUserId;
 
             if (userId.isEmpty) {
               return Scaffold(
@@ -111,10 +128,6 @@ class ZoonlAuthGate extends StatelessWidget {
                 ),
               );
             }
-
-            // Never grant Owner authority using a public username or ID.
-            // Owner access must be verified by a trusted server-side role.
-            const bool isOwner = false;
 
             zoonl.ZoonlStore.instance.currentUser = {
               'id': userId,
