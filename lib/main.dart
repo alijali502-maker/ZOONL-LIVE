@@ -7,6 +7,7 @@ import 'app_entry.dart' as entry;
 import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'profile_edit_screen.dart';
+import 'feature_hub_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1474,7 +1475,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
     switch (widget.topTabIndex) {
       case 0:
-        return _buildShortVideoSection();
+        return const FeatureHubScreen();
       case 1:
         return _buildLiveSection();
       case 2:
