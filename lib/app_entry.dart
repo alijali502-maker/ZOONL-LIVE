@@ -199,6 +199,13 @@ class ZoonlAuthGate extends StatelessWidget {
   ) async {
     final client = Backend.client;
 
+    var trustedOwner = false;
+    try {
+      trustedOwner = await client.rpc('is_zoonl_owner') == true;
+    } catch (_) {
+      // Fail closed. A public ID never substitutes for the Owner RPC.
+    }
+
     Map<String, dynamic>? profile = await client
         .from('profiles')
         .select(_profileColumns)
@@ -208,6 +215,9 @@ class ZoonlAuthGate extends StatelessWidget {
     // A profile trigger may not have created the row. Try creating only
     // this authenticated user's own profile, without changing DB policies.
     if (profile == null) {
+      if (trustedOwner) {
+        throw StateError('Owner profile row is missing.');
+      }
       final String candidateId = _newZoonlId();
       final metadataName =
           Backend.currentUser?.userMetadata?['display_name']?.toString() ??
@@ -240,6 +250,9 @@ class ZoonlAuthGate extends StatelessWidget {
         'Profile row create/read failed. Check the profiles table policy.',
       );
     }
+
+    // Keep the Owner's canonical public ID (10001) unchanged.
+    if (trustedOwner) return profile;
 
     final existingId = profile['username']?.toString().trim() ?? '';
     if (existingId.isNotEmpty) return profile;
