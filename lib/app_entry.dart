@@ -73,8 +73,10 @@ class ZoonlAuthGate extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Profile not found. Please contact support.',
+                        Text(
+                          profileSnapshot.hasError
+                              ? 'Profile setup failed: ${profileSnapshot.error}'
+                              : 'Profile record नहीं मिली। कृपया दोबारा Login करें।',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
