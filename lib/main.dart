@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'app_entry.dart' as entry;
 import 'core/app_config.dart';
 import 'core/backend.dart';
+import 'profile_edit_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2582,102 +2583,176 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildProfileAndSettingsScreen() {
-    final bool isOwner = store.isOwner;
     final bool isLive = store.currentUser['isLive'] == true;
+    final String displayName =
+        (store.currentUser['name'] ?? 'ZOONL User').toString();
+    final String userId = (store.currentUser['id'] ?? '').toString();
+    final String country =
+        (store.currentUser['country'] ?? 'Not set').toString();
+    final String bio = (store.currentUser['bio'] ?? '').toString();
+    final String avatarUrl =
+        (store.currentUser['avatarUrl'] ?? '').toString();
 
-    final dynamic offlineValue =
-        store.currentUser['offlineSince'];
-    final DateTime? offlineSince =
-        offlineValue is DateTime ? offlineValue : null;
-
-    final List<dynamic> linkedAccounts =
-        store.currentUser['linkedAccounts'] as List<dynamic>? ??
-            <dynamic>[];
+    Future<void> openProfileEditor() async {
+      final bool? saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => const ProfileEditScreen(),
+        ),
+      );
+      if (saved == true && mounted) {
+        _showMessage('Profile saved. Reopen this page to refresh account details.');
+      }
+    }
 
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
         _luxuryCard(
-          title:
-              '${store.currentUser['name']} (User ID: ${store.currentUser['id']})',
+          title: 'MY ZOONL PROFILE',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                'Level: ${store.currentUser['level']} • VIP: ${store.currentUser['vipTier']}',
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: const Color(0xFF2A1A49),
+                    backgroundImage: avatarUrl.startsWith('http')
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: avatarUrl.startsWith('http')
+                        ? null
+                        : const Icon(Icons.person, size: 38, color: Color(0xFFE6C47A)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Color(0xFFE6C47A),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('User ID: ${userId.isEmpty ? 'Not assigned' : userId}'),
+                        Text(
+                          isLive ? 'LIVE NOW' : 'OFFLINE',
+                          style: TextStyle(
+                            color: isLive ? Colors.greenAccent : Colors.white60,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Edit profile',
+                    onPressed: openProfileEditor,
+                    icon: const Icon(Icons.edit, color: Color(0xFFE6C47A)),
+                  ),
+                ],
               ),
-              Text(
-                isLive
-                    ? 'Status: LIVE'
-                    : 'Status: OFFLINE ${offlineSince != null ? "(Since ${offlineSince.hour}:${offlineSince.minute.toString().padLeft(2, '0')})" : ""}',
-                style: TextStyle(
-                  color: isLive
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
+              const Divider(height: 24),
+              _profileInfoRow(Icons.workspace_premium, 'Level',
+                  '${store.currentUser['level'] ?? 1}  •  VIP ${store.currentUser['vipTier'] ?? 'NONE'}'),
+              _profileInfoRow(Icons.flag_outlined, 'Country', country),
+              _profileInfoRow(Icons.info_outline, 'Bio',
+                  bio.isEmpty ? 'Add a short introduction' : bio),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: openProfileEditor,
+                  icon: const Icon(Icons.manage_accounts),
+                  label: const Text('EDIT PROFILE'),
                 ),
               ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'ACCOUNT & PRIVACY SETTINGS',
+          child: Column(
+            children: <Widget>[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_outline, color: Color(0xFFE6C47A)),
+                title: const Text('Profile information'),
+                subtitle: const Text('Photo, display name, country and bio'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: openProfileEditor,
+              ),
+              const Divider(height: 1),
               SwitchListTile(
-                title: const Text('Friend List Public / Private'),
-                value:
-                    store.currentUser['friendListPublic'] == true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Friend list visibility'),
+                subtitle: const Text('Choose whether your friend list is public'),
+                value: store.currentUser['friendListPublic'] == true,
                 onChanged: (bool value) {
                   if (store.isLiveMode) {
-                    _showMessage(
-                      'Profile settings require server integration.',
-                    );
+                    _showMessage('Privacy changes need verified server support.');
                     return;
                   }
                   store.currentUser['friendListPublic'] = value;
                   store.refresh();
                 },
               ),
-              Text(
-                'Linked Accounts: ${linkedAccounts.join(", ")}',
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.link, color: Color(0xFFE6C47A)),
+                title: const Text('Linked accounts'),
+                subtitle: Text(
+                  (store.currentUser['linkedAccounts'] as List<dynamic>? ??
+                          <dynamic>[])
+                      .join(', ')
+                      .isEmpty
+                      ? 'Email / phone / social accounts'
+                      : (store.currentUser['linkedAccounts'] as List<dynamic>).join(', '),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showMessage(
+                  'Account linking is managed through secure authentication settings.',
+                ),
               ),
-              Text(
-                'Country: ${store.currentUser['country'] ?? 'Not set'}',
-              ),
-              Text(
-                'Bio: ${store.currentUser['bio'] ?? ''}',
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.security, color: Color(0xFFE6C47A)),
+                title: const Text('Security'),
+                subtitle: const Text('Password and sign-in protection'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _showMessage(
+                  'Use the secure sign-in and password recovery options on the login screen.',
+                ),
               ),
             ],
           ),
         ),
-        if (isOwner)
-          _luxuryCard(
-            title: 'Owner 10001 Sovereign Control',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const Text(
-                  'Owner access requires a trusted authenticated server role. Public ID alone is not authorization.',
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (store.isLiveMode) {
-                      _showMessage(
-                        'Owner ban must be processed by the secure server.',
-                      );
-                      return;
-                    }
-                    store.ownerPermanentBan(
-                      'TEST-USER',
-                      reason: 'TEST permanent ban',
-                    );
-                    _showMessage(
-                      'TEST ban applied to local test session.',
-                    );
-                  },
-                  icon: const Icon(Icons.gpp_bad),
-                  label: const Text(
-                    'Permanent Ban (TEST session)',
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
+    );
+  }
+
+  Widget _profileInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 18, color: const Color(0xFFE6C47A)),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 76,
+            child: Text(label, style: const TextStyle(color: Colors.white70)),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
     );
   }
 
