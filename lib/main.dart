@@ -29,12 +29,61 @@ class ZoonlApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF070510),
-        primaryColor: const Color(0xFF7C4DFF),
+        scaffoldBackgroundColor: const Color(0xFF090812),
+        primaryColor: const Color(0xFF8B5CF6),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF7C4DFF),
-          secondary: Color(0xFFE6C47A),
-          surface: Color(0xFF120D24),
+          primary: Color(0xFF9B78FF),
+          onPrimary: Color(0xFF100B1D),
+          secondary: Color(0xFFE8C77B),
+          onSecondary: Color(0xFF17120A),
+          surface: Color(0xFF171326),
+          onSurface: Color(0xFFF4F2FA),
+          error: Color(0xFFFF5B65),
+          onError: Color(0xFFFFFFFF),
+        ),
+        textTheme: ThemeData.dark().textTheme.apply(
+          bodyColor: const Color(0xFFE7E4EE),
+          displayColor: const Color(0xFFF8F7FB),
+        ).copyWith(
+          titleLarge: const TextStyle(
+            color: Color(0xFFF8F7FB),
+            fontWeight: FontWeight.w700,
+          ),
+          titleMedium: const TextStyle(
+            color: Color(0xFFF1EEF7),
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: const TextStyle(
+            color: Color(0xFFE7E4EE),
+          ),
+          bodyMedium: const TextStyle(
+            color: Color(0xFFD0CCD9),
+          ),
+          bodySmall: const TextStyle(
+            color: Color(0xFFAAA5B7),
+          ),
+          labelLarge: const TextStyle(
+            color: Color(0xFFF8F7FB),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Color(0xFF252033),
+          contentTextStyle: TextStyle(color: Color(0xFFF8F7FB)),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          labelStyle: const TextStyle(color: Color(0xFFC9C3D5)),
+          hintStyle: const TextStyle(color: Color(0xFF8F899F)),
+          filled: true,
+          fillColor: const Color(0xFF100D1B),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF393149)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFB69AFF), width: 1.4),
+          ),
         ),
         useMaterial3: true,
       ),
