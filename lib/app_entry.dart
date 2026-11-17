@@ -133,6 +133,7 @@ class ZoonlAuthGate extends StatelessWidget {
                   'id': userId,
                   'name': (profile['display_name'] ?? '').toString(),
                   'isOwner': isOwner,
+                  'trustedRole': isOwner ? 'OWNER' : 'USER',
                   'isVerifiedStreamer': profile['is_verified'] == true,
                   'level': profile['user_level'] ?? 1,
 
