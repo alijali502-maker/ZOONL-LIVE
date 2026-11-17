@@ -1,14 +1,25 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:livekit_client/livekit_client.dart'
+    show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+// Tables used: live_rooms (owner_id, room_name, is_live) and
+// chat_messages (room_id, sender_id, message).
 class LiveScreen extends StatefulWidget {
   final String userName;
   final String userId;
+
+  // null = you go live as Host. A room id = you watch as Viewer.
+  final String? joinRoomId;
 
   const LiveScreen({
     super.key,
     required this.userName,
     required this.userId,
+    this.joinRoomId,
   });
 
   @override
@@ -16,61 +27,425 @@ class LiveScreen extends StatefulWidget {
 }
 
 class _LiveScreenState extends State<LiveScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  bool get _isHost => widget.joinRoomId == null;
+
   bool _isLive = false;
-  bool _isHost = true;
+  bool _busy = false;
   bool _microphoneEnabled = true;
   bool _cameraEnabled = true;
   bool _chatEnabled = true;
+  bool _hostSeen = false;
+
+  String? _roomId;
+  String? _roomOwnerId;
+  String _roomName = '';
+
+  RealtimeChannel? _channel;
+  Room? _lk;
 
   final TextEditingController _titleController =
       TextEditingController();
-
   final TextEditingController _messageController =
       TextEditingController();
 
   final List<Map<String, String>> _messages = [];
+  final Set<String> _seenMessageIds = {};
 
-  void _startLive() {
-    if (_titleController.text.trim().isEmpty) {
+  String? get _myId => _supabase.auth.currentUser?.id;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isHost) {
+      _busy = true;
+      _joinAsViewer();
+    }
+  }
+
+  // ---------- Host: go live ----------
+  Future<void> _startLive() async {
+    if (_busy) return;
+
+    final myId = _myId;
+    final title = _titleController.text.trim();
+
+    if (myId == null) {
+      _showMessage('Live शुरू करने के लिए पहले Login करें।');
+      return;
+    }
+
+    if (title.isEmpty) {
       _showMessage('Please enter a live room title.');
       return;
     }
 
-    setState(() {
-      _isLive = true;
-      _isHost = true;
-    });
+    final permissions = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
 
-    _showMessage('Live preview started. Streaming server integration is pending.');
+    if (permissions[Permission.camera]?.isGranted != true ||
+        permissions[Permission.microphone]?.isGranted != true) {
+      _showMessage('Camera और Microphone की permission दें।');
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _busy = true);
+
+    try {
+      // Close any old room of mine that is stuck as live.
+      await _supabase
+          .from('live_rooms')
+          .update({'is_live': false})
+          .eq('owner_id', myId)
+          .eq('is_live', true);
+
+      final row = await _supabase
+          .from('live_rooms')
+          .insert({
+            'owner_id': myId,
+            'room_name': title,
+            'is_live': true,
+          })
+          .select('id')
+          .single();
+
+      final roomId = row['id'] as String;
+      _roomId = roomId;
+      _roomOwnerId = myId;
+
+      await _connectLiveKit(roomId);
+      _subscribeRealtime(roomId);
+
+      if (!mounted) return;
+      setState(() {
+        _roomName = title;
+        _isLive = true;
+        _messages.clear();
+        _seenMessageIds.clear();
+      });
+
+      _showMessage('आप Live हैं।');
+    } catch (error) {
+      final roomId = _roomId;
+      _roomId = null;
+      if (roomId != null) await _markRoomEnded(roomId);
+      await _closeChannel();
+      await _disconnectLiveKit();
+      _showMessage('Live शुरू नहीं हुआ: ${_readable(error)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  void _endLive() {
-    setState(() {
-      _isLive = false;
-    });
+  // ---------- Viewer: join ----------
+  Future<void> _joinAsViewer() async {
+    final roomId = widget.joinRoomId!;
+    var joined = false;
 
-    _showMessage('Live session preview ended.');
+    try {
+      if (_myId == null) {
+        _showMessage('Live देखने के लिए पहले Login करें।');
+        return;
+      }
+
+      final room = await _supabase
+          .from('live_rooms')
+          .select('room_name, owner_id, is_live')
+          .eq('id', roomId)
+          .maybeSingle();
+
+      if (room == null || room['is_live'] != true) {
+        _showMessage('यह Live खत्म हो चुका है।');
+        return;
+      }
+
+      _roomOwnerId = room['owner_id'] as String?;
+      _roomName = (room['room_name'] ?? '').toString();
+
+      await _connectLiveKit(roomId);
+      _subscribeRealtime(roomId);
+
+      if (!mounted) return;
+      setState(() {
+        _roomId = roomId;
+        _isLive = true;
+      });
+      joined = true;
+    } catch (error) {
+      _showMessage('Live में जुड़ नहीं सके: ${_readable(error)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+      if (!joined) {
+        await _closeChannel();
+        await _disconnectLiveKit();
+        if (mounted) Navigator.of(context).maybePop();
+      }
+    }
   }
 
-  void _sendMessage() {
-    final message = _messageController.text.trim();
+  // ---------- LiveKit (video + audio) ----------
+  Future<void> _connectLiveKit(String roomId) async {
+    final response = await _supabase.functions.invoke(
+      'livekit-token',
+      body: {'room_id': roomId},
+    );
 
-    if (message.isEmpty) return;
+    final data = Map<String, dynamic>.from(response.data as Map);
+
+    final room = Room();
+    _lk = room;
+    room.addListener(_onRoomChanged);
+
+    await room.connect(
+      data['url'] as String,
+      data['token'] as String,
+      roomOptions: const RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+      ),
+    );
+
+    if (_isHost) {
+      await room.localParticipant?.setCameraEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(true);
+    }
+  }
+
+  void _onRoomChanged() {
+    if (!mounted) return;
+
+    // Viewer: if the host was here and has now left, the live is over.
+    final room = _lk;
+    final ownerId = _roomOwnerId;
+    if (!_isHost && room != null && ownerId != null) {
+      final hostHere =
+          room.remoteParticipants.values.any((p) => p.identity == ownerId);
+      if (hostHere) {
+        _hostSeen = true;
+      } else if (_hostSeen && _isLive) {
+        _hostSeen = false;
+        _showMessage('Live खत्म हो गया।');
+        _leaveViewer();
+        return;
+      }
+    }
+
+    setState(() {});
+  }
+
+  Future<void> _disconnectLiveKit() async {
+    final room = _lk;
+    _lk = null;
+    if (room == null) return;
+
+    room.removeListener(_onRoomChanged);
+    try {
+      await room.disconnect();
+    } catch (_) {}
+    room.dispose();
+  }
+
+  VideoTrack? _activeVideoTrack() {
+    final room = _lk;
+    if (room == null) return null;
+
+    if (_isHost) {
+      final pubs = room.localParticipant?.videoTrackPublications;
+      if (pubs != null) {
+        for (final pub in pubs) {
+          final track = pub.track;
+          if (track != null) return track;
+        }
+      }
+    } else {
+      for (final participant in room.remoteParticipants.values) {
+        for (final pub in participant.videoTrackPublications) {
+          final track = pub.track;
+          if (pub.subscribed && track != null) return track;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ---------- Realtime: chat + room end ----------
+  void _subscribeRealtime(String roomId) {
+    _channel = _supabase
+        .channel('live_room_$roomId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => _addIncoming(payload.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'live_rooms',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: roomId,
+          ),
+          callback: (payload) {
+            if (!_isHost && payload.newRecord['is_live'] == false) {
+              _showMessage('Live खत्म हो गया।');
+              _leaveViewer();
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  String _nameFor(String? senderId) {
+    if (senderId == null) return 'User';
+    if (senderId == _myId) return widget.userName;
+    if (senderId == _roomOwnerId) return 'Host';
+    return 'User ${senderId.substring(0, 4)}';
+  }
+
+  void _addIncoming(Map<String, dynamic> row) {
+    if (!mounted) return;
+
+    final id = (row['id'] ?? '').toString();
+    if (id.isNotEmpty && !_seenMessageIds.add(id)) return;
 
     setState(() {
       _messages.add({
-        'name': widget.userName,
-        'message': message,
+        'name': _nameFor(row['sender_id']?.toString()),
+        'message': (row['message'] ?? '').toString(),
       });
-
-      _messageController.clear();
     });
   }
 
+  Future<void> _sendMessage() async {
+    final roomId = _roomId;
+    final myId = _myId;
+    final message = _messageController.text.trim();
+
+    if (roomId == null || message.isEmpty) return;
+
+    if (myId == null) {
+      _showMessage('Message भेजने के लिए पहले Login करें।');
+      return;
+    }
+
+    _messageController.clear();
+
+    try {
+      final row = await _supabase
+          .from('chat_messages')
+          .insert({
+            'room_id': roomId,
+            'sender_id': myId,
+            'message': message,
+          })
+          .select('id, sender_id, message')
+          .single();
+
+      // Show it right away; realtime copy is skipped by id.
+      _addIncoming(row);
+    } catch (error) {
+      _showMessage('Message नहीं गया: ${_readable(error)}');
+    }
+  }
+
+  // ---------- End / leave ----------
+  Future<void> _markRoomEnded(String roomId) async {
+    try {
+      await _supabase
+          .from('live_rooms')
+          .update({'is_live': false})
+          .eq('id', roomId);
+    } catch (_) {}
+  }
+
+  Future<void> _endLive() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+
+    final roomId = _roomId;
+    if (roomId != null) await _markRoomEnded(roomId);
+
+    await _closeChannel();
+    await _disconnectLiveKit();
+
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _isLive = false;
+      _roomId = null;
+      _messages.clear();
+      _seenMessageIds.clear();
+      _messageController.clear();
+    });
+    _showMessage('Live session ended.');
+  }
+
+  Future<void> _leaveViewer() async {
+    await _closeChannel();
+    await _disconnectLiveKit();
+
+    if (!mounted) return;
+    setState(() {
+      _isLive = false;
+      _roomId = null;
+    });
+    Navigator.of(context).maybePop();
+  }
+
+  Future<void> _closeChannel() async {
+    final channel = _channel;
+    _channel = null;
+    if (channel != null) {
+      await _supabase.removeChannel(channel);
+    }
+  }
+
+  // ---------- Controls ----------
+  Future<void> _toggleMicrophone() async {
+    final next = !_microphoneEnabled;
+    try {
+      await _lk?.localParticipant?.setMicrophoneEnabled(next);
+      if (mounted) setState(() => _microphoneEnabled = next);
+    } catch (error) {
+      _showMessage('Microphone बदल नहीं सका: ${_readable(error)}');
+    }
+  }
+
+  Future<void> _toggleCamera() async {
+    final next = !_cameraEnabled;
+    try {
+      await _lk?.localParticipant?.setCameraEnabled(next);
+      if (mounted) setState(() => _cameraEnabled = next);
+    } catch (error) {
+      _showMessage('Camera बदल नहीं सका: ${_readable(error)}');
+    }
+  }
+
+  String _readable(Object error) {
+    if (error is PostgrestException) return error.message;
+    if (error is AuthException) return error.message;
+    if (error is FunctionException) {
+      return 'server error (${error.status}) ${error.details ?? ''}';
+    }
+    return error.toString();
+  }
+
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _control({
@@ -92,10 +467,7 @@ class _LiveScreenState extends State<LiveScreen> {
         const SizedBox(height: 5),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 11,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 11),
         ),
       ],
     );
@@ -103,6 +475,14 @@ class _LiveScreenState extends State<LiveScreen> {
 
   @override
   void dispose() {
+    final roomId = _roomId;
+    if (_isHost && roomId != null) {
+      unawaited(_markRoomEnded(roomId));
+    }
+
+    unawaited(_closeChannel());
+    unawaited(_disconnectLiveKit());
+
     _titleController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -110,10 +490,23 @@ class _LiveScreenState extends State<LiveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Widget body;
+
+    if (_isLive) {
+      body = _buildLiveRoom();
+    } else if (_isHost) {
+      body = _buildStartScreen();
+    } else {
+      body = const Center(
+        child: CircularProgressIndicator(color: Color(0xFFE5BD70)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF100B18),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1B1225),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'ZOONL LIVE ROOM',
           style: TextStyle(
@@ -122,11 +515,7 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: !_isLive
-            ? _buildStartScreen()
-            : _buildLiveRoom(),
-      ),
+      body: SafeArea(child: body),
     );
   }
 
@@ -138,10 +527,7 @@ class _LiveScreenState extends State<LiveScreen> {
           height: 190,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [
-                Color(0xFF6E3B8F),
-                Color(0xFF21152F),
-              ],
+              colors: [Color(0xFF6E3B8F), Color(0xFF21152F)],
             ),
             borderRadius: BorderRadius.circular(22),
           ),
@@ -186,10 +572,7 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.person,
-                color: Color(0xFFE5BD70),
-              ),
+              const Icon(Icons.person, color: Color(0xFFE5BD70)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -204,8 +587,14 @@ class _LiveScreenState extends State<LiveScreen> {
         SizedBox(
           height: 52,
           child: ElevatedButton.icon(
-            onPressed: _startLive,
-            icon: const Icon(Icons.play_circle),
+            onPressed: _busy ? null : _startLive,
+            icon: _busy
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_circle),
             label: const Text('GO LIVE'),
           ),
         ),
@@ -213,7 +602,34 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  Widget _videoLayer() {
+    final track = _activeVideoTrack();
+
+    if (track != null) {
+      return VideoTrackRenderer(track);
+    }
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.person, size: 110, color: Color(0xFFE5BD70)),
+          if (!_isHost)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'Host का video आ रहा है...',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLiveRoom() {
+    final viewers = _lk?.remoteParticipants.length ?? 0;
+
     return Column(
       children: [
         Expanded(
@@ -222,13 +638,7 @@ class _LiveScreenState extends State<LiveScreen> {
             children: [
               Container(
                 color: const Color(0xFF21152F),
-                child: const Center(
-                  child: Icon(
-                    Icons.person,
-                    size: 110,
-                    color: Color(0xFFE5BD70),
-                  ),
-                ),
+                child: _videoLayer(),
               ),
               Positioned(
                 top: 14,
@@ -244,11 +654,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   ),
                   child: const Row(
                     children: [
-                      Icon(
-                        Icons.circle,
-                        size: 8,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.circle, size: 8, color: Colors.white),
                       SizedBox(width: 6),
                       Text(
                         'LIVE',
@@ -270,17 +676,17 @@ class _LiveScreenState extends State<LiveScreen> {
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.visibility,
                         color: Colors.white,
                         size: 17,
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        '0',
-                        style: TextStyle(color: Colors.white),
+                        '$viewers',
+                        style: const TextStyle(color: Colors.white),
                       ),
                     ],
                   ),
@@ -290,7 +696,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 left: 14,
                 bottom: 14,
                 child: Text(
-                  widget.userName,
+                  _roomName,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -311,9 +717,11 @@ class _LiveScreenState extends State<LiveScreen> {
               children: [
                 Expanded(
                   child: ListView.builder(
+                    reverse: true,
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
-                      final item = _messages[index];
+                      final item =
+                          _messages[_messages.length - 1 - index];
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 3),
@@ -330,10 +738,12 @@ class _LiveScreenState extends State<LiveScreen> {
                     Expanded(
                       child: TextField(
                         controller: _messageController,
+                        maxLength: 300,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           hintText: 'Write a message...',
                           hintStyle: TextStyle(color: Colors.white54),
+                          counterText: '',
                           isDense: true,
                         ),
                         onSubmitted: (_) => _sendMessage(),
@@ -360,57 +770,52 @@ class _LiveScreenState extends State<LiveScreen> {
           color: const Color(0xFF1B1225),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _control(
-                icon: _microphoneEnabled
-                    ? Icons.mic
-                    : Icons.mic_off,
-                label: 'Microphone',
-                onTap: () {
-                  setState(() {
-                    _microphoneEnabled = !_microphoneEnabled;
-                  });
-                },
-              ),
-              _control(
-                icon: _cameraEnabled
-                    ? Icons.videocam
-                    : Icons.videocam_off,
-                label: 'Camera',
-                onTap: () {
-                  setState(() {
-                    _cameraEnabled = !_cameraEnabled;
-                  });
-                },
-              ),
-              _control(
-                icon: Icons.sports_kabaddi,
-                label: 'PK Battle',
-                onTap: () {
-                  _showMessage(
-                    'Connect the PK Battle screen in the integration step.',
-                  );
-                },
-              ),
-              _control(
-                icon: Icons.chat,
-                label: 'Chat',
-                onTap: () {
-                  setState(() {
-                    _chatEnabled = !_chatEnabled;
-                  });
-                },
-              ),
-              _control(
-                icon: Icons.call_end,
-                label: 'End Live',
-                color: Colors.red,
-                onTap: _endLive,
-              ),
-            ],
+            children: _isHost ? _hostControls() : _viewerControls(),
           ),
         ),
       ],
     );
+  }
+
+  List<Widget> _hostControls() {
+    return [
+      _control(
+        icon: _microphoneEnabled ? Icons.mic : Icons.mic_off,
+        label: 'Microphone',
+        onTap: _toggleMicrophone,
+      ),
+      _control(
+        icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
+        label: 'Camera',
+        onTap: _toggleCamera,
+      ),
+      _control(
+        icon: Icons.chat,
+        label: 'Chat',
+        onTap: () => setState(() => _chatEnabled = !_chatEnabled),
+      ),
+      _control(
+        icon: Icons.call_end,
+        label: 'End Live',
+        color: Colors.red,
+        onTap: _endLive,
+      ),
+    ];
+  }
+
+  List<Widget> _viewerControls() {
+    return [
+      _control(
+        icon: Icons.chat,
+        label: 'Chat',
+        onTap: () => setState(() => _chatEnabled = !_chatEnabled),
+      ),
+      _control(
+        icon: Icons.exit_to_app,
+        label: 'Leave',
+        color: Colors.red,
+        onTap: _leaveViewer,
+      ),
+    ];
   }
 }
