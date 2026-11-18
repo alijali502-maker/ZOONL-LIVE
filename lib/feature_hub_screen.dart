@@ -1,269 +1,382 @@
 import 'package:flutter/material.dart';
-import 'role_portals_screen.dart';
 
-class FeatureHubScreen extends StatelessWidget {
+import 'core/backend.dart';
+import 'lib/features/live_screen.dart';
+import 'role_portals_screen.dart';
+import 'settings_center_screen.dart';
+
+class FeatureHubScreen extends StatefulWidget {
   const FeatureHubScreen({super.key});
 
-  static const Color gold = Color(0xFFD6B46A);
-  static const Color panel = Color(0xFF17232E);
-  static const Color muted = Color(0xFFAAB5BE);
+  @override
+  State<FeatureHubScreen> createState() => _FeatureHubScreenState();
+}
 
-  static const List<_Feature> features = <_Feature>[
-    _Feature('Home & Discovery', 'Discover creators, trending rooms and popular videos.', Icons.explore, ['Recommended creators', 'Trending now', 'Live now', 'Following feed', 'Search people and rooms', 'Categories']),
-    _Feature('Short Videos', 'A complete creator studio and public video feed.', Icons.play_circle, ['For You feed', 'Following feed', 'Record video', 'Choose from gallery', 'Filters and effects', 'Caption and hashtags', 'Like, comment and share', 'My uploads']),
-    _Feature('Live Streaming', 'Video and audio rooms with guest and moderation controls.', Icons.live_tv, ['Start video live', 'Start audio live', 'Room title and cover', 'Guest invitations and seats', 'Live chat and viewers', 'Mute and camera controls', 'Moderators and room rules', 'Private room access']),
-    _Feature('PK Battle', 'Multi-seat battle layouts, invitations and score panels.', Icons.sports_mma, ['1 vs 1', '2 player layout', '3 player layout', '4 player grid', '6 player grid', 'Invite and accept', 'Countdown and timer', 'Scoreboard and history']),
-    _Feature('Wallet & Gifts', 'Coins, gift catalog, top-ups and transaction history.', Icons.account_balance_wallet, ['Coin balance', 'Top-up packages', 'Gift catalog', 'Gift animation and sound', 'Sent gift history', 'Received gift history', 'Wallet transactions', 'Earnings and payout history']),
-    _Feature('Profile & Social', 'Identity, creator profile and social connections.', Icons.person, ['Profile photo', 'Display name', 'User ID', 'Bio and country', 'Followers and following', 'Friends', 'VIP and level badges', 'Privacy and blocked users']),
-    _Feature('Messages & Notifications', 'Private conversations, requests and account alerts.', Icons.forum, ['Private conversations', 'Message requests', 'Friend requests', 'Gift notifications', 'Live notifications', 'System announcements', 'Block and report']),
-    _Feature('VIP & Events', 'Membership, levels, rewards and leaderboards.', Icons.workspace_premium, ['VIP membership', 'Level progression', 'Frames and entry effects', 'Profile backgrounds', 'Weekly Star 1 to 5', 'Daily leaderboard', 'Weekly leaderboard', 'Monthly leaderboard', 'Event rewards']),
-    _Feature('Agency & Creator Center', 'Creator applications, verification and agency tools.', Icons.business_center, ['Streamer agency application', 'Top-up agency application', 'Combined agency application', 'Host registration', 'Identity document upload', 'Application status', 'Live-hour targets', 'Agency reports']),
-    _Feature('Owner & Admin Control', 'Permission-based operations and platform oversight.', Icons.admin_panel_settings, ['Owner identity: 10001', 'P2 / P3 / P4 permission groups', 'Admin permission management', 'User management', 'Gift and package configuration', 'Agency approvals', 'Reports and moderation', 'Audit history']),
-  ];
+class _FeatureHubScreenState extends State<FeatureHubScreen> {
+  static const Color _bg = Color(0xFF080D14);
+  static const Color _panel = Color(0xFF17232E);
+  static const Color _panelRaised = Color(0xFF1D2B37);
+  static const Color _gold = Color(0xFFD6B46A);
+  static const Color _teal = Color(0xFF4BC2B0);
+  static const Color _muted = Color(0xFFAAB5BE);
+
+  bool _loading = true;
+  bool _canHost = false;
+  String? _error;
+  Map<String, dynamic> _profile = {};
+  List<Map<String, dynamic>> _rooms = [];
+  List<Map<String, dynamic>> _gifts = [];
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
-      children: <Widget>[
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF293B49), Color(0xFF17232E), Color(0xFF11101A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: gold.withOpacity(.45)),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ZOONL LIVE', style: TextStyle(color: gold, fontSize: 23, fontWeight: FontWeight.w800, letterSpacing: 1.4)),
-              SizedBox(height: 8),
-              Text('Your world of live entertainment', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
-              SizedBox(height: 5),
-              Text('Explore all ten feature areas. Service connections can be added to each section without redesigning the app.', style: TextStyle(color: Color(0xFFD0CCD9), height: 1.45)),
-            ],
-          ),
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
+
+  Map<String, dynamic> _map(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<void> _loadDashboard() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final userId = Backend.currentUserId;
+      if (userId == null) {
+        throw StateError('Login required.');
+      }
+
+      final profile = await Backend.client
+          .from('profiles')
+          .select('username, display_name, avatar_url, user_level, is_verified')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final owner = await Backend.isZoonlOwner();
+      final roomsRaw = await Backend.client
+          .from('live_rooms')
+          .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
+          .eq('is_live', true)
+          .eq('is_private', false)
+          .eq('is_locked', false)
+          .order('created_at', ascending: false)
+          .limit(30);
+
+      final giftsRaw = await Backend.client
+          .from('gifts')
+          .select('id, gift_name, coin_price')
+          .eq('is_active', true)
+          .order('coin_price', ascending: true)
+          .limit(8);
+
+      if (!mounted) return;
+      setState(() {
+        _profile = _map(profile);
+        _canHost = owner || profile?['is_verified'] == true;
+        _rooms = (roomsRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _gifts = (giftsRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _notice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _startLive({required String roomType}) async {
+    if (!_canHost) {
+      _notice('Broadcasting is available to the Owner or an approved Host only.');
+      return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveScreen(
+          userName: (_profile['display_name'] ?? 'ZOONL Host').toString(),
+          userId: (_profile['username'] ?? '').toString(),
+          roomType: roomType,
         ),
-        const SizedBox(height: 18),
-        const Text('ALL APP FEATURES', style: TextStyle(color: gold, fontWeight: FontWeight.w800, letterSpacing: 1.1)),
-        const SizedBox(height: 10),
-        for (int i = 0; i < features.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _FeatureCard(index: i + 1, feature: features[i]),
-          ),
-      ],
+      ),
+    );
+    _loadDashboard();
+  }
+
+  Future<void> _joinRoom(Map<String, dynamic> room) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveScreen(
+          userName: (_profile['display_name'] ?? 'ZOONL User').toString(),
+          userId: (_profile['username'] ?? '').toString(),
+          joinRoomId: room['id'].toString(),
+          roomType: (room['room_type'] ?? 'video').toString(),
+        ),
+      ),
+    );
+    _loadDashboard();
+  }
+
+  Widget _panelCard({required Widget child, EdgeInsets padding = const EdgeInsets.all(15)}) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF354653)),
+      ),
+      child: child,
     );
   }
-}
 
-class _Feature {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final List<String> items;
-  const _Feature(this.title, this.subtitle, this.icon, this.items);
-}
-
-class _FeatureCard extends StatelessWidget {
-  final int index;
-  final _Feature feature;
-  const _FeatureCard({required this.index, required this.feature});
+  Widget _sectionTitle(String title, {String? trailing, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 20, 2, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                color: _gold,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.1,
+              ),
+            ),
+          ),
+          if (trailing != null)
+            TextButton(
+              onPressed: onTap,
+              child: Text(trailing, style: const TextStyle(color: _teal, fontSize: 11)),
+            ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final name = (_profile['display_name'] ?? 'ZOONL Member').toString();
+    final publicId = (_profile['username'] ?? '').toString();
+    final level = (_profile['user_level'] as num?)?.toInt() ?? 1;
+
+    return Scaffold(
+      backgroundColor: _bg,
+      body: RefreshIndicator(
+        color: _gold,
+        backgroundColor: _panel,
+        onRefresh: _loadDashboard,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 30),
+          children: [
+            _panelCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.diamond_outlined, color: _gold, size: 27),
+                      const SizedBox(width: 9),
+                      const Expanded(
+                        child: Text(
+                          'ZOONL LIVE',
+                          style: TextStyle(
+                            color: _gold,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _loading ? null : _loadDashboard,
+                        icon: const Icon(Icons.refresh_rounded, color: _teal),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    'Welcome, $name',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'User ID: ${publicId.isEmpty ? 'Not assigned' : publicId}  •  Level $level',
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
+                          icon: const Icon(Icons.videocam_rounded),
+                          label: const Text('VIDEO LIVE'),
+                          style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
+                          icon: const Icon(Icons.mic_rounded),
+                          label: const Text('AUDIO LIVE'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!_canHost)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Live publishing unlocks after Host approval. Owner accounts can broadcast.',
+                        style: TextStyle(color: _muted, fontSize: 10),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            _sectionTitle('Live Now', trailing: 'REFRESH', onTap: _loadDashboard),
+            if (_loading)
+              const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: _gold)))
+            else if (_error != null)
+              _panelCard(
+                child: Text('Dashboard data could not load: $_error', style: const TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+              )
+            else if (_rooms.isEmpty)
+              _panelCard(
+                child: const Row(
+                  children: [
+                    Icon(Icons.live_tv_outlined, color: _muted, size: 28),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'No public rooms are live right now. Approved Hosts can start a broadcast from this page.',
+                        style: TextStyle(color: _muted, fontSize: 12, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ..._rooms.map((room) {
+                final audio = (room['room_type'] ?? '').toString().toLowerCase() == 'audio';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 9),
+                  child: _panelCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: _panelRaised,
+                        child: Icon(audio ? Icons.graphic_eq : Icons.videocam_rounded, color: _gold),
+                      ),
+                      title: Text((room['room_name'] ?? 'ZOONL LIVE Room').toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: Text('${audio ? 'Audio' : 'Video'}  •  ${room['viewer_count'] ?? 0} viewers', style: const TextStyle(color: _muted, fontSize: 11)),
+                      trailing: const Icon(Icons.play_circle_fill_rounded, color: _teal, size: 30),
+                      onTap: () => _joinRoom(room),
+                    ),
+                  ),
+                );
+              }),
+            _sectionTitle('Gift Collection'),
+            if (_gifts.isEmpty && !_loading)
+              _panelCard(child: const Text('Gift catalog is empty or unavailable.', style: TextStyle(color: _muted, fontSize: 12)))
+            else
+              _panelCard(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _gifts.map((gift) {
+                    return Chip(
+                      backgroundColor: _panelRaised,
+                      side: const BorderSide(color: Color(0xFF354653)),
+                      label: Text(
+                        '${gift['gift_name']}  •  ${gift['coin_price']} Coins',
+                        style: const TextStyle(color: _gold, fontSize: 10),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            _sectionTitle('Platform Portals'),
+            Row(
+              children: [
+                Expanded(
+                  child: _portalButton(
+                    icon: Icons.business_center_rounded,
+                    title: 'AGENCY',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const AgencyPortalScreen())),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: _portalButton(
+                    icon: Icons.admin_panel_settings_rounded,
+                    title: 'OWNER / ADMIN',
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const RolePortalGateScreen())),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            _portalButton(
+              icon: Icons.settings_rounded,
+              title: 'SETTINGS CENTER',
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsCenterScreen())),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _portalButton({required IconData icon, required String title, required VoidCallback onTap}) {
     return Material(
-      color: const Color(0xFF17232E),
-      borderRadius: BorderRadius.circular(16),
+      color: _panel,
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          if (index == 10) {
-            Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const RolePortalGateScreen(),
-            ));
-            return;
-          }
-          if (index == 9) {
-            Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => const AgencyPortalScreen(),
-            ));
-            return;
-          }
-          Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => _FeatureDetailPage(feature: feature, index: index),
-          ));
-        },
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 15),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(color: const Color(0xFF354653)),
           ),
           child: Row(
             children: [
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(color: const Color(0xFF293B49), borderRadius: BorderRadius.circular(14)),
-                child: Icon(feature.icon, color: const Color(0xFFD6B46A), size: 25),
-              ),
-              const SizedBox(width: 13),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$index. ${feature.title}', style: const TextStyle(color: Color(0xFFF8F7FB), fontWeight: FontWeight.w700, fontSize: 15)),
-                  const SizedBox(height: 4),
-                  Text(feature.subtitle, style: const TextStyle(color: Color(0xFFAAB5BE), fontSize: 12, height: 1.35)),
-                ],
-              )),
-              const Icon(Icons.chevron_right, color: Color(0xFFD6B46A)),
+              Icon(icon, color: _gold, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
+              const Icon(Icons.chevron_right_rounded, color: _teal, size: 18),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FeatureDetailPage extends StatefulWidget {
-  final _Feature feature;
-  final int index;
-  const _FeatureDetailPage({required this.feature, required this.index});
-
-  @override
-  State<_FeatureDetailPage> createState() => _FeatureDetailPageState();
-}
-
-class _FeatureDetailPageState extends State<_FeatureDetailPage> {
-  final TextEditingController searchController = TextEditingController();
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final items = widget.feature.items.where((e) => e.toLowerCase().contains(searchController.text.toLowerCase())).toList();
-    return Scaffold(
-      backgroundColor: const Color(0xFF080D14),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF101923),
-        title: Text(widget.feature.title, style: const TextStyle(color: Color(0xFFF8F7FB), fontWeight: FontWeight.w700)),
-        iconTheme: const IconThemeData(color: Color(0xFFD6B46A)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(colors: [Color(0xFF293B49), Color(0xFF17232E)]),
-              border: Border.all(color: const Color(0xFFD6B46A).withOpacity(.4)),
-            ),
-            child: Row(children: [
-              Icon(widget.feature.icon, color: const Color(0xFFD6B46A), size: 34),
-              const SizedBox(width: 12),
-              Expanded(child: Text(widget.feature.subtitle, style: const TextStyle(color: Colors.white, height: 1.4))),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: searchController,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Find a feature', filled: true),
-          ),
-          const SizedBox(height: 12),
-          for (final item in items)
-            Card(
-              color: const Color(0xFF17232E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: Color(0xFF354653)),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 5,
-                ),
-                leading: const Icon(
-                  Icons.tune_rounded,
-                  color: Color(0xFFD6B46A),
-                ),
-                title: Text(
-                  item,
-                  style: const TextStyle(
-                    color: Color(0xFFF4F1E9),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: const Text(
-                  'Open this section',
-                  style: TextStyle(
-                    color: Color(0xFFAAB5BE),
-                    fontSize: 11,
-                  ),
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFFD6B46A),
-                ),
-                onTap: () => showModalBottomSheet<void>(
-                  context: context,
-                  backgroundColor: const Color(0xFF101923),
-                  showDragHandle: true,
-                  builder: (sheetContext) => SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item,
-                            style: const TextStyle(
-                              color: Color(0xFFD6B46A),
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'This section is included in the ZOONL LIVE application plan. Its live service must be connected and verified before it can process real account data or transactions.',
-                            style: TextStyle(
-                              color: Color(0xFFAAB5BE),
-                              height: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: () => Navigator.pop(sheetContext),
-                              child: const Text('CLOSE'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: const Color(0xFF1D2B37), borderRadius: BorderRadius.circular(14)),
-            child: const Text('STRUCTURE PREVIEW • This screen defines the feature layout. Live data, uploads, payments and privileged actions will be connected to their trusted services in the next phase.', style: TextStyle(color: Color(0xFFD0CCD9), height: 1.45)),
-          ),
-        ],
       ),
     );
   }
