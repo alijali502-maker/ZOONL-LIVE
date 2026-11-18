@@ -14,12 +14,14 @@ class LiveScreen extends StatefulWidget {
 
   // null = you go live as Host. A room id = you watch as Viewer.
   final String? joinRoomId;
+  final String roomType;
 
   const LiveScreen({
     super.key,
     required this.userName,
     required this.userId,
     this.joinRoomId,
+    this.roomType = 'video',
   });
 
   @override
@@ -37,6 +39,7 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _cameraEnabled = true;
   bool _chatEnabled = true;
   bool _hostSeen = false;
+  late String _selectedRoomType = widget.roomType;
 
   String? _roomId;
   String? _roomOwnerId;
@@ -81,14 +84,12 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
 
-    final permissions = await [
-      Permission.camera,
-      Permission.microphone,
-    ].request();
-
-    if (permissions[Permission.camera]?.isGranted != true ||
-        permissions[Permission.microphone]?.isGranted != true) {
-      _showMessage('Camera और Microphone की permission दें।');
+    final requestedPermissions = <Permission>[Permission.microphone];
+    if (_selectedRoomType == 'video') requestedPermissions.add(Permission.camera);
+    final permissions = await requestedPermissions.request();
+    if (permissions[Permission.microphone]?.isGranted != true ||
+        (_selectedRoomType == 'video' && permissions[Permission.camera]?.isGranted != true)) {
+      _showMessage('इस Room के लिए जरूरी Microphone/Camera permission दें।');
       return;
     }
 
@@ -108,6 +109,7 @@ class _LiveScreenState extends State<LiveScreen> {
           .insert({
             'owner_id': myId,
             'room_name': title,
+            'room_type': _selectedRoomType,
             'is_live': true,
           })
           .select('id')
@@ -154,7 +156,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       final room = await _supabase
           .from('live_rooms')
-          .select('room_name, owner_id, is_live')
+          .select('room_name, owner_id, is_live, room_type')
           .eq('id', roomId)
           .maybeSingle();
 
@@ -165,6 +167,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       _roomOwnerId = room['owner_id'] as String?;
       _roomName = (room['room_name'] ?? '').toString();
+      _selectedRoomType = (room['room_type'] ?? 'video').toString().toLowerCase();
 
       await _connectLiveKit(roomId);
       _subscribeRealtime(roomId);
@@ -210,8 +213,10 @@ class _LiveScreenState extends State<LiveScreen> {
     );
 
     if (_isHost) {
-      await room.localParticipant?.setCameraEnabled(true);
       await room.localParticipant?.setMicrophoneEnabled(true);
+      if (_selectedRoomType == 'video') {
+        await room.localParticipant?.setCameraEnabled(true);
+      }
     }
   }
 
@@ -531,11 +536,11 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
             borderRadius: BorderRadius.circular(22),
           ),
-          child: const Center(
+          child: Center(
             child: Icon(
-              Icons.live_tv,
+              _selectedRoomType == 'audio' ? Icons.headphones : Icons.live_tv,
               size: 85,
-              color: Color(0xFFE5BD70),
+              color: const Color(0xFFE5BD70),
             ),
           ),
         ),
@@ -563,6 +568,14 @@ class _LiveScreenState extends State<LiveScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 14),
+        const Text('Room Type', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: ChoiceChip(label: const Text('Video Live'), selected: _selectedRoomType == 'video', onSelected: _busy ? null : (_) => setState(() => _selectedRoomType = 'video'))),
+          const SizedBox(width: 10),
+          Expanded(child: ChoiceChip(label: const Text('Audio Live'), selected: _selectedRoomType == 'audio', onSelected: _busy ? null : (_) => setState(() => _selectedRoomType = 'audio'))),
+        ]),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(14),
@@ -638,7 +651,9 @@ class _LiveScreenState extends State<LiveScreen> {
             children: [
               Container(
                 color: const Color(0xFF21152F),
-                child: _videoLayer(),
+                child: _selectedRoomType == 'audio'
+                    ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.headphones, size: 100, color: Color(0xFFE5BD70)), SizedBox(height: 12), Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]))
+                    : _videoLayer(),
               ),
               Positioned(
                 top: 14,
@@ -784,7 +799,7 @@ class _LiveScreenState extends State<LiveScreen> {
         label: 'Microphone',
         onTap: _toggleMicrophone,
       ),
-      _control(
+      if (_selectedRoomType == 'video') _control(
         icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
         label: 'Camera',
         onTap: _toggleCamera,
