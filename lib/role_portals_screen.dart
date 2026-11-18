@@ -341,13 +341,69 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   }
 }
 
-class AdminOperationsPortalScreen extends StatelessWidget {
+class AdminOperationsPortalScreen extends StatefulWidget {
   final Map<String, bool> permissions;
   const AdminOperationsPortalScreen({super.key, required this.permissions});
 
   @override
+  State<AdminOperationsPortalScreen> createState() => _AdminOperationsPortalScreenState();
+}
+
+class _AdminOperationsPortalScreenState extends State<AdminOperationsPortalScreen> {
+  final TextEditingController targetId = TextEditingController();
+  final TextEditingController amount = TextEditingController();
+  final TextEditingController description = TextEditingController();
+  bool busy = false;
+
+  @override
+  void dispose() {
+    targetId.dispose();
+    amount.dispose();
+    description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addCoins() async {
+    final id = targetId.text.trim();
+    final coins = int.tryParse(amount.text.trim());
+    if (!RegExp(r'^[0-9]{5,12}$').hasMatch(id) || coins == null || coins <= 0) {
+      _notice('Enter a valid User ID and positive Coin amount.');
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await Backend.client.rpc(
+        'add_zoonl_coins',
+        params: <String, dynamic>{
+          'p_zoonl_id': id,
+          'p_amount': coins,
+          'p_description': description.text.trim().isEmpty
+              ? 'Admin top-up'
+              : description.text.trim(),
+        },
+      );
+      targetId.clear();
+      amount.clear();
+      description.clear();
+      _notice('Coins added through the secure Supabase ledger.');
+    } catch (e) {
+      _notice('Top-up failed: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void _notice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final granted = permissions.entries.where((e) => e.value).toList();
+    final granted = widget.permissions.entries.where((e) => e.value).toList();
+    final canTopup = widget.permissions['manage_topups'] == true;
     return Column(children: [
       _portalHeader('ADMIN OPERATIONS PORTAL', 'ONLY OWNER-GRANTED PERMISSIONS', Icons.admin_panel_settings),
       Expanded(child: ListView(
@@ -365,8 +421,29 @@ class AdminOperationsPortalScreen extends StatelessWidget {
                 trailing: const Icon(Icons.lock_open, color: _teal),
               ),
             ),
+          if (canTopup) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: _gold.withOpacity(.35))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('AUTHORIZED TOP-UP OPERATIONS', style: TextStyle(color: _gold, fontWeight: FontWeight.w800, fontSize: 12)),
+                  const SizedBox(height: 9),
+                  TextField(controller: targetId, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Recipient ZOONL ID')),
+                  const SizedBox(height: 8),
+                  TextField(controller: amount, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Coin amount')),
+                  const SizedBox(height: 8),
+                  TextField(controller: description, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Receipt / description')),
+                  const SizedBox(height: 9),
+                  FilledButton(onPressed: busy ? null : _addCoins, child: Text(busy ? 'PROCESSING…' : 'ADD COINS')),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
-          _portalCard('SECURITY RULE', 'Admin cannot grant permissions, issue Owner identity, change owner settings or exceed the limits granted by the Owner.', Icons.shield),
+          _portalCard('SECURITY RULE', 'Admin cannot grant permissions, issue Owner identity, change owner settings or exceed the limits granted by the Owner. Every Coin adjustment is checked again by the Supabase function.', Icons.shield),
         ],
       )),
     ]);
