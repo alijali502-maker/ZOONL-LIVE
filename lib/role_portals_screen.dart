@@ -148,6 +148,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     'wallet_transactions',
     'gifts',
     'live_rooms',
+    'admin_audit_logs',
     'owner_control_settings',
   ];
 
