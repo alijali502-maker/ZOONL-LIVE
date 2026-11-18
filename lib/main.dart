@@ -776,8 +776,8 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: <Color>[
-            Color(0xFF2A184A),
-            Color(0xFF140D26),
+            Color(0xFF263746),
+            Color(0xFF101923),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -808,7 +808,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           ),
           if (banner['mode'] == 'TEST')
             const Text(
-              'TEST',
+              'LIVE EVENT',
               style: TextStyle(
                 color: Color(0xFFD6B46A),
                 fontSize: 10,
@@ -842,7 +842,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             label: Text(labels[index]),
             selected: active,
             selectedColor: const Color(0xFF4BC2B0),
-            backgroundColor: const Color(0xFF150F2B),
+            backgroundColor: const Color(0xFF17232E),
             labelStyle: TextStyle(
               color: active
                   ? Colors.white
@@ -2580,7 +2580,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 children: <Widget>[
                   CircleAvatar(
                     radius: 38,
-                    backgroundColor: const Color(0xFF2A1A49),
+                    backgroundColor: const Color(0xFF293B49),
                     backgroundImage: avatarUrl.startsWith('http')
                         ? NetworkImage(avatarUrl)
                         : null,
