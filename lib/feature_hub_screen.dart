@@ -82,13 +82,13 @@ class _FeatureCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          if (index == 9) {
+          if (index == 10) {
             Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (_) => const RolePortalGateScreen(),
             ));
             return;
           }
-          if (index == 8) {
+          if (index == 9) {
             Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (_) => const AgencyPortalScreen(),
             ));
