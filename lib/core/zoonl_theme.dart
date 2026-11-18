@@ -49,11 +49,6 @@ class ZoonlTheme {
         ),
         iconTheme: IconThemeData(color: champagne),
       ),
-      cardTheme: const CardThemeData(
-        color: surface,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-      ),
       textTheme: ThemeData.dark().textTheme.apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
