@@ -153,7 +153,7 @@ class ZoonlAuthGate extends StatelessWidget {
                   'isVerifiedStreamer': profile['is_verified'] == true,
                   'level': profile['user_level'] ?? 1,
 
-                  // Wallet values are not loaded from a verified ledger here.
+                  // Wallet balances are read from the authenticated user's Supabase wallet row.
                   'coins': (wallet['coins'] as num?)?.toInt() ?? 0,
                   'diamonds': (wallet['diamonds'] as num?)?.toInt() ?? 0,
                   'sentCoins': 0,
