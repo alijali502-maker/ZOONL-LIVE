@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../core/backend.dart';
 
-const Color _bg = Color(0xFF080611);
-const Color _panel = Color(0xFF171126);
-const Color _purple = Color(0xFF9360F5);
-const Color _gold = Color(0xFFE6C47A);
-const Color _muted = Color(0xFFAAA1BC);
-const Color _pink = Color(0xFFDA65C8);
+const Color _bg = Color(0xFF080D14);
+const Color _panel = Color(0xFF17232E);
+const Color _purple = Color(0xFF4BC2B0);
+const Color _gold = Color(0xFFD6B46A);
+const Color _muted = Color(0xFFAAB5BE);
+const Color _pink = Color(0xFF79D7C8);
 
 class ZoonlFeatureHub extends StatefulWidget {
   const ZoonlFeatureHub({
@@ -120,7 +120,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: const Color(0xFF35234F),
+        backgroundColor: const Color(0xFF263746),
       ),
     );
   }
@@ -208,7 +208,7 @@ class _ZoonlFeatureHubState extends State<ZoonlFeatureHub> {
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF56328D), _panel],
+          colors: [Color(0xFF293B49), _panel],
         ),
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: _gold.withOpacity(.35)),
