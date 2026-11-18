@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'role_portals_screen.dart';
 
 class FeatureHubScreen extends StatelessWidget {
   const FeatureHubScreen({super.key});
@@ -80,9 +81,23 @@ class _FeatureCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => _FeatureDetailPage(feature: feature, index: index),
-        )),
+        onTap: () {
+          if (index == 9) {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const RolePortalGateScreen(),
+            ));
+            return;
+          }
+          if (index == 8) {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const AgencyPortalScreen(),
+            ));
+            return;
+          }
+          Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => _FeatureDetailPage(feature: feature, index: index),
+          ));
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
