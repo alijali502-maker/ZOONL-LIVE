@@ -147,6 +147,53 @@ class Backend {
     }
   }
 
+  // Trusted role checks. These RPCs are authoritative; client IDs are not.
+  static Future<bool> isZoonlOwner() async {
+    if (currentUserId == null) return false;
+    final dynamic result = await client.rpc('is_zoonl_owner');
+    return result == true;
+  }
+
+  static Future<bool> isZoonlAdminAllowed(String permissionKey) async {
+    if (currentUserId == null || permissionKey.trim().isEmpty) {
+      return false;
+    }
+    final dynamic result = await client.rpc(
+      'is_zoonl_admin_allowed',
+      params: <String, dynamic>{
+        'p_permission_key': permissionKey.trim(),
+      },
+    );
+    return result == true;
+  }
+
+  // Read-only portal access to existing application tables.
+  // Table names are allow-listed; row access is still enforced by Supabase RLS.
+  static Future<List<Map<String, dynamic>>> fetchPortalRows(
+    String tableName, {
+    int limit = 50,
+  }) async {
+    const Set<String> allowedTables = <String>{
+      'owner_admin_permissions',
+      'agency_applications',
+      'profiles',
+      'wallet_transactions',
+      'live_rooms',
+      'owner_control_settings',
+    };
+    if (!allowedTables.contains(tableName)) {
+      throw ArgumentError('Portal table is not allow-listed.');
+    }
+    if (currentUserId == null) {
+      throw StateError('पहले Login करना जरूरी है।');
+    }
+    final dynamic response = await client
+        .from(tableName)
+        .select()
+        .limit(limit.clamp(1, 100));
+    return _asRows(response);
+  }
+
   // Sign Out
   static Future<void> logout() async {
     await client.auth.signOut();
