@@ -116,6 +116,15 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   String? error;
   List<Map<String, dynamic>> records = const [];
   final TextEditingController search = TextEditingController();
+  final TextEditingController adminId = TextEditingController();
+  final TextEditingController agencyName = TextEditingController();
+  final TextEditingController agencyCode = TextEditingController();
+  final TextEditingController commission = TextEditingController(text: '65');
+  final TextEditingController coinTargetId = TextEditingController();
+  final TextEditingController coinAmount = TextEditingController();
+  final TextEditingController coinDescription = TextEditingController();
+  bool allowTopups = true;
+  bool actionBusy = false;
 
   static const List<_PortalSection> sections = [
     _PortalSection('Overview', Icons.dashboard_outlined),
@@ -152,6 +161,13 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   @override
   void dispose() {
     search.dispose();
+    adminId.dispose();
+    agencyName.dispose();
+    agencyCode.dispose();
+    commission.dispose();
+    coinTargetId.dispose();
+    coinAmount.dispose();
+    coinDescription.dispose();
     super.dispose();
   }
 
@@ -162,7 +178,16 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     }
     setState(() { loading = true; error = null; });
     try {
-      final rows = await Backend.fetchPortalRows(_table);
+      List<Map<String, dynamic>> rows;
+      if (selected == 2) {
+        final dynamic result = await Backend.client.rpc('owner_list_agencies');
+        final dynamic values = result is Map ? result['agencies'] : result;
+        rows = values is List
+            ? values.map((row) => Map<String, dynamic>.from(row as Map)).toList()
+            : <Map<String, dynamic>>[];
+      } else {
+        rows = await Backend.fetchPortalRows(_table);
+      }
       if (!mounted) return;
       setState(() { records = rows; loading = false; });
     } catch (e) {
@@ -266,9 +291,524 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     ],
   );
 
+  Future<void> _setAdminTopupPermission() async {
+    final id = adminId.text.trim();
+    if (!RegExp(r'^[0-9]{5,12}
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: TextField(
+          controller: search,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search records'),
+        ),
+      ),
+      if (loading) const LinearProgressIndicator(color: _gold),
+      if (error != null) Padding(padding: const EdgeInsets.all(16), child: Text('Could not load $_table: $error', style: const TextStyle(color: Color(0xFFE47777)))),
+      Expanded(
+        child: filtered.isEmpty && !loading && error == null
+            ? const Center(child: Text('No records returned by the connected database.', style: TextStyle(color: _muted)))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final row = filtered[i];
+                  final title = row['display_name'] ?? row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Database record';
+                  return Card(
+                    color: _panel,
+                    child: ListTile(
+                      leading: const Icon(Icons.storage_outlined, color: _gold),
+                      title: Text(title.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: Text(row.entries.take(5).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
+                      trailing: const Icon(Icons.chevron_right, color: _gold),
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: _panel,
+                          title: Text(title.toString(), style: const TextStyle(color: _gold)),
+                          content: SingleChildScrollView(child: Text(row.entries.map((e) => '${e.key}: ${e.value}').join('\n'), style: const TextStyle(color: _muted, fontSize: 12))),
+                          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(12),
+        child: OutlinedButton.icon(onPressed: loading ? null : _loadRecords, icon: const Icon(Icons.refresh), label: const Text('REFRESH DATABASE RECORDS')),
+      ),
+    ]);
+  }
+}
+
+class AdminOperationsPortalScreen extends StatelessWidget {
+  final Map<String, bool> permissions;
+  const AdminOperationsPortalScreen({super.key, required this.permissions});
+
+  @override
+  Widget build(BuildContext context) {
+    final granted = permissions.entries.where((e) => e.value).toList();
+    return Column(children: [
+      _portalHeader('ADMIN OPERATIONS PORTAL', 'ONLY OWNER-GRANTED PERMISSIONS', Icons.admin_panel_settings),
+      Expanded(child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _portalCard('YOUR ACCESS SCOPE', 'Only permissions confirmed by is_zoonl_admin_allowed() are shown. Missing permissions remain unavailable.', Icons.verified_user),
+          const SizedBox(height: 12),
+          for (final item in granted)
+            Card(
+              color: _panel,
+              child: ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: _teal),
+                title: Text(item.key.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                subtitle: const Text('Permission verified by Supabase', style: TextStyle(color: _muted, fontSize: 11)),
+                trailing: const Icon(Icons.lock_open, color: _teal),
+              ),
+            ),
+          const SizedBox(height: 12),
+          _portalCard('SECURITY RULE', 'Admin cannot grant permissions, issue Owner identity, change owner settings or exceed the limits granted by the Owner.', Icons.shield),
+        ],
+      )),
+    ]);
+  }
+}
+
+class AgencyPortalScreen extends StatefulWidget {
+  const AgencyPortalScreen({super.key});
+  @override
+  State<AgencyPortalScreen> createState() => _AgencyPortalScreenState();
+}
+
+class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
+  bool loading = true;
+  String? error;
+  List<Map<String, dynamic>> rows = [];
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { loading = true; error = null; });
+    try {
+      final result = await Backend.fetchPortalRows('agency_applications');
+      if (!mounted) return;
+      setState(() { rows = result; loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { error = e.toString(); loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Agency & Creator Portal')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
+      const SizedBox(height: 14),
+      _portalCard('AGENCY APPLICATIONS', 'Application records below are loaded from the connected agency_applications table. Approval and official agency ID issuance remain Owner-authorized server operations.', Icons.assignment),
+      const SizedBox(height: 10),
+      FilledButton.icon(onPressed: () => _agencyApplicationInfo(context), icon: const Icon(Icons.add_business), label: const Text('START AGENCY APPLICATION')),
+      const SizedBox(height: 14),
+      if (loading) const Center(child: CircularProgressIndicator(color: _gold)),
+      if (error != null) Text('Agency records could not be loaded: $error', style: const TextStyle(color: Color(0xFFE47777))),
+      if (!loading && error == null && rows.isEmpty)
+        const Padding(padding: EdgeInsets.all(20), child: Text('No agency application records returned.', textAlign: TextAlign.center, style: TextStyle(color: _muted))),
+      for (final row in rows)
+        Card(color: _panel, child: ListTile(
+          leading: const Icon(Icons.business, color: _gold),
+          title: Text((row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
+          subtitle: Text(row.entries.take(4).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
+        )),
+      OutlinedButton.icon(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh), label: const Text('REFRESH')),
+    ]),
+  );
+
+  void _agencyApplicationInfo(BuildContext context) {
+    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: _panel,
+      title: const Text('Agency application', style: TextStyle(color: _gold)),
+      content: const Text('Choose Streamer Agency, Top-up Agency or Both in the application flow. The secure submission endpoint and official ID issuance must be enabled in Supabase before this app can submit or approve an application. No local or sample application is created.', style: TextStyle(color: _muted, height: 1.5)),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
+    ));
+  }
+}
+
+class _PortalSection {
+  final String title;
+  final IconData icon;
+  const _PortalSection(this.title, this.icon);
+}
+
+Widget _portalHeader(String title, String subtitle, IconData icon) => Container(
+  margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+  padding: const EdgeInsets.all(17),
+  decoration: BoxDecoration(
+    gradient: const LinearGradient(colors: [Color(0xFF293B49), _panel, _bg]),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: _gold.withOpacity(.55)),
+  ),
+  child: Row(children: [
+    Container(width: 48, height: 48, decoration: BoxDecoration(color: _gold.withOpacity(.14), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: _gold, size: 26)),
+    const SizedBox(width: 13),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: .8)),
+      const SizedBox(height: 4),
+      Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
+    ])),
+    const Icon(Icons.verified, color: _teal),
+  ]),
+);
+
+Widget _portalCard(String title, String body, IconData icon) => Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(15),
+  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF354653))),
+  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Icon(icon, color: _gold, size: 24),
+    const SizedBox(width: 12),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 5),
+      Text(body, style: const TextStyle(color: _muted, fontSize: 11, height: 1.45)),
+    ])),
+  ]),
+);
+).hasMatch(id)) {
+      _notice('Enter a valid Admin ZOONL ID.');
+      return;
+    }
+    setState(() => actionBusy = true);
+    try {
+      await Backend.client.rpc(
+        'owner_set_admin_topup_permission',
+        params: <String, dynamic>{
+          'p_admin_zoonl_id': id,
+          'p_allowed': allowTopups,
+        },
+      );
+      _notice(allowTopups ? 'Top-up permission granted.' : 'Top-up permission revoked.');
+      await _loadRecords();
+    } catch (e) {
+      _notice('Admin permission update failed: $e');
+    } finally {
+      if (mounted) setState(() => actionBusy = false);
+    }
+  }
+
+  Future<void> _createAgency() async {
+    final name = agencyName.text.trim();
+    final code = agencyCode.text.trim().toUpperCase();
+    final rate = double.tryParse(commission.text.trim());
+    if (name.length < 3 || code.length < 4 || rate == null || rate < 0 || rate > 100) {
+      _notice('Enter a valid agency name, code and commission from 0 to 100.');
+      return;
+    }
+    setState(() => actionBusy = true);
+    try {
+      await Backend.client.rpc(
+        'owner_create_agency',
+        params: <String, dynamic>{
+          'p_agency_name': name,
+          'p_agency_code': code,
+          'p_commission_percent': rate,
+        },
+      );
+      agencyName.clear();
+      agencyCode.clear();
+      _notice('Agency created in Supabase.');
+      await _loadRecords();
+    } catch (e) {
+      _notice('Agency creation failed: $e');
+    } finally {
+      if (mounted) setState(() => actionBusy = false);
+    }
+  }
+
+  Future<void> _addCoins() async {
+    final id = coinTargetId.text.trim();
+    final amount = int.tryParse(coinAmount.text.trim());
+    if (!RegExp(r'^[0-9]{5,12}
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: TextField(
+          controller: search,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search records'),
+        ),
+      ),
+      if (loading) const LinearProgressIndicator(color: _gold),
+      if (error != null) Padding(padding: const EdgeInsets.all(16), child: Text('Could not load $_table: $error', style: const TextStyle(color: Color(0xFFE47777)))),
+      Expanded(
+        child: filtered.isEmpty && !loading && error == null
+            ? const Center(child: Text('No records returned by the connected database.', style: TextStyle(color: _muted)))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final row = filtered[i];
+                  final title = row['display_name'] ?? row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Database record';
+                  return Card(
+                    color: _panel,
+                    child: ListTile(
+                      leading: const Icon(Icons.storage_outlined, color: _gold),
+                      title: Text(title.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      subtitle: Text(row.entries.take(5).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
+                      trailing: const Icon(Icons.chevron_right, color: _gold),
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: _panel,
+                          title: Text(title.toString(), style: const TextStyle(color: _gold)),
+                          content: SingleChildScrollView(child: Text(row.entries.map((e) => '${e.key}: ${e.value}').join('\n'), style: const TextStyle(color: _muted, fontSize: 12))),
+                          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+      Padding(
+        padding: const EdgeInsets.all(12),
+        child: OutlinedButton.icon(onPressed: loading ? null : _loadRecords, icon: const Icon(Icons.refresh), label: const Text('REFRESH DATABASE RECORDS')),
+      ),
+    ]);
+  }
+}
+
+class AdminOperationsPortalScreen extends StatelessWidget {
+  final Map<String, bool> permissions;
+  const AdminOperationsPortalScreen({super.key, required this.permissions});
+
+  @override
+  Widget build(BuildContext context) {
+    final granted = permissions.entries.where((e) => e.value).toList();
+    return Column(children: [
+      _portalHeader('ADMIN OPERATIONS PORTAL', 'ONLY OWNER-GRANTED PERMISSIONS', Icons.admin_panel_settings),
+      Expanded(child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _portalCard('YOUR ACCESS SCOPE', 'Only permissions confirmed by is_zoonl_admin_allowed() are shown. Missing permissions remain unavailable.', Icons.verified_user),
+          const SizedBox(height: 12),
+          for (final item in granted)
+            Card(
+              color: _panel,
+              child: ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: _teal),
+                title: Text(item.key.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                subtitle: const Text('Permission verified by Supabase', style: TextStyle(color: _muted, fontSize: 11)),
+                trailing: const Icon(Icons.lock_open, color: _teal),
+              ),
+            ),
+          const SizedBox(height: 12),
+          _portalCard('SECURITY RULE', 'Admin cannot grant permissions, issue Owner identity, change owner settings or exceed the limits granted by the Owner.', Icons.shield),
+        ],
+      )),
+    ]);
+  }
+}
+
+class AgencyPortalScreen extends StatefulWidget {
+  const AgencyPortalScreen({super.key});
+  @override
+  State<AgencyPortalScreen> createState() => _AgencyPortalScreenState();
+}
+
+class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
+  bool loading = true;
+  String? error;
+  List<Map<String, dynamic>> rows = [];
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { loading = true; error = null; });
+    try {
+      final result = await Backend.fetchPortalRows('agency_applications');
+      if (!mounted) return;
+      setState(() { rows = result; loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { error = e.toString(); loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Agency & Creator Portal')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
+      const SizedBox(height: 14),
+      _portalCard('AGENCY APPLICATIONS', 'Application records below are loaded from the connected agency_applications table. Approval and official agency ID issuance remain Owner-authorized server operations.', Icons.assignment),
+      const SizedBox(height: 10),
+      FilledButton.icon(onPressed: () => _agencyApplicationInfo(context), icon: const Icon(Icons.add_business), label: const Text('START AGENCY APPLICATION')),
+      const SizedBox(height: 14),
+      if (loading) const Center(child: CircularProgressIndicator(color: _gold)),
+      if (error != null) Text('Agency records could not be loaded: $error', style: const TextStyle(color: Color(0xFFE47777))),
+      if (!loading && error == null && rows.isEmpty)
+        const Padding(padding: EdgeInsets.all(20), child: Text('No agency application records returned.', textAlign: TextAlign.center, style: TextStyle(color: _muted))),
+      for (final row in rows)
+        Card(color: _panel, child: ListTile(
+          leading: const Icon(Icons.business, color: _gold),
+          title: Text((row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
+          subtitle: Text(row.entries.take(4).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
+        )),
+      OutlinedButton.icon(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh), label: const Text('REFRESH')),
+    ]),
+  );
+
+  void _agencyApplicationInfo(BuildContext context) {
+    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      backgroundColor: _panel,
+      title: const Text('Agency application', style: TextStyle(color: _gold)),
+      content: const Text('Choose Streamer Agency, Top-up Agency or Both in the application flow. The secure submission endpoint and official ID issuance must be enabled in Supabase before this app can submit or approve an application. No local or sample application is created.', style: TextStyle(color: _muted, height: 1.5)),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
+    ));
+  }
+}
+
+class _PortalSection {
+  final String title;
+  final IconData icon;
+  const _PortalSection(this.title, this.icon);
+}
+
+Widget _portalHeader(String title, String subtitle, IconData icon) => Container(
+  margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+  padding: const EdgeInsets.all(17),
+  decoration: BoxDecoration(
+    gradient: const LinearGradient(colors: [Color(0xFF293B49), _panel, _bg]),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: _gold.withOpacity(.55)),
+  ),
+  child: Row(children: [
+    Container(width: 48, height: 48, decoration: BoxDecoration(color: _gold.withOpacity(.14), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: _gold, size: 26)),
+    const SizedBox(width: 13),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: .8)),
+      const SizedBox(height: 4),
+      Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
+    ])),
+    const Icon(Icons.verified, color: _teal),
+  ]),
+);
+
+Widget _portalCard(String title, String body, IconData icon) => Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(15),
+  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF354653))),
+  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Icon(icon, color: _gold, size: 24),
+    const SizedBox(width: 12),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 5),
+      Text(body, style: const TextStyle(color: _muted, fontSize: 11, height: 1.45)),
+    ])),
+  ]),
+);
+).hasMatch(id) || amount == null || amount <= 0) {
+      _notice('Enter a valid User ID and positive Coin amount.');
+      return;
+    }
+    setState(() => actionBusy = true);
+    try {
+      await Backend.client.rpc(
+        'add_zoonl_coins',
+        params: <String, dynamic>{
+          'p_zoonl_id': id,
+          'p_amount': amount,
+          'p_description': coinDescription.text.trim().isEmpty
+              ? 'Owner portal Coin adjustment'
+              : coinDescription.text.trim(),
+        },
+      );
+      coinTargetId.clear();
+      coinAmount.clear();
+      coinDescription.clear();
+      _notice('Coin adjustment completed by the secure Supabase ledger.');
+      await _loadRecords();
+    } catch (e) {
+      _notice('Coin adjustment failed: $e');
+    } finally {
+      if (mounted) setState(() => actionBusy = false);
+    }
+  }
+
+  void _notice(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _actionPanel(String title, List<Widget> children) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: _panel,
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: _gold.withOpacity(.35)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(color: _gold, fontWeight: FontWeight.w800, fontSize: 12)),
+        const SizedBox(height: 9),
+        ...children,
+      ],
+    ),
+  );
+
+  Widget _adminPermissionPanel() => _actionPanel('OWNER: ADMIN TOP-UP PERMISSION', [
+    TextField(
+      controller: adminId,
+      keyboardType: TextInputType.number,
+      style: const TextStyle(color: Colors.white),
+      decoration: const InputDecoration(labelText: 'Admin ZOONL ID'),
+    ),
+    SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      value: allowTopups,
+      onChanged: actionBusy ? null : (value) => setState(() => allowTopups = value),
+      title: const Text('Allow Admin to manage top-ups', style: TextStyle(color: Colors.white, fontSize: 12)),
+      activeColor: _teal,
+    ),
+    FilledButton(
+      onPressed: actionBusy ? null : _setAdminTopupPermission,
+      child: Text(actionBusy ? 'SAVING…' : 'SAVE PERMISSION'),
+    ),
+  ]);
+
+  Widget _agencyCreatePanel() => _actionPanel('OWNER: CREATE AGENCY', [
+    TextField(controller: agencyName, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Agency name')),
+    const SizedBox(height: 8),
+    TextField(controller: agencyCode, textCapitalization: TextCapitalization.characters, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Agency code')),
+    const SizedBox(height: 8),
+    TextField(controller: commission, keyboardType: const TextInputType.numberWithOptions(decimal: true), style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Commission %')),
+    const SizedBox(height: 9),
+    FilledButton(onPressed: actionBusy ? null : _createAgency, child: Text(actionBusy ? 'CREATING…' : 'CREATE AGENCY')),
+  ]);
+
+  Widget _coinAdjustmentPanel() => _actionPanel('OWNER / AUTHORIZED ADMIN: ADD COINS', [
+    TextField(controller: coinTargetId, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Recipient ZOONL ID')),
+    const SizedBox(height: 8),
+    TextField(controller: coinAmount, keyboardType: TextInputType.number, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Coin amount')),
+    const SizedBox(height: 8),
+    TextField(controller: coinDescription, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Description / receipt note')),
+    const SizedBox(height: 9),
+    FilledButton(onPressed: actionBusy ? null : _addCoins, child: Text(actionBusy ? 'PROCESSING…' : 'ADD COINS THROUGH LEDGER')),
+  ]);
+
   Widget _records() {
     final filtered = records.where((row) => row.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
     return Column(children: [
+      if (selected == 1) _adminPermissionPanel(),
+      if (selected == 2) _agencyCreatePanel(),
+      if (selected == 5) _coinAdjustmentPanel(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: TextField(
