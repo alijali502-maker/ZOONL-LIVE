@@ -136,6 +136,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     _PortalSection('Gift Catalogue', Icons.card_giftcard_outlined),
     _PortalSection('Live Operations', Icons.live_tv_outlined),
     _PortalSection('Security & Audit', Icons.security_outlined),
+    _PortalSection('Owner Settings', Icons.settings_outlined),
   ];
 
   static const List<String> _portalTables = [
