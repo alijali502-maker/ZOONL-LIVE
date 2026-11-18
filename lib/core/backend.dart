@@ -178,6 +178,8 @@ class Backend {
       'agency_applications',
       'profiles',
       'wallet_transactions',
+      'wallets',
+      'gifts',
       'live_rooms',
       'owner_control_settings',
     };
