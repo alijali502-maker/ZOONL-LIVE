@@ -849,7 +849,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         gradient: const LinearGradient(
           colors: <Color>[
             Color(0xFF263746),
-            Color(0xFF140D26),
+            Color(0xFF17232E),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -914,7 +914,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             label: Text(labels[index]),
             selected: active,
             selectedColor: const Color(0xFF4BC2B0),
-            backgroundColor: const Color(0xFF150F2B),
+            backgroundColor: const Color(0xFF17232E),
             labelStyle: TextStyle(
               color: active
                   ? Colors.white
@@ -1063,7 +1063,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF16102E),
+            color: const Color(0xFF17232E),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: const Color(0xFFD6B46A),
@@ -1186,7 +1186,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   void _openCenterLiveStartSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF140E28),
+      backgroundColor: const Color(0xFF101923),
       builder: (BuildContext sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -1655,7 +1655,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       height: 170,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1235),
+                        color: const Color(0xFF1D2B37),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color: const Color(0xFFD6B46A),
@@ -1728,7 +1728,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         height: 170,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF100A24),
+                          color: const Color(0xFF101923),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: const Color(0xFF4BC2B0),
@@ -1956,7 +1956,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     height: 80,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1235),
+                      color: const Color(0xFF1D2B37),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: const Color(0xFFD6B46A),
@@ -2067,7 +2067,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   final Map<String, dynamic> seat = seats[index];
                   return Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF191133),
+                      color: const Color(0xFF17232E),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white24),
                     ),
@@ -2467,7 +2467,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1134),
+              color: const Color(0xFF1D2B37),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: const Color(0xFFD6B46A),
