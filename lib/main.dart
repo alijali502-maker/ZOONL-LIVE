@@ -9,6 +9,7 @@ import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
+import 'settings_center_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2601,6 +2602,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       children: <Widget>[
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
+          trailing: IconButton(
+            tooltip: 'Settings Center',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsCenterScreen(),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: Color(0xFFD6B46A),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
