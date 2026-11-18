@@ -129,10 +129,19 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     _PortalSection('Security & Audit', Icons.security_outlined),
   ];
 
-  String get _table => const [
-    '', 'owner_admin_permissions', 'agency_applications',
-    'profiles', 'wallet_transactions', 'live_rooms', 'owner_control_settings'
-  ][selected];
+  static const List<String> _portalTables = [
+    '',
+    'owner_admin_permissions',
+    'agency_applications',
+    'profiles',
+    'wallets',
+    'wallet_transactions',
+    'gifts',
+    'live_rooms',
+    'owner_control_settings',
+  ];
+
+  String get _table => _portalTables[selected];
 
   @override
   void initState() {
