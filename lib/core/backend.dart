@@ -190,7 +190,7 @@ class Backend {
     final dynamic response = await client
         .from(tableName)
         .select()
-        .limit(limit.clamp(1, 100));
+        .limit(limit.clamp(1, 100).toInt());
     return _asRows(response);
   }
 
