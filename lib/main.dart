@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'app_entry.dart' as entry;
 import 'core/app_config.dart';
 import 'core/backend.dart';
+import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
+import 'settings_center_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,66 +30,7 @@ class ZoonlApp extends StatelessWidget {
     return MaterialApp(
       title: 'ZOONL LIVE',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF090812),
-        primaryColor: const Color(0xFF8B5CF6),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF9B78FF),
-          onPrimary: Color(0xFF100B1D),
-          secondary: Color(0xFFE8C77B),
-          onSecondary: Color(0xFF17120A),
-          surface: Color(0xFF171326),
-          onSurface: Color(0xFFF4F2FA),
-          error: Color(0xFFFF5B65),
-          onError: Color(0xFFFFFFFF),
-        ),
-        textTheme: ThemeData.dark().textTheme.apply(
-          bodyColor: const Color(0xFFE7E4EE),
-          displayColor: const Color(0xFFF8F7FB),
-        ).copyWith(
-          titleLarge: const TextStyle(
-            color: Color(0xFFF8F7FB),
-            fontWeight: FontWeight.w700,
-          ),
-          titleMedium: const TextStyle(
-            color: Color(0xFFF1EEF7),
-            fontWeight: FontWeight.w600,
-          ),
-          bodyLarge: const TextStyle(
-            color: Color(0xFFE7E4EE),
-          ),
-          bodyMedium: const TextStyle(
-            color: Color(0xFFD0CCD9),
-          ),
-          bodySmall: const TextStyle(
-            color: Color(0xFFAAA5B7),
-          ),
-          labelLarge: const TextStyle(
-            color: Color(0xFFF8F7FB),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        snackBarTheme: const SnackBarThemeData(
-          backgroundColor: Color(0xFF252033),
-          contentTextStyle: TextStyle(color: Color(0xFFF8F7FB)),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          labelStyle: const TextStyle(color: Color(0xFFC9C3D5)),
-          hintStyle: const TextStyle(color: Color(0xFF8F899F)),
-          filled: true,
-          fillColor: const Color(0xFF100D1B),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF393149)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFB69AFF), width: 1.4),
-          ),
-        ),
-        useMaterial3: true,
-      ),
+      theme: ZoonlTheme.dark,
       home: const ZoonlMainShell(),
     );
   }
@@ -474,7 +417,7 @@ class ZoonlStore extends ChangeNotifier {
       return <String, dynamic>{
         'stars': 2,
         'label': '2 STAR',
-        'color': const Color(0xFF7C4DFF),
+        'color': const Color(0xFF4BC2B0),
       };
     } else if (sentCoins >= 10000) {
       return <String, dynamic>{
@@ -834,7 +777,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: testMode
-              ? const Color(0xFFE6C47A)
+              ? const Color(0xFFD6B46A)
               : const Color(0xFF00C853),
         ),
       ),
@@ -843,7 +786,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           Icon(
             testMode ? Icons.science : Icons.verified_user,
             color: testMode
-                ? const Color(0xFFE6C47A)
+                ? const Color(0xFFD6B46A)
                 : const Color(0xFF69F0AE),
           ),
           const SizedBox(width: 8),
@@ -854,7 +797,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   : 'LIVE MODE • Server verification required',
               style: TextStyle(
                 color: testMode
-                    ? const Color(0xFFE6C47A)
+                    ? const Color(0xFFD6B46A)
                     : const Color(0xFF69F0AE),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
@@ -905,13 +848,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: <Color>[
-            Color(0xFF2A184A),
-            Color(0xFF140D26),
+            Color(0xFF263746),
+            Color(0xFF17232E),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFE6C47A),
+          color: const Color(0xFFD6B46A),
         ),
       ),
       child: Row(
@@ -939,7 +882,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             const Text(
               'TEST',
               style: TextStyle(
-                color: Color(0xFFE6C47A),
+                color: Color(0xFFD6B46A),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
@@ -970,12 +913,12 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           return ChoiceChip(
             label: Text(labels[index]),
             selected: active,
-            selectedColor: const Color(0xFF7C4DFF),
-            backgroundColor: const Color(0xFF150F2B),
+            selectedColor: const Color(0xFF4BC2B0),
+            backgroundColor: const Color(0xFF17232E),
             labelStyle: TextStyle(
               color: active
                   ? Colors.white
-                  : const Color(0xFFE6C47A),
+                  : const Color(0xFFD6B46A),
               fontWeight: FontWeight.bold,
             ),
             onSelected: (_) {
@@ -1002,7 +945,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       onTap: () {
         showModalBottomSheet<void>(
           context: context,
-          backgroundColor: const Color(0xFF120D24),
+          backgroundColor: const Color(0xFF17232E),
           builder: (_) {
             return Padding(
               padding: const EdgeInsets.all(16),
@@ -1013,7 +956,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   const Text(
                     'Admin Streamers & Friends Live Now',
                     style: TextStyle(
-                      color: Color(0xFFE6C47A),
+                      color: Color(0xFFD6B46A),
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -1029,7 +972,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                       (Map<String, dynamic> item) {
                         return ListTile(
                           leading: const CircleAvatar(
-                            backgroundColor: Color(0xFF7C4DFF),
+                            backgroundColor: Color(0xFF4BC2B0),
                             child: Icon(
                               Icons.live_tv,
                               color: Colors.white,
@@ -1070,8 +1013,8 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           shape: BoxShape.circle,
           gradient: LinearGradient(
             colors: <Color>[
-              Color(0xFFE6C47A),
-              Color(0xFF7C4DFF),
+              Color(0xFFD6B46A),
+              Color(0xFF4BC2B0),
             ],
           ),
           boxShadow: <BoxShadow>[
@@ -1120,10 +1063,10 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF16102E),
+            color: const Color(0xFF17232E),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFFE6C47A),
+              color: const Color(0xFFD6B46A),
               width: 1.5,
             ),
           ),
@@ -1132,7 +1075,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             children: <Widget>[
               const Icon(
                 Icons.auto_awesome,
-                color: Color(0xFFE6C47A),
+                color: Color(0xFFD6B46A),
                 size: 42,
               ),
               const SizedBox(height: 10),
@@ -1142,7 +1085,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1154,7 +1097,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               const SizedBox(height: 16),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C4DFF),
+                  backgroundColor: const Color(0xFF4BC2B0),
                 ),
                 onPressed: () {
                   store.pendingNewIdWelcome = null;
@@ -1174,7 +1117,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
   Widget _buildBottomBar() {
     return BottomAppBar(
-      color: const Color(0xFF100B21),
+      color: const Color(0xFF101923),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: <Widget>[
@@ -1196,8 +1139,8 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: <Color>[
-                    Color(0xFFE6C47A),
-                    Color(0xFF7C4DFF),
+                    Color(0xFFD6B46A),
+                    Color(0xFF4BC2B0),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(24),
@@ -1243,7 +1186,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   void _openCenterLiveStartSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF140E28),
+      backgroundColor: const Color(0xFF101923),
       builder: (BuildContext sheetContext) {
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -1253,7 +1196,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               const Text(
                 'Start Broadcast Mode',
                 style: TextStyle(
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -1262,7 +1205,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ListTile(
                 leading: const Icon(
                   Icons.live_tv,
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                 ),
                 title: const Text('Video Live'),
                 subtitle: const Text(
@@ -1289,7 +1232,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
               ListTile(
                 leading: const Icon(
                   Icons.graphic_eq,
-                  color: Color(0xFF7C4DFF),
+                  color: Color(0xFF4BC2B0),
                 ),
                 title: const Text('Audio Room'),
                 subtitle: const Text(
@@ -1699,7 +1642,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 '${filteredGifters.take(10).map((dynamic g) => '${g['name']} (${g['coins']})').join(', ')}',
                 style: const TextStyle(
                   fontSize: 12,
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                 ),
               ),
               const Divider(height: 18),
@@ -1712,10 +1655,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       height: 170,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1235),
+                        color: const Color(0xFF1D2B37),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: const Color(0xFFE6C47A),
+                          color: const Color(0xFFD6B46A),
                         ),
                       ),
                       child: Column(
@@ -1785,10 +1728,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         height: 170,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF100A24),
+                          color: const Color(0xFF101923),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: const Color(0xFF7C4DFF),
+                            color: const Color(0xFF4BC2B0),
                           ),
                         ),
                         child: Column(
@@ -1847,7 +1790,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               const Text(
                 'VIP Beauty Filter Controls',
                 style: TextStyle(
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1893,7 +1836,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         const Text(
           'Original Gift System',
           style: TextStyle(
-            color: Color(0xFFE6C47A),
+            color: Color(0xFFD6B46A),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1927,7 +1870,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             child: Text(
               'TEST MODE: Gift transactions update only this test session.',
               style: TextStyle(
-                color: Color(0xFFE6C47A),
+                color: Color(0xFFD6B46A),
                 fontSize: 11,
               ),
             ),
@@ -2013,10 +1956,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     height: 80,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1235),
+                      color: const Color(0xFF1D2B37),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFFE6C47A),
+                        color: const Color(0xFFD6B46A),
                       ),
                     ),
                     child: Text(
@@ -2075,7 +2018,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               IconButton(
                 icon: const Icon(
                   Icons.add_circle,
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                 ),
                 onPressed: () {
                   if (store.isLiveMode) {
@@ -2124,7 +2067,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   final Map<String, dynamic> seat = seats[index];
                   return Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF191133),
+                      color: const Color(0xFF17232E),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white24),
                     ),
@@ -2133,7 +2076,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       children: <Widget>[
                         const Icon(
                           Icons.headset_mic,
-                          color: Color(0xFFE6C47A),
+                          color: Color(0xFFD6B46A),
                         ),
                         Text(
                           'Seat ${seat['seat']}',
@@ -2269,7 +2212,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 return ListTile(
                   leading: const Icon(
                     Icons.lock,
-                    color: Color(0xFFE6C47A),
+                    color: Color(0xFFD6B46A),
                   ),
                   title: Text(
                     'Private Room ${room['roomId']}',
@@ -2345,7 +2288,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     ? 'Payout Window Open (1–5)'
                     : 'Payout window: monthly, from day 1 to day 5.',
                 style: const TextStyle(
-                  color: Color(0xFFE6C47A),
+                  color: Color(0xFFD6B46A),
                 ),
               ),
               const SizedBox(height: 6),
@@ -2363,7 +2306,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 const Text(
                   'Add test Coins for Gift System checks',
                   style: TextStyle(
-                    color: Color(0xFFE6C47A),
+                    color: Color(0xFFD6B46A),
                   ),
                 ),
                 Wrap(
@@ -2524,10 +2467,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1134),
+              color: const Color(0xFF1D2B37),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: const Color(0xFFE6C47A),
+                color: const Color(0xFFD6B46A),
               ),
             ),
             child: Column(
@@ -2541,7 +2484,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       children: <Widget>[
                         const Icon(
                           Icons.smart_toy,
-                          color: Color(0xFFE6C47A),
+                          color: Color(0xFFD6B46A),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -2589,7 +2532,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         trailing: const Icon(
                           Icons.volume_up,
                           size: 18,
-                          color: Color(0xFFE6C47A),
+                          color: Color(0xFFD6B46A),
                         ),
                         onTap: () {
                           setState(() {
@@ -2659,6 +2602,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       children: <Widget>[
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
+          trailing: IconButton(
+            tooltip: 'Settings Center',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsCenterScreen(),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: Color(0xFFD6B46A),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -2667,13 +2624,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 children: <Widget>[
                   CircleAvatar(
                     radius: 38,
-                    backgroundColor: const Color(0xFF2A1A49),
+                    backgroundColor: const Color(0xFF263746),
                     backgroundImage: avatarUrl.startsWith('http')
                         ? NetworkImage(avatarUrl)
                         : null,
                     child: avatarUrl.startsWith('http')
                         ? null
-                        : const Icon(Icons.person, size: 38, color: Color(0xFFE6C47A)),
+                        : const Icon(Icons.person, size: 38, color: Color(0xFFD6B46A)),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -2683,7 +2640,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         Text(
                           displayName,
                           style: const TextStyle(
-                            color: Color(0xFFE6C47A),
+                            color: Color(0xFFD6B46A),
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2703,10 +2660,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   IconButton(
                     tooltip: 'Edit profile',
                     onPressed: openProfileEditor,
-                    icon: const Icon(Icons.edit, color: Color(0xFFE6C47A)),
+                    icon: const Icon(Icons.edit, color: Color(0xFFD6B46A)),
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _buildProfileLevelBanner(),
               const Divider(height: 24),
               _profileInfoRow(Icons.workspace_premium, 'Level',
                   '${store.currentUser['level'] ?? 1}  •  VIP ${store.currentUser['vipTier'] ?? 'NONE'}'),
@@ -2731,7 +2690,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: <Widget>[
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.person_outline, color: Color(0xFFE6C47A)),
+                leading: const Icon(Icons.person_outline, color: Color(0xFFD6B46A)),
                 title: const Text('Profile information'),
                 subtitle: const Text('Photo, display name, country and bio'),
                 trailing: const Icon(Icons.chevron_right),
@@ -2755,7 +2714,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.link, color: Color(0xFFE6C47A)),
+                leading: const Icon(Icons.link, color: Color(0xFFD6B46A)),
                 title: const Text('Linked accounts'),
                 subtitle: Text(
                   (store.currentUser['linkedAccounts'] as List<dynamic>? ??
@@ -2773,7 +2732,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               const Divider(height: 1),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.security, color: Color(0xFFE6C47A)),
+                leading: const Icon(Icons.security, color: Color(0xFFD6B46A)),
                 title: const Text('Security'),
                 subtitle: const Text('Password and sign-in protection'),
                 trailing: const Icon(Icons.chevron_right),
@@ -2788,13 +2747,145 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  Widget _buildProfileLevelBanner() {
+    final int level =
+        (store.currentUser['level'] as num?)?.toInt() ?? 1;
+    final int sentCoins =
+        (store.currentUser['sentCoins'] as num?)?.toInt() ?? 0;
+    final Map<String, dynamic> star =
+        store.resolveColorStar(sentCoins);
+    final int earnedStars = (star['stars'] as num?)?.toInt() ?? 0;
+    final String vipTier =
+        store.currentUser['vipTier']?.toString() ?? 'NONE';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: <Color>[
+            Color(0xFF293B49),
+            Color(0xFF17232E),
+            Color(0xFF101923),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFD6B46A).withOpacity(.65),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD6B46A).withOpacity(.14),
+                  border: Border.all(
+                    color: const Color(0xFFD6B46A),
+                    width: 1.2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.workspace_premium,
+                  color: Color(0xFFD6B46A),
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'LEVEL $level',
+                      style: const TextStyle(
+                        color: Color(0xFFE8D29A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'ZOONL MEMBER  •  $vipTier',
+                      style: const TextStyle(
+                        color: Color(0xFFAAB5BE),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF101923),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF4BC2B0)),
+                ),
+                child: Text(
+                  earnedStars == 0 ? 'NO STAR' : '$earnedStars STAR',
+                  style: const TextStyle(
+                    color: Color(0xFF4BC2B0),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Row(
+            children: List<Widget>.generate(5, (int index) {
+              final bool active = index < earnedStars;
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index == 4 ? 0 : 5),
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? (star['color'] as Color)
+                        : const Color(0xFF354653),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            earnedStars == 0
+                ? 'Your star badge will appear as your verified activity grows.'
+                : 'Your current achievement badge is active.',
+            style: const TextStyle(
+              color: Color(0xFFAAB5BE),
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _profileInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 18, color: const Color(0xFFE6C47A)),
+          Icon(icon, size: 18, color: const Color(0xFFD6B46A)),
           const SizedBox(width: 10),
           SizedBox(
             width: 76,
@@ -2885,10 +2976,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF120D24),
+        color: const Color(0xFF17232E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF3A2766),
+          color: const Color(0xFF354653),
         ),
       ),
       child: Column(
@@ -2901,7 +2992,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 child: Text(
                   title,
                   style: const TextStyle(
-                    color: Color(0xFFE6C47A),
+                    color: Color(0xFFD6B46A),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),

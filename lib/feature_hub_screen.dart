@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'role_portals_screen.dart';
 
 class FeatureHubScreen extends StatelessWidget {
   const FeatureHubScreen({super.key});
 
-  static const Color gold = Color(0xFFE8C77B);
-  static const Color panel = Color(0xFF171326);
-  static const Color muted = Color(0xFFAAA5B7);
+  static const Color gold = Color(0xFFD6B46A);
+  static const Color panel = Color(0xFF17232E);
+  static const Color muted = Color(0xFFAAB5BE);
 
   static const List<_Feature> features = <_Feature>[
     _Feature('Home & Discovery', 'Discover creators, trending rooms and popular videos.', Icons.explore, ['Recommended creators', 'Trending now', 'Live now', 'Following feed', 'Search people and rooms', 'Categories']),
@@ -29,7 +30,7 @@ class FeatureHubScreen extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF30234D), Color(0xFF171326), Color(0xFF11101A)],
+              colors: [Color(0xFF293B49), Color(0xFF17232E), Color(0xFF11101A)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -76,25 +77,39 @@ class _FeatureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF171326),
+      color: const Color(0xFF17232E),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => _FeatureDetailPage(feature: feature, index: index),
-        )),
+        onTap: () {
+          if (index == 10) {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const RolePortalGateScreen(),
+            ));
+            return;
+          }
+          if (index == 9) {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const AgencyPortalScreen(),
+            ));
+            return;
+          }
+          Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => _FeatureDetailPage(feature: feature, index: index),
+          ));
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF393149)),
+            border: Border.all(color: const Color(0xFF354653)),
           ),
           child: Row(
             children: [
               Container(
                 width: 48, height: 48,
-                decoration: BoxDecoration(color: const Color(0xFF30234D), borderRadius: BorderRadius.circular(14)),
-                child: Icon(feature.icon, color: const Color(0xFFE8C77B), size: 25),
+                decoration: BoxDecoration(color: const Color(0xFF293B49), borderRadius: BorderRadius.circular(14)),
+                child: Icon(feature.icon, color: const Color(0xFFD6B46A), size: 25),
               ),
               const SizedBox(width: 13),
               Expanded(child: Column(
@@ -102,10 +117,10 @@ class _FeatureCard extends StatelessWidget {
                 children: [
                   Text('$index. ${feature.title}', style: const TextStyle(color: Color(0xFFF8F7FB), fontWeight: FontWeight.w700, fontSize: 15)),
                   const SizedBox(height: 4),
-                  Text(feature.subtitle, style: const TextStyle(color: Color(0xFFAAA5B7), fontSize: 12, height: 1.35)),
+                  Text(feature.subtitle, style: const TextStyle(color: Color(0xFFAAB5BE), fontSize: 12, height: 1.35)),
                 ],
               )),
-              const Icon(Icons.chevron_right, color: Color(0xFFE8C77B)),
+              const Icon(Icons.chevron_right, color: Color(0xFFD6B46A)),
             ],
           ),
         ),
@@ -124,7 +139,6 @@ class _FeatureDetailPage extends StatefulWidget {
 }
 
 class _FeatureDetailPageState extends State<_FeatureDetailPage> {
-  final Set<String> selected = <String>{};
   final TextEditingController searchController = TextEditingController();
 
   @override
@@ -137,11 +151,11 @@ class _FeatureDetailPageState extends State<_FeatureDetailPage> {
   Widget build(BuildContext context) {
     final items = widget.feature.items.where((e) => e.toLowerCase().contains(searchController.text.toLowerCase())).toList();
     return Scaffold(
-      backgroundColor: const Color(0xFF090812),
+      backgroundColor: const Color(0xFF080D14),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF100D1B),
+        backgroundColor: const Color(0xFF101923),
         title: Text(widget.feature.title, style: const TextStyle(color: Color(0xFFF8F7FB), fontWeight: FontWeight.w700)),
-        iconTheme: const IconThemeData(color: Color(0xFFE8C77B)),
+        iconTheme: const IconThemeData(color: Color(0xFFD6B46A)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -150,11 +164,11 @@ class _FeatureDetailPageState extends State<_FeatureDetailPage> {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(colors: [Color(0xFF30234D), Color(0xFF171326)]),
-              border: Border.all(color: const Color(0xFFE8C77B).withOpacity(.4)),
+              gradient: const LinearGradient(colors: [Color(0xFF293B49), Color(0xFF17232E)]),
+              border: Border.all(color: const Color(0xFFD6B46A).withOpacity(.4)),
             ),
             child: Row(children: [
-              Icon(widget.feature.icon, color: const Color(0xFFE8C77B), size: 34),
+              Icon(widget.feature.icon, color: const Color(0xFFD6B46A), size: 34),
               const SizedBox(width: 12),
               Expanded(child: Text(widget.feature.subtitle, style: const TextStyle(color: Colors.white, height: 1.4))),
             ]),
@@ -169,22 +183,84 @@ class _FeatureDetailPageState extends State<_FeatureDetailPage> {
           const SizedBox(height: 12),
           for (final item in items)
             Card(
-              color: const Color(0xFF171326),
-              child: CheckboxListTile(
-                value: selected.contains(item),
-                activeColor: const Color(0xFF8B5CF6),
-                checkColor: Colors.white,
-                title: Text(item, style: const TextStyle(color: Color(0xFFF1EEF7))),
-                subtitle: const Text('Feature area in the app structure', style: TextStyle(color: Color(0xFFAAA5B7), fontSize: 11)),
-                onChanged: (value) => setState(() {
-                  if (value == true) { selected.add(item); } else { selected.remove(item); }
-                }),
+              color: const Color(0xFF17232E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Color(0xFF354653)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 5,
+                ),
+                leading: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFFD6B46A),
+                ),
+                title: Text(
+                  item,
+                  style: const TextStyle(
+                    color: Color(0xFFF4F1E9),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Open this section',
+                  style: TextStyle(
+                    color: Color(0xFFAAB5BE),
+                    fontSize: 11,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFD6B46A),
+                ),
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  backgroundColor: const Color(0xFF101923),
+                  showDragHandle: true,
+                  builder: (sheetContext) => SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item,
+                            style: const TextStyle(
+                              color: Color(0xFFD6B46A),
+                              fontSize: 19,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'This section is included in the ZOONL LIVE application plan. Its live service must be connected and verified before it can process real account data or transactions.',
+                            style: TextStyle(
+                              color: Color(0xFFAAB5BE),
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: () => Navigator.pop(sheetContext),
+                              child: const Text('CLOSE'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: const Color(0xFF211B30), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: const Color(0xFF1D2B37), borderRadius: BorderRadius.circular(14)),
             child: const Text('STRUCTURE PREVIEW • This screen defines the feature layout. Live data, uploads, payments and privileged actions will be connected to their trusted services in the next phase.', style: TextStyle(color: Color(0xFFD0CCD9), height: 1.45)),
           ),
         ],

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/zoonl_theme.dart';
+
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
 
@@ -157,7 +159,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         children: [
           CircleAvatar(
             radius: 54,
-            backgroundColor: Colors.deepPurple.shade100,
+            backgroundColor: ZoonlTheme.surfaceRaised,
             backgroundImage: _isValidImageUrl(imageUrl) &&
                     imageUrl.isNotEmpty
                 ? NetworkImage(imageUrl)
@@ -167,7 +169,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 ? const Icon(
                     Icons.person,
                     size: 55,
-                    color: Colors.deepPurple,
+                    color: ZoonlTheme.champagne,
                   )
                 : null,
             onBackgroundImageError: (_, __) {},
