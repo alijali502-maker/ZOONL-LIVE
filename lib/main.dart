@@ -1900,10 +1900,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           spacing: 8,
           runSpacing: 8,
           children: <Widget>[
-            _giftButton(streamer, 'Rose', 100),
-            _giftButton(streamer, 'Heart', 1000),
-            _giftButton(streamer, 'Diamond', 10000),
-            _giftButton(streamer, 'Royal Castle', 200000),
+            _giftButton(streamer, 'Golden Rose', 100),
+            _giftButton(streamer, 'Golden Heart', 300),
+            _giftButton(streamer, 'Diamond Heart', 1500),
+            _giftButton(streamer, 'Royal Castle', 85000),
           ],
         ),
         if (store.isLiveMode)
