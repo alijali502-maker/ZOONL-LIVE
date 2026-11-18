@@ -133,6 +133,18 @@ class ZoonlAuthGate extends StatelessWidget {
                   );
                 }
 
+                Map<String, dynamic> wallet = <String, dynamic>{};
+                try {
+                  wallet = await Backend.client
+                      .from('wallets')
+                      .select('coins, diamonds')
+                      .eq('user_id', user.id)
+                      .maybeSingle() ?? <String, dynamic>{};
+                } catch (_) {
+                  // Keep the account signed in, but never invent wallet credits.
+                  wallet = <String, dynamic>{};
+                }
+
                 zoonl.ZoonlStore.instance.currentUser = {
                   'id': userId,
                   'name': (profile['display_name'] ?? '').toString(),
@@ -142,8 +154,8 @@ class ZoonlAuthGate extends StatelessWidget {
                   'level': profile['user_level'] ?? 1,
 
                   // Wallet values are not loaded from a verified ledger here.
-                  'coins': 0,
-                  'diamonds': 0,
+                  'coins': (wallet['coins'] as num?)?.toInt() ?? 0,
+                  'diamonds': (wallet['diamonds'] as num?)?.toInt() ?? 0,
                   'sentCoins': 0,
                   'walletBalance': 0.0,
 
@@ -164,6 +176,38 @@ class ZoonlAuthGate extends StatelessWidget {
                   'language': profile['language'],
                   'bio': profile['bio'],
                 };
+
+                // Production accounts must use Supabase-backed transactions.
+                zoonl.ZoonlStore.instance.setAppMode(zoonl.ZoonlAppMode.live);
+
+                // Populate the live feed from existing database rooms, not local demo rows.
+                try {
+                  final rooms = await Backend.client
+                      .from('live_rooms')
+                      .select('id, owner_id, room_name, room_type, is_live, is_private, is_locked, viewer_count')
+                      .eq('is_live', true)
+                      .order('created_at', ascending: false);
+                  zoonl.ZoonlStore.instance.streamers
+                    ..clear()
+                    ..addAll((rooms as List).map((raw) {
+                      final room = Map<String, dynamic>.from(raw as Map);
+                      return <String, dynamic>{
+                        'roomId': room['id'],
+                        'userId': room['owner_id'],
+                        'name': room['room_name'] ?? 'ZOONL LIVE Host',
+                        'mode': (room['room_type'] ?? 'VIDEO').toString().toUpperCase(),
+                        'isLive': room['is_live'] == true,
+                        'viewerCount': room['viewer_count'] ?? 0,
+                        'receivedCoins': 0,
+                        'giftersHistory': <dynamic>[],
+                        'videoCallOpen': false,
+                        'isPrivate': room['is_private'] == true,
+                        'isLocked': room['is_locked'] == true,
+                      };
+                    }));
+                } catch (_) {
+                  zoonl.ZoonlStore.instance.streamers.clear();
+                }
 
                 return const zoonl.ZoonlMainShell();
               },
