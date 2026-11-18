@@ -2664,6 +2664,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _buildProfileLevelBanner(),
               const Divider(height: 24),
               _profileInfoRow(Icons.workspace_premium, 'Level',
                   '${store.currentUser['level'] ?? 1}  •  VIP ${store.currentUser['vipTier'] ?? 'NONE'}'),
@@ -2742,6 +2744,138 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProfileLevelBanner() {
+    final int level =
+        (store.currentUser['level'] as num?)?.toInt() ?? 1;
+    final int sentCoins =
+        (store.currentUser['sentCoins'] as num?)?.toInt() ?? 0;
+    final Map<String, dynamic> star =
+        store.resolveColorStar(sentCoins);
+    final int earnedStars = (star['stars'] as num?)?.toInt() ?? 0;
+    final String vipTier =
+        store.currentUser['vipTier']?.toString() ?? 'NONE';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: <Color>[
+            Color(0xFF293B49),
+            Color(0xFF17232E),
+            Color(0xFF101923),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFD6B46A).withOpacity(.65),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFD6B46A).withOpacity(.14),
+                  border: Border.all(
+                    color: const Color(0xFFD6B46A),
+                    width: 1.2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.workspace_premium,
+                  color: Color(0xFFD6B46A),
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'LEVEL $level',
+                      style: const TextStyle(
+                        color: Color(0xFFE8D29A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'ZOONL MEMBER  •  $vipTier',
+                      style: const TextStyle(
+                        color: Color(0xFFAAB5BE),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF101923),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF4BC2B0)),
+                ),
+                child: Text(
+                  earnedStars == 0 ? 'NO STAR' : '$earnedStars STAR',
+                  style: const TextStyle(
+                    color: Color(0xFF4BC2B0),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 13),
+          Row(
+            children: List<Widget>.generate(5, (int index) {
+              final bool active = index < earnedStars;
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(right: index == 4 ? 0 : 5),
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? (star['color'] as Color)
+                        : const Color(0xFF354653),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            earnedStars == 0
+                ? 'Your star badge will appear as your verified activity grows.'
+                : 'Your current achievement badge is active.',
+            style: const TextStyle(
+              color: Color(0xFFAAB5BE),
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
