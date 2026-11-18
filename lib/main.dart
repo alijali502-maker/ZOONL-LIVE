@@ -51,8 +51,8 @@ class ZoonlStore extends ChangeNotifier {
 
   static const String ownerId = '10001';
 
-  // TEST is the safe initial mode. LIVE transactions require server integration.
-  ZoonlAppMode appMode = ZoonlAppMode.test;
+  // Production mode is the only app mode. Local test transactions are disabled.
+  ZoonlAppMode appMode = ZoonlAppMode.live;
 
   bool get isTestMode => appMode == ZoonlAppMode.test;
   bool get isLiveMode => appMode == ZoonlAppMode.live;
@@ -760,80 +760,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
     );
   }
 
-  Widget _buildModeBanner() {
-    final bool testMode = store.isTestMode;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: testMode
-            ? const Color(0xFF34250B)
-            : const Color(0xFF102D20),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: testMode
-              ? const Color(0xFFD6B46A)
-              : const Color(0xFF00C853),
-        ),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            testMode ? Icons.science : Icons.verified_user,
-            color: testMode
-                ? const Color(0xFFD6B46A)
-                : const Color(0xFF69F0AE),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              testMode
-                  ? 'TEST MODE • Test transactions only'
-                  : 'LIVE MODE • Server verification required',
-              style: TextStyle(
-                color: testMode
-                    ? const Color(0xFFD6B46A)
-                    : const Color(0xFF69F0AE),
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          PopupMenuButton<ZoonlAppMode>(
-            tooltip: 'Change app mode',
-            icon: const Icon(
-              Icons.swap_horiz,
-              color: Colors.white,
-            ),
-            onSelected: (ZoonlAppMode mode) {
-              store.setAppMode(mode);
-              _showMessage(
-                mode == ZoonlAppMode.test
-                    ? 'TEST MODE enabled.'
-                    : 'LIVE MODE enabled. Server transactions are not enabled in this client.',
-              );
-            },
-            itemBuilder: (BuildContext context) =>
-                const <PopupMenuEntry<ZoonlAppMode>>[
-              PopupMenuItem<ZoonlAppMode>(
-                value: ZoonlAppMode.test,
-                child: Text('TEST MODE'),
-              ),
-              PopupMenuItem<ZoonlAppMode>(
-                value: ZoonlAppMode.live,
-                child: Text('LIVE MODE'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildModeBanner() => const SizedBox.shrink();
 
   Widget _buildGlobalGiftBanner(Map<String, dynamic> banner) {
     return Container(
