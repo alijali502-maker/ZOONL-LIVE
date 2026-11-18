@@ -1304,8 +1304,14 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                     );
                     return;
                   }
-                  _showMessage(
-                    'Audio Room is not connected to a separate audio-room publisher yet. Video Live is connected.',
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => LiveScreen(
+                        userName: store.currentUser['name']?.toString() ?? 'ZOONL User',
+                        userId: store.currentUser['id']?.toString() ?? '',
+                        roomType: 'audio',
+                      ),
+                    ),
                   );
                 },
               ),
