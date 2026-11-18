@@ -97,10 +97,11 @@ class Backend {
 
     try {
       final dynamic response = await client.rpc(
-        'send_zoonl_gift',
+        'zoonl_send_live_gift',
         params: <String, dynamic>{
-          'p_receiver': receiver,
-          'p_gift_code': code,
+          'p_sender_id': me,
+          'p_receiver_id': receiver,
+          'p_zoonl_gift_code': code,
         },
       );
 
