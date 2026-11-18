@@ -581,9 +581,9 @@ class ZoonlStore extends ChangeNotifier {
   }
 
   bool canStartLive() {
-    if (isOwner) return true;
-    if (currentUser['isVerifiedStreamer'] == true) return true;
-    return ((currentUser['level'] as num?)?.toInt() ?? 1) >= 5;
+    // Only the trusted Owner or a server-approved Host may publish.
+    // User level and public ZOONL ID never grant broadcast permission.
+    return isOwner || currentUser['isVerifiedStreamer'] == true;
   }
 
   void toggleLiveStatus({
@@ -1137,13 +1137,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 ),
                 title: const Text('Video Live'),
                 subtitle: const Text(
-                  'Verified streamer or Level 5 account',
+                  'Owner or approved Host (18+)',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   if (!store.canStartLive()) {
                     _showMessage(
-                      'Live ke liye Level 5 ya verified streamer status chahiye.',
+                      'Live के लिए Owner या approved Host status जरूरी है।',
                     );
                     return;
                   }
