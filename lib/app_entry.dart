@@ -133,65 +133,49 @@ class ZoonlAuthGate extends StatelessWidget {
                   );
                 }
 
-                Map<String, dynamic> wallet = <String, dynamic>{};
-                try {
-                  wallet = await Backend.client
-                      .from('wallets')
-                      .select('coins, diamonds')
-                      .eq('user_id', user.id)
-                      .maybeSingle() ?? <String, dynamic>{};
-                } catch (_) {
-                  // Keep the account signed in, but never invent wallet credits.
-                  wallet = <String, dynamic>{};
-                }
+                return FutureBuilder<_HomeData>(
+                  future: _loadHomeData(user.id),
+                  builder: (context, homeSnapshot) {
+                    if (homeSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      );
+                    }
 
-                zoonl.ZoonlStore.instance.currentUser = {
-                  'id': userId,
-                  'name': (profile['display_name'] ?? '').toString(),
-                  'isOwner': isOwner,
-                  'trustedRole': isOwner ? 'OWNER' : 'USER',
-                  'isVerifiedStreamer': profile['is_verified'] == true,
-                  'level': profile['user_level'] ?? 1,
+                    final home = homeSnapshot.data ?? _HomeData.empty();
+                    zoonl.ZoonlStore.instance.currentUser = {
+                      'id': userId,
+                      'name': (profile['display_name'] ?? '').toString(),
+                      'isOwner': isOwner,
+                      'trustedRole': isOwner ? 'OWNER' : 'USER',
+                      'isVerifiedStreamer': profile['is_verified'] == true,
+                      'level': profile['user_level'] ?? 1,
+                      'coins': (home.wallet['coins'] as num?)?.toInt() ?? 0,
+                      'diamonds': (home.wallet['diamonds'] as num?)?.toInt() ?? 0,
+                      'sentCoins': 0,
+                      'walletBalance': 0.0,
+                      'vipTier': 'NONE',
+                      'isNewId': false,
+                      'trialExpiresAt': null,
+                      'friendListPublic': true,
+                      'linkedAccounts': ['Email Auth'],
+                      'payoutLocked': true,
+                      'payoutMethod': '',
+                      'payoutAccount': '',
+                      'registrationType': 'USER',
+                      'approved': false,
+                      'isLive': false,
+                      'offlineSince': null,
+                      'avatarUrl': profile['avatar_url'],
+                      'country': profile['country'],
+                      'language': profile['language'],
+                      'bio': profile['bio'],
+                    };
 
-                  // Wallet balances are read from the authenticated user's Supabase wallet row.
-                  'coins': (wallet['coins'] as num?)?.toInt() ?? 0,
-                  'diamonds': (wallet['diamonds'] as num?)?.toInt() ?? 0,
-                  'sentCoins': 0,
-                  'walletBalance': 0.0,
-
-                  'vipTier': 'NONE',
-                  'isNewId': false,
-                  'trialExpiresAt': null,
-                  'friendListPublic': true,
-                  'linkedAccounts': ['Email Auth'],
-                  'payoutLocked': true,
-                  'payoutMethod': '',
-                  'payoutAccount': '',
-                  'registrationType': 'USER',
-                  'approved': false,
-                  'isLive': false,
-                  'offlineSince': null,
-                  'avatarUrl': profile['avatar_url'],
-                  'country': profile['country'],
-                  'language': profile['language'],
-                  'bio': profile['bio'],
-                };
-
-                // Production accounts must use Supabase-backed transactions.
-                zoonl.ZoonlStore.instance.setAppMode(zoonl.ZoonlAppMode.live);
-
-                // Populate the live feed from existing database rooms, not local demo rows.
-                try {
-                  final rooms = await Backend.client
-                      .from('live_rooms')
-                      .select('id, owner_id, room_name, room_type, is_live, is_private, is_locked, viewer_count')
-                      .eq('is_live', true)
-                      .order('created_at', ascending: false);
-                  zoonl.ZoonlStore.instance.streamers
-                    ..clear()
-                    ..addAll((rooms as List).map((raw) {
-                      final room = Map<String, dynamic>.from(raw as Map);
-                      return <String, dynamic>{
+                    zoonl.ZoonlStore.instance.setAppMode(zoonl.ZoonlAppMode.live);
+                    zoonl.ZoonlStore.instance.streamers
+                      ..clear()
+                      ..addAll(home.rooms.map((room) => <String, dynamic>{
                         'roomId': room['id'],
                         'userId': room['owner_id'],
                         'name': room['room_name'] ?? 'ZOONL LIVE Host',
@@ -203,19 +187,48 @@ class ZoonlAuthGate extends StatelessWidget {
                         'videoCallOpen': false,
                         'isPrivate': room['is_private'] == true,
                         'isLocked': room['is_locked'] == true,
-                      };
-                    }));
-                } catch (_) {
-                  zoonl.ZoonlStore.instance.streamers.clear();
-                }
+                      }));
 
-                return const zoonl.ZoonlMainShell();
+                    return const zoonl.ZoonlMainShell();
+                  },
+                );
+
               },
             );
           },
         );
       },
     );
+  }
+
+  Future<_HomeData> _loadHomeData(String authUserId) async {
+    Map<String, dynamic> wallet = <String, dynamic>{};
+    List<Map<String, dynamic>> rooms = <Map<String, dynamic>>[];
+
+    try {
+      wallet = await Backend.client
+          .from('wallets')
+          .select('coins, diamonds')
+          .eq('user_id', authUserId)
+          .maybeSingle() ?? <String, dynamic>{};
+    } catch (_) {
+      // Never invent balances when the wallet cannot be read.
+    }
+
+    try {
+      final result = await Backend.client
+          .from('live_rooms')
+          .select('id, owner_id, room_name, room_type, is_live, is_private, is_locked, viewer_count')
+          .eq('is_live', true)
+          .order('created_at', ascending: false);
+      rooms = (result as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      rooms = <Map<String, dynamic>>[];
+    }
+
+    return _HomeData(wallet: wallet, rooms: rooms);
   }
 
   Future<bool> _loadOwnerStatus() async {
@@ -332,4 +345,16 @@ class ZoonlAuthGate extends StatelessWidget {
       'Unique ZOONL ID could not be assigned after several attempts.',
     );
   }
+}
+
+class _HomeData {
+  final Map<String, dynamic> wallet;
+  final List<Map<String, dynamic>> rooms;
+
+  const _HomeData({required this.wallet, required this.rooms});
+
+  factory _HomeData.empty() => const _HomeData(
+    wallet: <String, dynamic>{},
+    rooms: <Map<String, dynamic>>[],
+  );
 }
