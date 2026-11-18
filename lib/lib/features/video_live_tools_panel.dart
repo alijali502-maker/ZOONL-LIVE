@@ -19,8 +19,8 @@ class _VideoLiveToolsPanelState extends State<VideoLiveToolsPanel> {
 
   Future<List<Map<String, dynamic>>> _rows(String table, {String? order}) async {
     dynamic q = _db.from(table).select();
-    if (table == 'zoonl_live_gifts') {
-      q = q.eq('project_name', 'ZOONL LIVE').eq('is_active', true);
+    if (table == 'gifts') {
+      q = q.eq('is_active', true);
     } else if (table == 'live_room_members' || table == 'room_live_sessions' ||
         table == 'room_display_settings' || table == 'room_access_logs') {
       q = q.eq('room_id', widget.roomId);
@@ -37,7 +37,7 @@ class _VideoLiveToolsPanelState extends State<VideoLiveToolsPanel> {
     setState(() { _sending = true; _notice = null; });
     try {
       await Backend.sendZoonlLiveGift(roomId: widget.roomId, giftId: gift['id'].toString());
-      if (mounted) setState(() => _notice = '${gift['zoonl_gift_name']} भेज दिया गया।');
+      if (mounted) setState(() => _notice = '${gift['gift_name']} भेज दिया गया।');
     } catch (e) {
       if (mounted) setState(() => _notice = 'Gift नहीं भेजा गया: $e');
     } finally {
@@ -102,12 +102,12 @@ class _VideoLiveToolsPanelState extends State<VideoLiveToolsPanel> {
           if (_notice != null)
             Padding(padding: const EdgeInsets.all(8), child: Text(_notice!, style: const TextStyle(color: Color(0xFFE5BD70)))),
           Expanded(child: TabBarView(children: [
-            _section('Gifts', _rows('zoonl_live_gifts', order: 'sort_order'), (g) => Card(
+            _section('Gifts', _rows('gifts', order: 'created_at'), (g) => Card(
               color: const Color(0xFF251A32),
               child: ListTile(
                 leading: const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70)),
-                title: Text('${g['zoonl_gift_name'] ?? 'Gift'}', style: const TextStyle(color: Colors.white)),
-                subtitle: Text('${g['coin_price'] ?? 0} coins', style: const TextStyle(color: Colors.white60)),
+                title: Text('${g['gift_name'] ?? 'Gift'}', style: const TextStyle(color: Colors.white)),
+                subtitle: Text('${g['coin_price'] ?? 0} coins • ${g['category'] ?? 'General'}', style: const TextStyle(color: Colors.white60)),
                 trailing: widget.isHost ? const Text('Host', style: TextStyle(color: Colors.white38)) :
                   TextButton(onPressed: _sending ? null : () => _sendGift(g), child: Text(_sending ? 'Sending' : 'Send')),
               ),
