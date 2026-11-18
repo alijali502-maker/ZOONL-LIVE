@@ -165,6 +165,7 @@ class Backend {
       'gifts',
       'live_rooms',
       'owner_control_settings',
+      'admin_audit_logs',
     };
     if (!allowedTables.contains(tableName)) {
       throw ArgumentError('Portal table is not allow-listed.');
