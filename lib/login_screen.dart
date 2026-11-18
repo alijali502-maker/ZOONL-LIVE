@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(text),
-          backgroundColor: const Color(0xFF211735),
+          backgroundColor: const Color(0xFF1D2B37),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -277,21 +277,21 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFBD78FF)),
+      prefixIcon: Icon(icon, color: const Color(0xFFD6B46A)),
       filled: true,
-      fillColor: const Color(0xFF191426),
+      fillColor: const Color(0xFF101923),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Color(0xFF302342)),
+        borderSide: const BorderSide(color: Color(0xFF17232E)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(
-          color: Color(0xFFB65CFF),
+          color: Color(0xFF4BC2B0),
           width: 1.4,
         ),
       ),
@@ -309,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
       label: Text(title),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
-        side: const BorderSide(color: Color(0xFF49365F)),
+        side: const BorderSide(color: Color(0xFF354653)),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
@@ -327,18 +327,18 @@ class _LoginScreenState extends State<LoginScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF42166B),
-            Color(0xFF1B0D30),
-            Color(0xFF090713),
+            Color(0xFF263746),
+            Color(0xFF101923),
+            Color(0xFF080D14),
           ],
         ),
         border: Border.all(
-          color: const Color(0xFFE6C47A).withOpacity(0.65),
+          color: const Color(0xFFD6B46A).withOpacity(0.65),
           width: 1.3,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9636F5).withOpacity(0.3),
+            color: const Color(0xFF4BC2B0).withOpacity(0.3),
             blurRadius: 26,
             offset: const Offset(0, 9),
           ),
@@ -350,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _tag('● LIVE STAGE', const Color(0xFFFF2E63)),
               const Spacer(),
-              _tag('CREATOR VIP', const Color(0xFFE6C47A)),
+              _tag('CREATOR VIP', const Color(0xFFD6B46A)),
             ],
           ),
           const SizedBox(height: 10),
@@ -374,7 +374,7 @@ class _LoginScreenState extends State<LoginScreen> {
               letterSpacing: 3,
               shadows: [
                 Shadow(
-                  color: Color(0xFFB65CFF),
+                  color: Color(0xFF4BC2B0),
                   blurRadius: 16,
                 ),
               ],
@@ -385,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
             'Welcome to Live Streamer & Creator Arena',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFE6C47A),
+              color: Color(0xFFD6B46A),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -488,7 +488,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _loading ? null : _forgotPassword,
                 child: const Text(
                   'Forgot password?',
-                  style: TextStyle(color: Color(0xFFC58AFF)),
+                  style: TextStyle(color: Color(0xFF79D7C8)),
                 ),
               ),
             ),
@@ -571,14 +571,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
             child: const Text(
               'Change Number',
-              style: TextStyle(color: Color(0xFFC58AFF)),
+              style: TextStyle(color: Color(0xFF79D7C8)),
             ),
           ),
           TextButton(
             onPressed: _loading ? null : _sendPhoneOtp,
             child: const Text(
               'Resend OTP',
-              style: TextStyle(color: Color(0xFFC58AFF)),
+              style: TextStyle(color: Color(0xFF79D7C8)),
             ),
           ),
         ],
@@ -592,7 +592,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: _loading ? null : action,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF9636F5),
+          backgroundColor: const Color(0xFF4BC2B0),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
@@ -627,13 +627,13 @@ class _LoginScreenState extends State<LoginScreen> {
       onPressed: _loading ? null : onTap,
       style: OutlinedButton.styleFrom(
         backgroundColor: selected
-            ? const Color(0xFF542CA0)
-            : const Color(0xFF191426),
+            ? const Color(0xFF263746)
+            : const Color(0xFF101923),
         foregroundColor: Colors.white,
         side: BorderSide(
           color: selected
-              ? const Color(0xFFB65CFF)
-              : const Color(0xFF302342),
+              ? const Color(0xFF4BC2B0)
+              : const Color(0xFF17232E),
         ),
         padding: const EdgeInsets.symmetric(vertical: 13),
         shape: RoundedRectangleBorder(
@@ -658,16 +658,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF090713),
+      backgroundColor: const Color(0xFF080D14),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF23113A),
-              Color(0xFF090713),
-              Color(0xFF06040D),
+              Color(0xFF17232E),
+              Color(0xFF080D14),
+              Color(0xFF080D14),
             ],
           ),
         ),
@@ -731,7 +731,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : 'New user? Create an account',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFFD0A4FF),
+                        color: Color(0xFFE8D29A),
                       ),
                     ),
                   ),
@@ -739,7 +739,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Row(
                     children: [
                       Expanded(
-                        child: Divider(color: Color(0xFF49365F)),
+                        child: Divider(color: Color(0xFF354653)),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
@@ -752,7 +752,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       Expanded(
-                        child: Divider(color: Color(0xFF49365F)),
+                        child: Divider(color: Color(0xFF354653)),
                       ),
                     ],
                   ),
@@ -794,8 +794,8 @@ class ZoonlLogoPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     const gold = Color(0xFFFFD982);
-    const purple = Color(0xFFB65CFF);
-    const pink = Color(0xFFFF65C8);
+    const purple = Color(0xFF4BC2B0);
+    const pink = Color(0xFF4BC2B0);
 
     final glow = Paint()
       ..color = purple.withOpacity(0.24)
@@ -809,8 +809,8 @@ class ZoonlLogoPainter extends CustomPainter {
       ..shader = const LinearGradient(
         colors: [
           Color(0xFFFFE7A5),
-          Color(0xFFB65CFF),
-          Color(0xFFFF65C8),
+          Color(0xFF4BC2B0),
+          Color(0xFF4BC2B0),
           Color(0xFFFFE7A5),
         ],
       ).createShader(
@@ -882,8 +882,8 @@ class ZoonlLogoPainter extends CustomPainter {
         colors: [
           Color(0xFFFFF0B5),
           Color(0xFFFFD05A),
-          Color(0xFFB65CFF),
-          Color(0xFFFF65C8),
+          Color(0xFF4BC2B0),
+          Color(0xFF4BC2B0),
         ],
       ).createShader(
         Rect.fromCenter(
@@ -944,7 +944,7 @@ class ZoonlLogoPainter extends CustomPainter {
       ..shader = const RadialGradient(
         colors: [
           Color(0xFFFFB5E8),
-          Color(0xFFB65CFF),
+          Color(0xFF4BC2B0),
         ],
       ).createShader(
         Rect.fromCircle(
