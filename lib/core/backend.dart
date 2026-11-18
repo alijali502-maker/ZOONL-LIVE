@@ -52,9 +52,9 @@ class Backend {
   }) async {
     try {
       final dynamic response = await client
-          .from('zoonl_live_feed')
+          .from('zoonl_api_full_feed')
           .select()
-          .order('created_at', ascending: false)
+          .order('sort_order', ascending: true)
           .limit(limit);
 
       return _asRows(response);
