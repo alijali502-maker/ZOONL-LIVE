@@ -8,6 +8,7 @@ import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
+import 'lib/features/live_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -1276,14 +1277,14 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                     );
                     return;
                   }
-                  store.toggleLiveStatus(
-                    goLive: true,
-                    mode: 'VIDEO',
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => LiveScreen(
+                        userName: store.currentUser['name']?.toString() ?? 'ZOONL User',
+                        userId: store.currentUser['id']?.toString() ?? '',
+                      ),
+                    ),
                   );
-                  setState(() {
-                    bottomIndex = 0;
-                    topTabIndex = 1;
-                  });
                 },
               ),
               ListTile(
@@ -1303,14 +1304,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                     );
                     return;
                   }
-                  store.toggleLiveStatus(
-                    goLive: true,
-                    mode: 'AUDIO',
+                  _showMessage(
+                    'Audio Room is not connected to a separate audio-room publisher yet. Video Live is connected.',
                   );
-                  setState(() {
-                    bottomIndex = 0;
-                    topTabIndex = 3;
-                  });
                 },
               ),
               ListTile(
@@ -1942,25 +1938,66 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     int coins,
   ) {
     return OutlinedButton(
-      onPressed: () {
-        if (store.isLiveMode) {
+      onPressed: () async {
+        if (!store.isLiveMode) {
+          final bool sent = store.sendGift(
+            streamer: streamer,
+            giftName: giftName,
+            giftCoins: coins,
+          );
           _showMessage(
-            'LIVE gift sending is waiting for server transaction integration.',
+            sent
+                ? '$giftName sent in TEST mode.'
+                : 'Insufficient test Coins or invalid test session.',
           );
           return;
         }
 
-        final bool sent = store.sendGift(
-          streamer: streamer,
-          giftName: giftName,
-          giftCoins: coins,
-        );
+        final String roomId = (streamer['roomId'] ?? '').toString();
+        if (roomId.isEmpty) {
+          _showMessage('This streamer has no active Supabase live room.');
+          return;
+        }
 
-        _showMessage(
-          sent
-              ? '$giftName sent in TEST mode.'
-              : 'Insufficient test Coins or invalid test session.',
-        );
+        try {
+          final gift = await Backend.client
+              .from('gifts')
+              .select('id, coin_price')
+              .eq('gift_name', giftName)
+              .eq('is_active', true)
+              .maybeSingle();
+
+          if (gift == null) {
+            _showMessage('$giftName is not in the active Supabase gift catalog.');
+            return;
+          }
+
+          final result = await Backend.client.rpc(
+            'send_live_gift',
+            params: <String, dynamic>{
+              'p_gift_id': gift['id'],
+              'p_room_id': roomId,
+              'p_quantity': 1,
+            },
+          );
+
+          final wallet = await Backend.client
+              .from('wallets')
+              .select('coins, diamonds')
+              .eq('user_id', Backend.currentUserId!)
+              .maybeSingle();
+
+          if (wallet != null) {
+            store.currentUser['coins'] =
+                (wallet['coins'] as num?)?.toInt() ?? 0;
+            store.currentUser['diamonds'] =
+                (wallet['diamonds'] as num?)?.toInt() ?? 0;
+            store.refresh();
+          }
+          _showMessage('$giftName sent successfully from the Supabase wallet.');
+        } catch (error) {
+          _showMessage('Gift failed: $error');
+        }
       },
       child: Text('$giftName • $coins'),
     );
