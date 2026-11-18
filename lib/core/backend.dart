@@ -71,45 +71,28 @@ class Backend {
   // server). Coins are NEVER sent by the client; the server looks up the
   // price from the gift catalog, checks the balance and deducts it in
   // one transaction. See supabase_zoonl_setup.sql.
+  // Room gifts must use the room-bound server RPC so the server derives
+  // the sender from auth.uid() and validates room access and wallet balance.
   static Future<List<Map<String, dynamic>>> sendZoonlLiveGift({
-    required String receiverId,
-    required String giftCode,
+    required String roomId,
+    required String giftId,
+    int quantity = 1,
   }) async {
-    final String receiver = receiverId.trim();
-    final String code = giftCode.trim();
-
-    if (receiver.isEmpty || code.isEmpty) {
-      throw ArgumentError(
-        'Receiver ID और Gift Code जरूरी हैं।',
-      );
-    }
-
-    final String? me = currentUserId;
-    if (me == null) {
+    if (currentUserId == null) {
       throw StateError('पहले Login करना जरूरी है।');
     }
-
-    if (me == receiver) {
-      throw ArgumentError(
-        'आप खुद को Gift नहीं भेज सकते।',
-      );
+    if (roomId.trim().isEmpty || giftId.trim().isEmpty || quantity < 1) {
+      throw ArgumentError('Room, Gift और Quantity जरूरी हैं।');
     }
-
-    try {
-      final dynamic response = await client.rpc(
-        'send_zoonl_gift',
-        params: <String, dynamic>{
-          'p_receiver': receiver,
-          'p_gift_code': code,
-        },
-      );
-
-      return _asRows(response);
-    } on PostgrestException {
-      rethrow;
-    } catch (e) {
-      throw Exception('Gift भेजने में समस्या हुई: $e');
-    }
+    final dynamic response = await client.rpc(
+      'send_live_gift',
+      params: <String, dynamic>{
+        'p_room_id': roomId.trim(),
+        'p_gift_id': giftId.trim(),
+        'p_quantity': quantity,
+      },
+    );
+    return _asRows(response);
   }
 
   // Equip ZOONL Cosmetic
@@ -145,6 +128,55 @@ class Backend {
         'Cosmetic Equip करने में समस्या हुई: $e',
       );
     }
+  }
+
+  // Trusted role checks. These RPCs are authoritative; client IDs are not.
+  static Future<bool> isZoonlOwner() async {
+    if (currentUserId == null) return false;
+    final dynamic result = await client.rpc('is_zoonl_owner');
+    return result == true;
+  }
+
+  static Future<bool> isZoonlAdminAllowed(String permissionKey) async {
+    if (currentUserId == null || permissionKey.trim().isEmpty) {
+      return false;
+    }
+    final dynamic result = await client.rpc(
+      'is_zoonl_admin_allowed',
+      params: <String, dynamic>{
+        'p_permission_key': permissionKey.trim(),
+      },
+    );
+    return result == true;
+  }
+
+  // Read-only portal access to existing application tables.
+  // Table names are allow-listed; row access is still enforced by Supabase RLS.
+  static Future<List<Map<String, dynamic>>> fetchPortalRows(
+    String tableName, {
+    int limit = 50,
+  }) async {
+    const Set<String> allowedTables = <String>{
+      'owner_admin_permissions',
+      'agency_applications',
+      'profiles',
+      'wallet_transactions',
+      'wallets',
+      'gifts',
+      'live_rooms',
+      'owner_control_settings',
+    };
+    if (!allowedTables.contains(tableName)) {
+      throw ArgumentError('Portal table is not allow-listed.');
+    }
+    if (currentUserId == null) {
+      throw StateError('पहले Login करना जरूरी है।');
+    }
+    final dynamic response = await client
+        .from(tableName)
+        .select()
+        .limit(limit.clamp(1, 100).toInt());
+    return _asRows(response);
   }
 
   // Sign Out
