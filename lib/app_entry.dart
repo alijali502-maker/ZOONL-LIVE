@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_config.dart';
 import 'core/backend.dart';
+import 'core/zoonl_theme.dart';
 import 'login_screen.dart';
 import 'main.dart' as zoonl;
 
@@ -28,7 +29,7 @@ class ZoonlEntryApp extends StatelessWidget {
     return MaterialApp(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
+      theme: ZoonlTheme.dark,
       home: const ZoonlAuthGate(),
     );
   }
