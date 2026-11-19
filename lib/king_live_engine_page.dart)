@@ -1,0 +1,2587 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart' show AudioPlayer;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show
+        PostgresChangeEvent,
+        PostgresChangeFilter,
+        PostgresChangeFilterType,
+        PostgrestException,
+        RealtimeChannel,
+        Supabase,
+        SupabaseClient;
+import 'package:video_player/video_player.dart'
+    show VideoPlayer, VideoPlayerController;
+
+// ============================================================================
+// COMPLETE UNIFIED KING LIVE ENGINE PAGE (lib/king_live_engine_page.dart)
+// - Same page as before: Full-Screen Live + PK + Audio Seats + Profile
+// - NOW CONNECTED TO REAL SUPABASE DATA:
+//   * Wallet coins / XP / Level (100 levels) from the database
+//   * Gifts from `gifts` table, sending only through safe `send_live_gift`
+//   * Frames / Entry / Badge / Chat bubble / Profile BG from
+//     `zoonl_live_cosmetics` (buy + equip through safe functions)
+//   * Owner-only controls (price edit, add gift, add coins) checked by DB
+//   * Owner Royal Entry + Imperial Frame (premium, number 1)
+//   * Real 3D / video / animated-image gifts + sound when URL is filled
+//     (emoji only shows when no file is filled)
+// - Open it with a roomId:  KingLiveEnginePage(roomId: '<live room id>')
+// ============================================================================
+
+class KingLiveEnginePage extends StatefulWidget {
+  final String brandTitle;
+  final String initialUserName;
+  final String initialUserId;
+  final int initialCoins;
+  final String supabaseUrl;
+  final String supabaseAnonKey;
+  final String? roomId;
+
+  const KingLiveEnginePage({
+    super.key,
+    this.brandTitle = 'LIVE STUDIO',
+    this.initialUserName = 'User',
+    this.initialUserId = 'ID: -',
+    this.initialCoins = 0,
+    this.supabaseUrl = '',
+    this.supabaseAnonKey = '',
+    this.roomId,
+  });
+
+  @override
+  State<KingLiveEnginePage> createState() => _KingLiveEnginePageState();
+}
+
+class _LevelTier {
+  final int level;
+  final int minCoins;
+  final String sticker;
+  final String title;
+  final Color pattiStart;
+  final Color pattiEnd;
+  final Color bgTint;
+
+  const _LevelTier({
+    required this.level,
+    required this.minCoins,
+    required this.sticker,
+    required this.title,
+    required this.pattiStart,
+    required this.pattiEnd,
+    required this.bgTint,
+  });
+
+  _LevelTier withLevel(int lv) => _LevelTier(
+        level: lv,
+        minCoins: minCoins,
+        sticker: sticker,
+        title: title,
+        pattiStart: pattiStart,
+        pattiEnd: pattiEnd,
+        bgTint: bgTint,
+      );
+}
+
+class _LevelDef {
+  final int level;
+  final int exp;
+  final String name;
+
+  const _LevelDef({required this.level, required this.exp, required this.name});
+}
+
+class _LiveGiftModel {
+  final String id;
+  String name;
+  int coins;
+  int diamonds;
+  String category;
+  String art;
+  String songLabel;
+  String videoUrl; // 3D / video / animated image link (animation_3d_url)
+  String imageUrl;
+  String soundUrl;
+  Color c1;
+  Color c2;
+
+  _LiveGiftModel({
+    required this.id,
+    required this.name,
+    required this.coins,
+    this.diamonds = 0,
+    required this.category,
+    required this.art,
+    required this.songLabel,
+    this.videoUrl = '',
+    this.imageUrl = '',
+    this.soundUrl = '',
+    required this.c1,
+    required this.c2,
+  });
+
+  static bool _isVideoUrl(String url) {
+    final l = url.toLowerCase().split('?').first;
+    return l.endsWith('.mp4') ||
+        l.endsWith('.webm') ||
+        l.endsWith('.mov') ||
+        l.endsWith('.m4v');
+  }
+
+  bool get hasVideo => videoUrl.isNotEmpty && _isVideoUrl(videoUrl);
+  bool get hasAnimatedImage => videoUrl.isNotEmpty && !_isVideoUrl(videoUrl);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'coins': coins,
+        'diamonds': diamonds,
+        'category': category,
+        'art': art,
+        'songLabel': songLabel,
+        'videoUrl': videoUrl,
+        'imageUrl': imageUrl,
+        'soundUrl': soundUrl,
+        'c1': c1.value,
+        'c2': c2.value,
+      };
+}
+
+class _CosmeticModel {
+  final String code;
+  String name;
+  final String type;
+  String mediaUrl;
+  final String soundFx;
+  final List<Color> colors;
+  final double cycleSec;
+  final int durationSec;
+  int minLevel;
+  int price;
+  bool active;
+  final int sortOrder;
+
+  _CosmeticModel({
+    required this.code,
+    required this.name,
+    required this.type,
+    required this.mediaUrl,
+    required this.soundFx,
+    required this.colors,
+    required this.cycleSec,
+    required this.durationSec,
+    required this.minLevel,
+    required this.price,
+    required this.active,
+    required this.sortOrder,
+  });
+
+  bool get isOwnerItem => code.startsWith('ZOONL_OWNER_');
+}
+
+class _ProfileFrameModel {
+  final String id;
+  final String name;
+  final String crown;
+  final Color c1;
+  final Color c2;
+  final List<Color> colors;
+  final bool isOwner;
+
+  const _ProfileFrameModel({
+    required this.id,
+    required this.name,
+    required this.crown,
+    required this.c1,
+    required this.c2,
+    this.colors = const [],
+    this.isOwner = false,
+  });
+}
+
+class _SeatModel {
+  final int seatNo;
+  String? userName;
+  String userId;
+  bool muted;
+  int frameIdx;
+  String? emoji;
+  Timer? emojiTimer;
+
+  _SeatModel({
+    required this.seatNo,
+    this.userName,
+    this.userId = 'ID: 2000',
+    this.muted = false,
+    this.frameIdx = 0,
+    this.emoji,
+  });
+
+  bool get occupied => userName != null && userName!.isNotEmpty;
+}
+
+class _ShortVideoItem {
+  final String id;
+  final String title;
+  final String mediaSource; // video link or short clip label
+  bool isPublic; // true = Public feed + Profile, false = Private (only profile/self)
+  int likes;
+
+  _ShortVideoItem({
+    required this.id,
+    required this.title,
+    required this.mediaSource,
+    required this.isPublic,
+    this.likes = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'mediaSource': mediaSource,
+        'isPublic': isPublic,
+        'likes': likes,
+      };
+}
+
+class _ChatRibbonMsg {
+  final String sender;
+  final String userId;
+  final String text;
+  final int level;
+  final Color ribbonColor;
+
+  _ChatRibbonMsg({
+    required this.sender,
+    required this.userId,
+    required this.text,
+    required this.level,
+    required this.ribbonColor,
+  });
+}
+
+class _QueuedGift {
+  final _LiveGiftModel gift;
+  final String sender;
+
+  _QueuedGift(this.gift, this.sender);
+}
+
+class _Person {
+  final String name;
+  final String zid;
+  final int level;
+  final Color ribbon;
+
+  _Person({
+    required this.name,
+    required this.zid,
+    required this.level,
+    required this.ribbon,
+  });
+}
+
+List<Color> _hexList(String? raw) {
+  final out = <Color>[];
+  if (raw == null) return out;
+  for (final part in raw.split(',')) {
+    var h = part.trim().replaceAll('#', '');
+    if (h.length == 6) h = 'FF$h';
+    if (h.length != 8) continue;
+    final v = int.tryParse(h, radix: 16);
+    if (v != null) out.add(Color(v));
+  }
+  return out;
+}
+
+String _artFor(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('lion') || n.contains('sher') || n.contains('tiger')) return '🦁';
+  if (n.contains('palace') || n.contains('castle') || n.contains('mansion') || n.contains('mahal')) return '🏰';
+  if (n.contains('ring') || n.contains('proposal') || n.contains('marry')) return '💍';
+  if (n.contains('heart') || n.contains('love')) return '💖';
+  if (n.contains('rose') || n.contains('flower')) return '🌹';
+  if (n.contains('bird') || n.contains('paradise') || n.contains('dove')) return '🕊️';
+  if (n.contains('crown') || n.contains('king') || n.contains('royal')) return '👑';
+  if (n.contains('diamond') || n.contains('gem')) return '💎';
+  if (n.contains('rocket')) return '🚀';
+  if (n.contains('yacht') || n.contains('ship') || n.contains('jet')) return '🛥️';
+  return '🎁';
+}
+
+class _KingLiveEnginePageState extends State<KingLiveEnginePage>
+    with TickerProviderStateMixin {
+  final SupabaseClient _sb = Supabase.instance.client;
+  String? get _uid => _sb.auth.currentUser?.id;
+
+  late String brandName;
+  late String userName;
+  late String userId;
+  int coins = 0;
+  int progressCoins = 0; // XP = total coins spent on gifts
+  int myLevel = 1;
+  int followersCount = 0;
+  bool profilePrivate = false;
+  bool isOwner = false;
+  bool loading = true;
+  String loadError = '';
+  String sbStatus = 'Connecting...';
+
+  // Bottom Mode Switcher: 0 = Full-Screen Live + PK + Gifts, 1 = Audio Broad Seats, 2 = Profile + Short Videos
+  int activeTab = 0;
+
+  // Smooth Settings Toggles
+  bool autoSoundEnabled = true;
+  bool showEntryAlerts = true;
+  bool ownerEditMode = true;
+
+  // Visual tiers (each tier covers 10 real levels from level_definitions)
+  final List<_LevelTier> levelTiers = const [
+    _LevelTier(level: 1, minCoins: 0, sticker: '🌱', title: 'ROOKIE', pattiStart: Color(0xFF2E7D32), pattiEnd: Color(0xFF00E676), bgTint: Color(0xFF09130E)),
+    _LevelTier(level: 2, minCoins: 50000, sticker: '💠', title: 'RISING', pattiStart: Color(0xFF0277BD), pattiEnd: Color(0xFF00E5FF), bgTint: Color(0xFF08121E)),
+    _LevelTier(level: 3, minCoins: 200000, sticker: '🦅', title: 'FALCON', pattiStart: Color(0xFF4527A0), pattiEnd: Color(0xFFB388FF), bgTint: Color(0xFF100B20)),
+    _LevelTier(level: 4, minCoins: 500000, sticker: '🦁', title: 'JUNGLE LORD', pattiStart: Color(0xFFEF6C00), pattiEnd: Color(0xFFFFD180), bgTint: Color(0xFF1B1007)),
+    _LevelTier(level: 5, minCoins: 800000, sticker: '🏰', title: 'PALACE DUKE', pattiStart: Color(0xFFAD1457), pattiEnd: Color(0xFFFF80AB), bgTint: Color(0xFF1D0915)),
+    _LevelTier(level: 6, minCoins: 1000000, sticker: '💎', title: 'MILLIONAIRE', pattiStart: Color(0xFF00838F), pattiEnd: Color(0xFF84FFFF), bgTint: Color(0xFF07191D)),
+    _LevelTier(level: 7, minCoins: 1500000, sticker: '🔥', title: 'SULTAN FIRE', pattiStart: Color(0xFFC62828), pattiEnd: Color(0xFFFF8A80), bgTint: Color(0xFF20080B)),
+    _LevelTier(level: 8, minCoins: 2000000, sticker: '👑', title: 'ROYAL KING', pattiStart: Color(0xFFFF8F00), pattiEnd: Color(0xFFFFF59D), bgTint: Color(0xFF211806)),
+    _LevelTier(level: 9, minCoins: 3500000, sticker: '💖', title: 'HEART EMPEROR', pattiStart: Color(0xFFC2185B), pattiEnd: Color(0xFFFF4081), bgTint: Color(0xFF200914)),
+    _LevelTier(level: 10, minCoins: 6000000, sticker: '🏆', title: 'SUPREME LEGEND', pattiStart: Color(0xFFFF6F00), pattiEnd: Color(0xFFFFD700), bgTint: Color(0xFF231307)),
+  ];
+
+  List<_LevelDef> levelDefs = [];
+
+  _LevelTier get currentLevelTier {
+    final idx = math.min(levelTiers.length - 1, math.max(0, (myLevel - 1) ~/ 10));
+    return levelTiers[idx].withLevel(myLevel);
+  }
+
+  int _levelFromXp(int xp) {
+    var lv = 1;
+    if (levelDefs.isNotEmpty) {
+      for (final d in levelDefs) {
+        if (d.exp <= xp) lv = d.level;
+      }
+    } else {
+      for (final t in levelTiers) {
+        if (xp >= t.minCoins) lv = t.level;
+      }
+    }
+    return lv;
+  }
+
+  static const List<List<Color>> _giftPalette = [
+    [Color(0xFFFF4081), Color(0xFF880E4F)],
+    [Color(0xFFFFB300), Color(0xFF1B5E20)],
+    [Color(0xFFE040FB), Color(0xFF1A237E)],
+    [Color(0xFF00E5FF), Color(0xFF004D40)],
+    [Color(0xFFFF80AB), Color(0xFF4A148C)],
+    [Color(0xFFFFD700), Color(0xFF5D4037)],
+  ];
+
+  // Gifts (loaded from the `gifts` table - no demo gifts)
+  List<_LiveGiftModel> gifts = [];
+
+  // Cosmetics (frames, entry, badge, chat bubble, profile bg)
+  List<_CosmeticModel> cosmetics = [];
+  Set<String> ownedCodes = {};
+  Map<String, String> activeCodes = {};
+
+  static const _ProfileFrameModel _noFrame = _ProfileFrameModel(
+    id: 'none',
+    name: 'No Frame',
+    crown: '',
+    c1: Color(0x33FFFFFF),
+    c2: Color(0x22FFFFFF),
+  );
+
+  // Frames: index 0 is always "no frame"
+  List<_ProfileFrameModel> frames = const [_noFrame];
+  int activeFrameIdx = 0;
+
+  // Calling Seats (Host + 5 Seats)
+  bool hostMuted = false;
+  String? hostEmoji;
+  Timer? hostEmojiTimer;
+  int selectedEmojiSeat = 0;
+  late final List<_SeatModel> seats;
+  final List<String> reactionEmojis = const ['😂', '😭', '😊', '😉', '🥰', '💖', '🔥', '😎'];
+
+  // 5-Min PK + Top #1-#4 Gifters + WIN/LOSS
+  bool pkRunning = true;
+  int pkSeconds = 300;
+  Timer? pkTimer;
+  int myPkScore = 85000;
+  int rivalPkScore = 54000;
+  String? pkResult;
+
+  final Map<String, int> topGifters = {
+    'Host': 160000,
+    'Guest 1': 95000,
+    'Guest 2': 60000,
+    'VIP Fan': 35000,
+  };
+
+  // Color-Ribbon Chat Messages
+  final TextEditingController chatInputCtrl = TextEditingController();
+  Color selectedChatRibbonColor = const Color(0xFF00B0FF);
+  final List<Color> chatRibbonPalette = const [
+    Color(0xFF00B0FF),
+    Color(0xFFFF4081),
+    Color(0xFF00E676),
+    Color(0xFFFFAB00),
+    Color(0xFFE040FB),
+  ];
+
+  final List<_ChatRibbonMsg> chatList = [];
+  final Set<String> _seenChat = {};
+  final Map<String, _Person> _people = {};
+
+  // Profile Short Videos (Public / Private)
+  final List<_ShortVideoItem> shortVideos = [
+    _ShortVideoItem(
+      id: 'sv1',
+      title: 'Jungle Vibe Short Clip',
+      mediaSource: 'short_clip_01.mp4',
+      isPublic: true,
+      likes: 420,
+    ),
+    _ShortVideoItem(
+      id: 'sv2',
+      title: 'Private Draft Memory',
+      mediaSource: 'private_clip_02.mp4',
+      isPublic: false,
+      likes: 0,
+    ),
+  ];
+
+  // Active Overlays
+  _LiveGiftModel? activeGift;
+  String activeGiftSender = '';
+  final List<_QueuedGift> _giftQueue = [];
+  VideoPlayerController? _giftVideo;
+  AudioPlayer? _giftAudio;
+  bool _sendingGift = false;
+
+  String? entryAlertText;
+  Color entryAlertColor = const Color(0xFFFF4081);
+  List<Color> entryColors = const [];
+  bool entryPremium = false;
+
+  RealtimeChannel? _roomChannel;
+
+  late AnimationController _giftAnimCtrl;
+  late AnimationController _frameAnimCtrl;
+  late AnimationController _emojiAnimCtrl;
+  late AnimationController _entryAnimCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    brandName = widget.brandTitle;
+    userName = widget.initialUserName;
+    userId = widget.initialUserId;
+    coins = widget.initialCoins;
+
+    seats = [
+      _SeatModel(seatNo: 1, userName: 'Seat 1', userId: 'ID: 332211', muted: false, frameIdx: 0),
+      _SeatModel(seatNo: 2, userName: 'Seat 2', userId: 'ID: 445566', muted: true, frameIdx: 0),
+      _SeatModel(seatNo: 3, userName: null, userId: 'ID: 1003', muted: false, frameIdx: 0),
+      _SeatModel(seatNo: 4, userName: null, userId: 'ID: 1004', muted: false, frameIdx: 0),
+      _SeatModel(seatNo: 5, userName: null, userId: 'ID: 1005', muted: false, frameIdx: 0),
+    ];
+
+    _giftAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3600));
+    _frameAnimCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    _emojiAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 850))
+      ..repeat(reverse: true);
+    _entryAnimCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
+
+    _startPkTimer();
+    _loadAll();
+    _subscribeRoom();
+  }
+
+  @override
+  void dispose() {
+    pkTimer?.cancel();
+    hostEmojiTimer?.cancel();
+    for (final s in seats) {
+      s.emojiTimer?.cancel();
+    }
+    final ch = _roomChannel;
+    _roomChannel = null;
+    if (ch != null) unawaited(_sb.removeChannel(ch));
+    final v = _giftVideo;
+    _giftVideo = null;
+    v?.dispose();
+    _giftAudio?.dispose();
+    chatInputCtrl.dispose();
+    _giftAnimCtrl.dispose();
+    _frameAnimCtrl.dispose();
+    _emojiAnimCtrl.dispose();
+    _entryAnimCtrl.dispose();
+    super.dispose();
+  }
+
+  // ===========================================================================
+  // REAL DATA LOADING
+  // ===========================================================================
+
+  String _mapErr(Object e) {
+    final raw = e is PostgrestException ? e.message : e.toString();
+    const map = {
+      'LOGIN_REQUIRED': 'Pehle login karein.',
+      'INSUFFICIENT_COINS': 'Coins kam hain!',
+      'ROOM_NOT_LIVE': 'Yeh live khatam ho chuka hai.',
+      'ROOM_NOT_FOUND': 'Room nahi mila.',
+      'CANNOT_SEND_GIFT_TO_SELF': 'Apne hi room me gift nahi bhej sakte.',
+      'ROOM_ACCESS_REQUIRED': 'Is private room me aapko access nahi hai.',
+      'GIFT_NOT_AVAILABLE': 'Yeh gift ab available nahi hai.',
+      'ITEM_NOT_AVAILABLE': 'Yeh item available nahi hai.',
+      'OWNER_ONLY_ITEM': 'Yeh item sirf Owner ke liye hai.',
+      'OWNER_ONLY': 'Yeh kaam sirf Owner kar sakta hai.',
+      'LEVEL_TOO_LOW': 'Aapka level abhi kam hai.',
+      'ALREADY_OWNED': 'Yeh item aapke paas pehle se hai.',
+      'ITEM_NOT_OWNED_OR_EXPIRED': 'Yeh item aapke paas nahi hai.',
+    };
+    for (final k in map.keys) {
+      if (raw.contains(k)) return map[k]!;
+    }
+    return raw;
+  }
+
+  void _snack(String text, {Color? color}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text), backgroundColor: color));
+  }
+
+  Future<void> _loadAll() async {
+    if (_uid == null) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        loadError = 'Login nahi hai. Pehle login karein.';
+        sbStatus = 'Not logged in';
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        loading = true;
+        sbStatus = 'Loading...';
+      });
+    }
+
+    final errors = <String>[];
+
+    Future<void> step(String label, Future<void> Function() fn) async {
+      try {
+        await fn();
+      } catch (e) {
+        errors.add('$label: ${_mapErr(e)}');
+      }
+    }
+
+    await step('profile', _loadProfile);
+    await step('levels', _loadLevels);
+    await step('gifts', _loadGifts);
+    await step('cosmetics', _loadCosmetics);
+    await step('me', _refreshMe);
+    await step('styles', _loadMyStyles);
+    await step('friends', _loadFollowers);
+
+    if (!mounted) return;
+    setState(() {
+      loading = false;
+      loadError = errors.join(' | ');
+      sbStatus = errors.isEmpty ? 'Supabase Live' : 'Partial (${errors.length} error)';
+    });
+
+    _announceMyEntry();
+  }
+
+  Future<void> _loadProfile() async {
+    final uid = _uid!;
+    final row = await _sb
+        .from('user_public_profiles')
+        .select('username, zoonl_id')
+        .eq('user_id', uid)
+        .maybeSingle();
+
+    if (row != null && mounted) {
+      final nm = (row['username'] ?? '').toString();
+      final zid = (row['zoonl_id'] ?? '').toString();
+      setState(() {
+        if (nm.isNotEmpty) userName = nm;
+        if (zid.isNotEmpty) userId = 'ID: $zid';
+      });
+    }
+
+    try {
+      final own = await _sb.rpc('is_zoonl_owner');
+      if (mounted) setState(() => isOwner = own == true);
+    } catch (_) {
+      if (mounted) setState(() => isOwner = false);
+    }
+  }
+
+  Future<void> _loadLevels() async {
+    final rows = await _sb
+        .from('level_definitions')
+        .select('level, required_exp, level_name')
+        .order('level');
+    final list = List<Map<String, dynamic>>.from(rows);
+    final defs = list
+        .map((r) => _LevelDef(
+              level: (r['level'] as num).toInt(),
+              exp: (r['required_exp'] as num?)?.toInt() ?? 0,
+              name: (r['level_name'] ?? '').toString(),
+            ))
+        .toList();
+    if (mounted) setState(() => levelDefs = defs);
+  }
+
+  Future<void> _loadGifts() async {
+    final rows = await _sb
+        .from('gifts')
+        .select('id, gift_name, image_url, animation_url, animation_3d_url, sound_url, coin_price, diamond_value, category')
+        .eq('is_active', true)
+        .order('coin_price');
+    final list = List<Map<String, dynamic>>.from(rows);
+    final out = <_LiveGiftModel>[];
+    for (var i = 0; i < list.length; i++) {
+      final r = list[i];
+      final name = (r['gift_name'] ?? 'Gift').toString();
+      final anim3d = (r['animation_3d_url'] ?? '').toString();
+      final anim = (r['animation_url'] ?? '').toString();
+      final snd = (r['sound_url'] ?? '').toString();
+      final pal = _giftPalette[i % _giftPalette.length];
+      out.add(
+        _LiveGiftModel(
+          id: r['id'].toString(),
+          name: name,
+          coins: (r['coin_price'] as num?)?.toInt() ?? 0,
+          diamonds: (r['diamond_value'] as num?)?.toInt() ?? 0,
+          category: (r['category'] ?? 'General').toString(),
+          art: _artFor(name),
+          songLabel: snd.isNotEmpty ? 'Gift Sound' : '',
+          videoUrl: anim3d.isNotEmpty ? anim3d : anim,
+          imageUrl: (r['image_url'] ?? '').toString(),
+          soundUrl: snd,
+          c1: pal[0],
+          c2: pal[1],
+        ),
+      );
+    }
+    if (mounted) setState(() => gifts = out);
+  }
+
+  Future<void> _loadCosmetics() async {
+    final rows = await _sb
+        .from('zoonl_live_cosmetics')
+        .select('zoonl_item_code, zoonl_item_name, item_type, media_url, sound_fx, color_theme_hex, gradient_cycle_sec, duration_sec, min_level_req, coin_price, is_active, sort_order')
+        .eq('project_name', 'ZOONL LIVE')
+        .order('sort_order');
+    final list = List<Map<String, dynamic>>.from(rows);
+    final out = <_CosmeticModel>[];
+    for (final r in list) {
+      var cols = _hexList(r['color_theme_hex']?.toString());
+      if (cols.isEmpty) cols = [const Color(0xFFFFD700), const Color(0xFF7C4DFF)];
+      if (cols.length == 1) cols = [cols.first, cols.first];
+      out.add(
+        _CosmeticModel(
+          code: (r['zoonl_item_code'] ?? '').toString(),
+          name: (r['zoonl_item_name'] ?? '').toString(),
+          type: (r['item_type'] ?? '').toString(),
+          mediaUrl: (r['media_url'] ?? '').toString(),
+          soundFx: (r['sound_fx'] ?? '').toString(),
+          colors: cols,
+          cycleSec: (r['gradient_cycle_sec'] as num?)?.toDouble() ?? 4,
+          durationSec: (r['duration_sec'] as num?)?.toInt() ?? 0,
+          minLevel: (r['min_level_req'] as num?)?.toInt() ?? 0,
+          price: (r['coin_price'] as num?)?.toInt() ?? 0,
+          active: r['is_active'] == true,
+          sortOrder: (r['sort_order'] as num?)?.toInt() ?? 0,
+        ),
+      );
+    }
+    if (!mounted) return;
+    setState(() {
+      cosmetics = out;
+      _rebuildFrames();
+    });
+  }
+
+  _ProfileFrameModel _frameFrom(_CosmeticModel c) {
+    final a = _artFor(c.name);
+    return _ProfileFrameModel(
+      id: c.code,
+      name: c.name,
+      crown: c.isOwnerItem ? '👑' : (a == '🎁' ? '✨' : a),
+      c1: c.colors.first,
+      c2: c.colors.length > 1 ? c.colors[1] : c.colors.first,
+      colors: c.colors,
+      isOwner: c.isOwnerItem,
+    );
+  }
+
+  void _rebuildFrames() {
+    final list = cosmetics
+        .where((c) => c.type == 'AVATAR_FRAME' && c.active)
+        .map(_frameFrom)
+        .toList();
+    frames = [_noFrame, ...list];
+    final code = activeCodes['frame'] ?? '';
+    final idx = frames.indexWhere((f) => f.id == code);
+    activeFrameIdx = idx < 0 ? 0 : idx;
+  }
+
+  _CosmeticModel? _cosmeticByCode(String? code) {
+    if (code == null || code.isEmpty) return null;
+    for (final c in cosmetics) {
+      if (c.code == code) return c;
+    }
+    return null;
+  }
+
+  Future<void> _refreshMe() async {
+    final uid = _uid;
+    if (uid == null) return;
+
+    final w = await _sb.from('wallets').select('coins').eq('user_id', uid).maybeSingle();
+    final newCoins = (w?['coins'] as num?)?.toInt() ?? 0;
+
+    var xp = 0;
+    try {
+      final sends = await _sb
+          .from('gift_sends')
+          .select('total_coins')
+          .eq('sender_id', uid)
+          .limit(5000);
+      for (final r in List<Map<String, dynamic>>.from(sends)) {
+        xp += (r['total_coins'] as num?)?.toInt() ?? 0;
+      }
+    } catch (_) {}
+
+    var lv = _levelFromXp(xp);
+    try {
+      final r = await _sb.rpc('zoonl_my_level');
+      if (r is num) lv = r.toInt();
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      coins = newCoins;
+      progressCoins = xp;
+      myLevel = lv < 1 ? 1 : lv;
+    });
+  }
+
+  Future<void> _loadMyStyles() async {
+    final uid = _uid;
+    if (uid == null) return;
+
+    final s = await _sb
+        .from('zoonl_live_active_styles')
+        .select('active_profile_bg_code, active_frame_code, active_entry_code, active_badge_code, active_chat_bubble_code')
+        .eq('user_id', uid)
+        .maybeSingle();
+
+    final b = await _sb
+        .from('zoonl_live_user_baggage')
+        .select('zoonl_item_code, expires_at')
+        .eq('user_id', uid);
+
+    final owned = <String>{};
+    for (final r in List<Map<String, dynamic>>.from(b)) {
+      final exp = r['expires_at'];
+      final ok = exp == null || (DateTime.tryParse(exp.toString())?.isAfter(DateTime.now()) ?? true);
+      if (ok) owned.add((r['zoonl_item_code'] ?? '').toString());
+    }
+
+    if (!mounted) return;
+    setState(() {
+      ownedCodes = owned;
+      activeCodes = {
+        'bg': (s?['active_profile_bg_code'] ?? '').toString(),
+        'frame': (s?['active_frame_code'] ?? '').toString(),
+        'entry': (s?['active_entry_code'] ?? '').toString(),
+        'badge': (s?['active_badge_code'] ?? '').toString(),
+        'bubble': (s?['active_chat_bubble_code'] ?? '').toString(),
+      };
+      _rebuildFrames();
+      final bubble = _cosmeticByCode(activeCodes['bubble']);
+      if (bubble != null) selectedChatRibbonColor = bubble.colors.first;
+    });
+  }
+
+  Future<void> _loadFollowers() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final rows = await _sb
+        .from('friendships')
+        .select('id')
+        .or('user_one.eq.$uid,user_two.eq.$uid');
+    if (mounted) setState(() => followersCount = List.from(rows).length);
+  }
+
+  // ===========================================================================
+  // ROOM REALTIME (gifts + chat + entries)
+  // ===========================================================================
+
+  void _subscribeRoom() {
+    final rid = widget.roomId;
+    if (rid == null) return;
+
+    _roomChannel = _sb
+        .channel('king_room_$rid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'gift_sends',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: rid,
+          ),
+          callback: (p) => _onGiftRow(p.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: rid,
+          ),
+          callback: (p) => _onChatRow(p.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'live_room_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: rid,
+          ),
+          callback: (p) => _onMemberRow(p.newRecord),
+        )
+        .subscribe();
+  }
+
+  Future<_Person> _person(String uid) async {
+    final cached = _people[uid];
+    if (cached != null) return cached;
+
+    var name = uid.length >= 4 ? 'User ${uid.substring(0, 4)}' : 'User';
+    var zid = '';
+    var level = 1;
+    var ribbon = chatRibbonPalette.first;
+
+    try {
+      final r = await _sb
+          .from('user_public_profiles')
+          .select('username, zoonl_id')
+          .eq('user_id', uid)
+          .maybeSingle();
+      if (r != null) {
+        final n = (r['username'] ?? '').toString();
+        if (n.isNotEmpty) name = n;
+        zid = (r['zoonl_id'] ?? '').toString();
+      }
+    } catch (_) {}
+
+    try {
+      final r = await _sb.from('profiles').select('user_level').eq('id', uid).maybeSingle();
+      level = (r?['user_level'] as num?)?.toInt() ?? 1;
+    } catch (_) {}
+
+    try {
+      final r = await _sb
+          .from('zoonl_live_active_styles')
+          .select('active_chat_bubble_code')
+          .eq('user_id', uid)
+          .maybeSingle();
+      final c = _cosmeticByCode(r?['active_chat_bubble_code']?.toString());
+      if (c != null) ribbon = c.colors.first;
+    } catch (_) {}
+
+    final p = _Person(
+      name: name,
+      zid: zid.isEmpty ? 'ID: -' : 'ID: $zid',
+      level: level,
+      ribbon: ribbon,
+    );
+    _people[uid] = p;
+    return p;
+  }
+
+  Future<void> _onGiftRow(Map<String, dynamic> row) async {
+    if (!mounted) return;
+    final sender = row['sender_id']?.toString();
+    if (sender == null || sender == _uid) return; // my own gift is already shown
+    final gift = _giftById(row['gift_id']?.toString());
+    if (gift == null) return;
+
+    final p = await _person(sender);
+    if (!mounted) return;
+    setState(() {
+      chatList.add(
+        _ChatRibbonMsg(
+          sender: p.name,
+          userId: p.zid,
+          text: 'Sent ${gift.art} ${gift.name} (${gift.coins} coins)',
+          level: p.level,
+          ribbonColor: gift.c1,
+        ),
+      );
+    });
+    _playGift(gift, '${p.name} (${p.zid})');
+  }
+
+  Future<void> _onChatRow(Map<String, dynamic> row) async {
+    if (!mounted) return;
+    final id = (row['id'] ?? '').toString();
+    if (id.isNotEmpty && !_seenChat.add(id)) return;
+
+    final senderId = (row['sender_id'] ?? '').toString();
+    final p = await _person(senderId);
+    if (!mounted) return;
+    setState(() {
+      chatList.add(
+        _ChatRibbonMsg(
+          sender: p.name,
+          userId: p.zid,
+          text: (row['message'] ?? '').toString(),
+          level: p.level,
+          ribbonColor: senderId == _uid ? selectedChatRibbonColor : p.ribbon,
+        ),
+      );
+    });
+  }
+
+  Future<void> _onMemberRow(Map<String, dynamic> row) async {
+    if (!mounted || !showEntryAlerts) return;
+    final uid = row['user_id']?.toString();
+    if (uid == null || uid == _uid) return;
+    try {
+      final s = await _sb
+          .from('zoonl_live_active_styles')
+          .select('active_entry_code')
+          .eq('user_id', uid)
+          .maybeSingle();
+      final c = _cosmeticByCode(s?['active_entry_code']?.toString());
+      if (c == null) return;
+      final p = await _person(uid);
+      if (!mounted) return;
+      _triggerEntryBanner(
+        '${c.name} • ${p.name} (${p.zid})',
+        c.colors.first,
+        premium: c.isOwnerItem,
+        colors: c.colors,
+      );
+    } catch (_) {}
+  }
+
+  void _announceMyEntry() {
+    if (widget.roomId == null || !showEntryAlerts) return;
+    final c = _cosmeticByCode(activeCodes['entry']);
+    if (c == null) return;
+    _triggerEntryBanner(
+      '${c.name} • $userName ($userId)',
+      c.colors.first,
+      premium: c.isOwnerItem,
+      colors: c.colors,
+    );
+  }
+
+  // ===========================================================================
+  // PK TIMER (unchanged)
+  // ===========================================================================
+
+  void _startPkTimer() {
+    pkTimer?.cancel();
+    setState(() {
+      pkRunning = true;
+      pkSeconds = 300;
+      pkResult = null;
+    });
+    pkTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (pkSeconds > 1) {
+        setState(() => pkSeconds--);
+      } else {
+        t.cancel();
+        setState(() {
+          pkSeconds = 0;
+          pkRunning = false;
+          pkResult = myPkScore >= rivalPkScore ? 'WIN' : 'LOSS';
+        });
+        _playSound();
+      }
+    });
+  }
+
+  // 1-Star (10k), 2-Star (50k), 3-Star (200k), 4-Star (1M), 5-Star (2M)
+  ({int stars, String tag, Color color}) _starInfo(int spent) {
+    if (spent >= 2000000) return (stars: 5, tag: '5★ 2M', color: const Color(0xFFFFD700));
+    if (spent >= 1000000) return (stars: 4, tag: '4★ 1M', color: const Color(0xFFFF5252));
+    if (spent >= 200000) return (stars: 3, tag: '3★ 200K', color: const Color(0xFFE040FB));
+    if (spent >= 50000) return (stars: 2, tag: '2★ 50K', color: const Color(0xFF00B0FF));
+    if (spent >= 10000) return (stars: 1, tag: '1★ 10K', color: const Color(0xFF00E676));
+    return (stars: 0, tag: '0★', color: Colors.white54);
+  }
+
+  Future<void> _playSound() async {
+    if (!autoSoundEnabled) return;
+    await SystemSound.play(SystemSoundType.click);
+    await HapticFeedback.mediumImpact();
+  }
+
+  // ===========================================================================
+  // GIFTS (real catalog, safe sending, real media)
+  // ===========================================================================
+
+  _LiveGiftModel? _giftById(String? id) {
+    if (id == null) return null;
+    for (final g in gifts) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  Future<void> _sendGift(_LiveGiftModel gift) async {
+    final rid = widget.roomId;
+    if (rid == null) {
+      _snack('Gift bhejne ke liye pehle kisi live room me jaiye.');
+      return;
+    }
+    if (_uid == null) {
+      _snack('Pehle login karein.');
+      return;
+    }
+    if (_sendingGift) return;
+    if (coins < gift.coins) {
+      _snack('Coins kam hain! Store/Wallet se coins lein.');
+      return;
+    }
+
+    _sendingGift = true;
+    final beforeLv = myLevel;
+    try {
+      // Coins katna, host ko diamonds, record: sab database function karta hai.
+      await _sb.rpc('send_live_gift', params: {
+        'p_gift_id': gift.id,
+        'p_room_id': rid,
+        'p_quantity': 1,
+      });
+
+      if (!mounted) return;
+      setState(() {
+        topGifters[userName] = (topGifters[userName] ?? 0) + gift.coins;
+        if (pkRunning) myPkScore += gift.coins;
+        chatList.add(
+          _ChatRibbonMsg(
+            sender: userName,
+            userId: userId,
+            text: 'Sent ${gift.art} ${gift.name} (${gift.coins} coins)',
+            level: myLevel,
+            ribbonColor: gift.c1,
+          ),
+        );
+      });
+
+      _playGift(gift, '$userName ($userId)');
+      await _refreshMe();
+
+      if (mounted && myLevel > beforeLv) {
+        final t = currentLevelTier;
+        _snack('🎉 Level Up! Ab Level ${t.level} (${t.title})', color: t.pattiStart);
+      }
+    } catch (e) {
+      _snack(_mapErr(e));
+    } finally {
+      _sendingGift = false;
+    }
+  }
+
+  Future<void> _playGift(_LiveGiftModel gift, String sender) async {
+    if (!mounted) return;
+    if (activeGift != null) {
+      _giftQueue.add(_QueuedGift(gift, sender));
+      return;
+    }
+
+    setState(() {
+      activeGift = gift;
+      activeGiftSender = sender;
+    });
+
+    var dur = const Duration(milliseconds: 3600);
+
+    if (gift.hasVideo) {
+      try {
+        final c = VideoPlayerController.networkUrl(Uri.parse(gift.videoUrl));
+        _giftVideo = c;
+        await c.initialize();
+        await c.setLooping(false);
+        await c.play();
+        final d = c.value.duration;
+        if (d > Duration.zero) {
+          dur = d > const Duration(seconds: 12) ? const Duration(seconds: 12) : d;
+        }
+        if (mounted) setState(() {});
+      } catch (_) {
+        final bad = _giftVideo;
+        _giftVideo = null;
+        bad?.dispose();
+      }
+    }
+
+    unawaited(_playGiftSound(gift));
+
+    if (!mounted) return;
+    _giftAnimCtrl.duration = dur;
+    _giftAnimCtrl.forward(from: 0).then((_) {
+      if (!mounted) return;
+      final v = _giftVideo;
+      _giftVideo = null;
+      setState(() => activeGift = null);
+      Future.delayed(const Duration(milliseconds: 250), () => v?.dispose());
+      if (_giftQueue.isNotEmpty) {
+        final next = _giftQueue.removeAt(0);
+        _playGift(next.gift, next.sender);
+      }
+    });
+  }
+
+  Future<void> _playGiftSound(_LiveGiftModel g) async {
+    if (!autoSoundEnabled) return;
+    if (g.soundUrl.isNotEmpty) {
+      try {
+        _giftAudio ??= AudioPlayer();
+        await _giftAudio!.setUrl(g.soundUrl);
+        unawaited(_giftAudio!.play());
+        return;
+      } catch (_) {}
+    }
+    await _playSound();
+  }
+
+  // ===========================================================================
+  // OWNER CONTROLS (DB enforces owner-only; UI shows them only to owner)
+  // ===========================================================================
+
+  void _editGiftPriceDialog(_LiveGiftModel gift) {
+    if (!isOwner) return;
+    final nameCtrl = TextEditingController(text: gift.name);
+    final priceCtrl = TextEditingController(text: gift.coins.toString());
+    final diaCtrl = TextEditingController(text: gift.diamonds.toString());
+    final videoCtrl = TextEditingController(text: gift.videoUrl);
+    final soundCtrl = TextEditingController(text: gift.soundUrl);
+    final imgCtrl = TextEditingController(text: gift.imageUrl);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161D2E),
+        title: const Text('👑 Owner Gift Edit'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Gift Name')),
+              TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Coins Price')),
+              TextField(controller: diaCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Host Diamonds')),
+              TextField(controller: videoCtrl, decoration: const InputDecoration(labelText: '3D / Video / Animated link')),
+              TextField(controller: soundCtrl, decoration: const InputDecoration(labelText: 'Sound link (mp3)')),
+              TextField(controller: imgCtrl, decoration: const InputDecoration(labelText: 'Image link')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final price = int.tryParse(priceCtrl.text.trim());
+              final dia = int.tryParse(diaCtrl.text.trim());
+              if (price == null || price < 0 || dia == null || dia < 0 || nameCtrl.text.trim().isEmpty) {
+                _snack('Name, price aur diamonds sahi bharein.');
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await _sb.from('gifts').update({
+                  'gift_name': nameCtrl.text.trim(),
+                  'coin_price': price,
+                  'diamond_value': dia,
+                  'animation_3d_url': videoCtrl.text.trim().isEmpty ? null : videoCtrl.text.trim(),
+                  'sound_url': soundCtrl.text.trim().isEmpty ? null : soundCtrl.text.trim(),
+                  'image_url': imgCtrl.text.trim().isEmpty ? null : imgCtrl.text.trim(),
+                }).eq('id', gift.id);
+                await _loadGifts();
+                _snack('Gift save ho gaya.');
+              } catch (e) {
+                _snack('Save nahi hua: ${_mapErr(e)}');
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addCustomGiftDialog() {
+    if (!isOwner) return;
+    final nameCtrl = TextEditingController();
+    final coinsCtrl = TextEditingController(text: '50000');
+    final diaCtrl = TextEditingController(text: '25000');
+    final catCtrl = TextEditingController(text: 'General');
+    final videoCtrl = TextEditingController();
+    final soundCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161D2E),
+        title: const Text('➕ Naya Gift Add Karein (Owner)'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Gift Name')),
+              TextField(controller: coinsCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Coins Price')),
+              TextField(controller: diaCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Host Diamonds')),
+              TextField(controller: catCtrl, decoration: const InputDecoration(labelText: 'Category')),
+              TextField(controller: videoCtrl, decoration: const InputDecoration(labelText: '3D / Video / Animated link')),
+              TextField(controller: soundCtrl, decoration: const InputDecoration(labelText: 'Sound link (mp3)')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final price = int.tryParse(coinsCtrl.text.trim());
+              final dia = int.tryParse(diaCtrl.text.trim());
+              if (nameCtrl.text.trim().isEmpty || price == null || price < 0 || dia == null || dia < 0) {
+                _snack('Name, price aur diamonds sahi bharein.');
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await _sb.from('gifts').insert({
+                  'gift_name': nameCtrl.text.trim(),
+                  'coin_price': price,
+                  'diamond_value': dia,
+                  'category': catCtrl.text.trim().isEmpty ? 'General' : catCtrl.text.trim(),
+                  'is_active': true,
+                  'animation_3d_url': videoCtrl.text.trim().isEmpty ? null : videoCtrl.text.trim(),
+                  'sound_url': soundCtrl.text.trim().isEmpty ? null : soundCtrl.text.trim(),
+                });
+                await _loadGifts();
+                _snack('Naya gift add ho gaya.');
+              } catch (e) {
+                _snack('Add nahi hua: ${_mapErr(e)}');
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _ownerCoinsDialog() {
+    if (!isOwner) return;
+    final idCtrl = TextEditingController();
+    final amtCtrl = TextEditingController(text: '1000');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161D2E),
+        title: const Text('🪙 Owner: Coins Dein'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: idCtrl, decoration: const InputDecoration(labelText: 'ZOONL ID (sirf number)')),
+            TextField(controller: amtCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Coins')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final amt = int.tryParse(amtCtrl.text.trim());
+              final zid = idCtrl.text.trim().replaceAll(RegExp(r'[^0-9A-Za-z]'), '');
+              if (amt == null || amt <= 0 || zid.isEmpty) {
+                _snack('ZOONL ID aur coins sahi bharein.');
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await _sb.rpc('add_zoonl_coins', params: {
+                  'p_zoonl_id': zid,
+                  'p_amount': amt,
+                  'p_description': 'Owner grant',
+                });
+                _snack('Coins add ho gaye.');
+                await _refreshMe();
+              } catch (e) {
+                _snack('Coins add nahi hue: ${_mapErr(e)}');
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editCosmeticDialog(_CosmeticModel c) {
+    if (!isOwner) return;
+    final priceCtrl = TextEditingController(text: c.price.toString());
+    final lvCtrl = TextEditingController(text: c.minLevel.toString());
+    final mediaCtrl = TextEditingController(text: c.mediaUrl);
+    var active = c.active;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          backgroundColor: const Color(0xFF161D2E),
+          title: Text('👑 Edit: ${c.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Coins Price')),
+                TextField(controller: lvCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Minimum Level')),
+                TextField(controller: mediaCtrl, decoration: const InputDecoration(labelText: 'Media link (image / video)')),
+                SwitchListTile(
+                  value: active,
+                  onChanged: (v) => setD(() => active = v),
+                  title: const Text('Active'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final price = int.tryParse(priceCtrl.text.trim());
+                final lv = int.tryParse(lvCtrl.text.trim());
+                if (price == null || price < 0 || lv == null || lv < 0) {
+                  _snack('Price aur level sahi bharein.');
+                  return;
+                }
+                Navigator.pop(ctx);
+                try {
+                  await _sb.from('zoonl_live_cosmetics').update({
+                    'coin_price': price,
+                    'min_level_req': lv,
+                    'media_url': mediaCtrl.text.trim(),
+                    'is_active': active,
+                  }).eq('zoonl_item_code', c.code);
+                  await _loadCosmetics();
+                  _snack('Item save ho gaya.');
+                } catch (e) {
+                  _snack('Save nahi hua: ${_mapErr(e)}');
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // COSMETIC STORE (buy + equip through safe DB functions)
+  // ===========================================================================
+
+  String _slotFor(String type) {
+    switch (type) {
+      case 'AVATAR_FRAME':
+        return 'frame';
+      case 'ENTRY_EFFECT':
+        return 'entry';
+      case 'ID_BADGE':
+        return 'badge';
+      case 'CHAT_BUBBLE':
+        return 'bubble';
+      default:
+        return 'bg';
+    }
+  }
+
+  Future<void> _buyCosmetic(_CosmeticModel c) async {
+    try {
+      await _sb.rpc('buy_zoonl_cosmetic', params: {'p_item_code': c.code});
+      await _refreshMe();
+      await _loadMyStyles();
+      _snack('✅ ${c.name} mil gaya!');
+    } catch (e) {
+      _snack(_mapErr(e));
+    }
+  }
+
+  Future<void> _equipCosmetic(_CosmeticModel c) async {
+    try {
+      await _sb.rpc('equip_zoonl_cosmetic', params: {'p_item_code': c.code});
+      await _loadMyStyles();
+      _snack('✅ ${c.name} laga diya.');
+    } catch (e) {
+      _snack(_mapErr(e));
+    }
+  }
+
+  void _openStoreSheet() {
+    var filter = 'AVATAR_FRAME';
+    const labels = {
+      'AVATAR_FRAME': '🖼️ Frame',
+      'ENTRY_EFFECT': '🚪 Entry',
+      'ID_BADGE': '🏅 Badge',
+      'CHAT_BUBBLE': '💬 Chat',
+      'PROFILE_BG': '🌄 Background',
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111724),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final items = cosmetics.where((c) => c.type == filter && (c.active || isOwner)).toList();
+          return SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.78,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  child: Text(
+                    '🛍️ Store • Lv.$myLevel • 🪙 $coins',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+                  ),
+                ),
+                SizedBox(
+                  height: 38,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: labels.entries.map((e) {
+                      final sel = filter == e.key;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(e.value, style: const TextStyle(fontSize: 11)),
+                          selected: sel,
+                          onSelected: (_) => setS(() => filter = e.key),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                Expanded(
+                  child: items.isEmpty
+                      ? const Center(child: Text('Koi item nahi mila.', style: TextStyle(color: Colors.white70)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: items.length,
+                          itemBuilder: (ctx, i) {
+                            final c = items[i];
+                            final slot = _slotFor(c.type);
+                            final equipped = (activeCodes[slot] ?? '') == c.code;
+                            final owned = ownedCodes.contains(c.code);
+                            Widget action;
+                            if (equipped) {
+                              action = const Text('✅ Lagaya hua', style: TextStyle(fontSize: 11, color: Colors.greenAccent));
+                            } else if (owned) {
+                              action = ElevatedButton(
+                                onPressed: () async {
+                                  await _equipCosmetic(c);
+                                  if (ctx.mounted) setS(() {});
+                                },
+                                child: const Text('Equip', style: TextStyle(fontSize: 11)),
+                              );
+                            } else if (c.isOwnerItem && !isOwner) {
+                              action = const Text('👑 Owner Only', style: TextStyle(fontSize: 11, color: Colors.amberAccent));
+                            } else if (myLevel < c.minLevel) {
+                              action = Text('Lv.${c.minLevel} chahiye', style: const TextStyle(fontSize: 11, color: Colors.redAccent));
+                            } else {
+                              action = ElevatedButton(
+                                onPressed: () async {
+                                  await _buyCosmetic(c);
+                                  if (ctx.mounted) setS(() {});
+                                },
+                                child: Text(c.price == 0 ? 'Free' : '🪙 ${c.price}', style: const TextStyle(fontSize: 11)),
+                              );
+                            }
+                            return Card(
+                              color: Colors.black.withOpacity(0.45),
+                              child: ListTile(
+                                leading: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(colors: c.colors),
+                                  ),
+                                ),
+                                title: Text(c.name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                                subtitle: Text(
+                                  'Lv.${c.minLevel} • 🪙 ${c.price}${c.active ? '' : ' • (inactive)'}',
+                                  style: const TextStyle(fontSize: 10.5),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    action,
+                                    if (isOwner)
+                                      IconButton(
+                                        onPressed: () => _editCosmeticDialog(c),
+                                        icon: const Icon(Icons.edit, size: 16, color: Colors.cyanAccent),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // CHAT, SEATS, ENTRY, VIDEOS
+  // ===========================================================================
+
+  Future<void> _sendColorRibbonChat() async {
+    final txt = chatInputCtrl.text.trim();
+    if (txt.isEmpty) return;
+    final rid = widget.roomId;
+    final uid = _uid;
+    if (rid == null || uid == null) {
+      _snack('Chat ke liye login karke kisi live room me jaiye.');
+      return;
+    }
+    chatInputCtrl.clear();
+    try {
+      final row = await _sb
+          .from('chat_messages')
+          .insert({'room_id': rid, 'sender_id': uid, 'message': txt})
+          .select('id')
+          .single();
+      final id = row['id'].toString();
+      if (_seenChat.add(id) && mounted) {
+        setState(() {
+          chatList.add(
+            _ChatRibbonMsg(
+              sender: userName,
+              userId: userId,
+              text: txt,
+              level: currentLevelTier.level,
+              ribbonColor: selectedChatRibbonColor,
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      _snack('Message nahi gaya: ${_mapErr(e)}');
+    }
+  }
+
+  void _applySeatEmoji(String em) {
+    setState(() {
+      if (selectedEmojiSeat == 0) {
+        hostEmoji = em;
+        hostEmojiTimer?.cancel();
+        hostEmojiTimer = Timer(const Duration(seconds: 5), () {
+          if (mounted) setState(() => hostEmoji = null);
+        });
+      } else {
+        final s = seats.firstWhere((item) => item.seatNo == selectedEmojiSeat, orElse: () => seats.first);
+        if (!s.occupied) {
+          s.userName = 'Seat ${s.seatNo}';
+          s.userId = 'ID: 20${s.seatNo}55';
+        }
+        s.emoji = em;
+        s.emojiTimer?.cancel();
+        s.emojiTimer = Timer(const Duration(seconds: 5), () {
+          if (mounted) setState(() => s.emoji = null);
+        });
+      }
+    });
+    _playSound();
+  }
+
+  void _triggerEntryBanner(String label, Color color, {bool premium = false, List<Color> colors = const []}) {
+    if (!showEntryAlerts || !mounted) return;
+    setState(() {
+      entryAlertText = label;
+      entryAlertColor = color;
+      entryPremium = premium;
+      entryColors = colors;
+    });
+    _playSound();
+    _entryAnimCtrl.duration = Duration(milliseconds: premium ? 4600 : 2800);
+    _entryAnimCtrl.forward(from: 0).then((_) {
+      if (mounted) setState(() => entryAlertText = null);
+    });
+  }
+
+  void _addShortVideoDialog() {
+    final titleCtrl = TextEditingController();
+    final linkCtrl = TextEditingController(text: 'my_short_video.mp4');
+    bool makePublic = !profilePrivate;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          backgroundColor: const Color(0xFF161D2E),
+          title: const Text('🎬 Create / Upload Short Video'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Short Video Title')),
+              TextField(controller: linkCtrl, decoration: const InputDecoration(labelText: 'Video File / URL')),
+              SwitchListTile(
+                value: makePublic,
+                onChanged: (v) => setD(() => makePublic = v),
+                title: Text(makePublic ? 'Public (Feed + Profile)' : 'Private (Profile Only)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (titleCtrl.text.trim().isEmpty) return;
+                setState(() {
+                  shortVideos.insert(
+                    0,
+                    _ShortVideoItem(
+                      id: 'sv_${DateTime.now().millisecondsSinceEpoch}',
+                      title: titleCtrl.text.trim(),
+                      mediaSource: linkCtrl.text.trim(),
+                      isPublic: makePublic,
+                    ),
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('Publish'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openSettingsAndBackupSheet() {
+    final backupStr = const JsonEncoder.withIndent('  ').convert({
+      'brand': brandName,
+      'user': {'name': userName, 'id': userId, 'coins': coins, 'progressCoins': progressCoins, 'followers': followersCount, 'private': profilePrivate},
+      'level': currentLevelTier.level,
+      'star': _starInfo(progressCoins).tag,
+      'gifts': gifts.map((g) => g.toJson()).toList(),
+      'shortVideos': shortVideos.map((v) => v.toJson()).toList(),
+    });
+    final backupCtrl = TextEditingController(text: backupStr);
+    final brandCtrl = TextEditingController(text: brandName);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111724),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('⚙️ Smooth Settings & Brand Backup', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(controller: brandCtrl, decoration: const InputDecoration(labelText: 'App / Brand Name', border: OutlineInputBorder())),
+                SwitchListTile(
+                  value: autoSoundEnabled,
+                  onChanged: (v) => setS(() => autoSoundEnabled = v),
+                  title: const Text('Gift & Entry Sound / Haptic'),
+                ),
+                SwitchListTile(
+                  value: showEntryAlerts,
+                  onChanged: (v) => setS(() => showEntryAlerts = v),
+                  title: const Text('Broadcast Entry Banners'),
+                ),
+                if (isOwner)
+                  SwitchListTile(
+                    value: ownerEditMode,
+                    onChanged: (v) => setS(() => ownerEditMode = v),
+                    title: const Text('Owner Gift Price Edit Button'),
+                  ),
+                SwitchListTile(
+                  value: profilePrivate,
+                  onChanged: (v) => setS(() => profilePrivate = v),
+                  title: const Text('Private Profile Mode'),
+                ),
+                const SizedBox(height: 6),
+                Text('Supabase: $sbStatus${loadError.isEmpty ? '' : '\n$loadError'}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          if (brandCtrl.text.trim().isNotEmpty) brandName = brandCtrl.text.trim();
+                        });
+                        Navigator.pop(ctx);
+                        _loadAll();
+                      },
+                      icon: const Icon(Icons.save),
+                      label: const Text('Apply & Sync'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: backupCtrl.text));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('✅ Brand Backup JSON Copied!')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy Backup'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: backupCtrl,
+                  maxLines: 5,
+                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // BUILD
+  // ===========================================================================
+
+  @override
+  Widget build(BuildContext context) {
+    final tier = currentLevelTier;
+    final star = _starInfo(progressCoins);
+    final badge = _cosmeticByCode(activeCodes['badge']);
+    final top4 = (topGifters.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).take(4).toList();
+    final mm = (pkSeconds ~/ 60).toString().padLeft(2, '0');
+    final ss = (pkSeconds % 60).toString().padLeft(2, '0');
+
+    return Scaffold(
+      backgroundColor: tier.bgTint,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                if (loading) const LinearProgressIndicator(minHeight: 2),
+
+                // TOP BAR (Brand Logo Title + Auto Level Patti + Star + Settings/Backup)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.maybePop(context),
+                        icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                      ),
+                      _buildFramedAvatar(frames[activeFrameIdx], size: 42, muted: hostMuted, floatingEmoji: hostEmoji),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('$brandName • $userName ($userId)', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(height: 2),
+                            Wrap(
+                              spacing: 4,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: [tier.pattiStart, tier.pattiEnd]),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${tier.sticker} LV.${tier.level} ${tier.title}',
+                                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.white),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: star.color.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: star.color),
+                                  ),
+                                  child: Text(star.tag, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: star.color)),
+                                ),
+                                if (badge != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(colors: badge.colors),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text('🏅 ${badge.name}', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Settings & Backup',
+                        onPressed: _openSettingsAndBackupSheet,
+                        icon: const Icon(Icons.settings, color: Colors.amberAccent),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // TAB BAR: Full-Screen Live | Audio Broad Seats | Profile & Short Videos
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  child: Row(
+                    children: [
+                      _modeTabBtn(0, '🎥 Full Live + PK'),
+                      const SizedBox(width: 6),
+                      _modeTabBtn(1, '🎙️ Audio Seats'),
+                      const SizedBox(width: 6),
+                      _modeTabBtn(2, '👤 Profile & Videos'),
+                    ],
+                  ),
+                ),
+
+                // BODY BASED ON ACTIVE TAB
+                Expanded(
+                  child: activeTab == 0
+                      ? _buildFullScreenLiveView(mm, ss, top4)
+                      : (activeTab == 1 ? _buildAudioBroadView() : _buildProfileShortVideosView()),
+                ),
+
+                // DIRECT GIFTING DOCK ALWAYS ACCESSIBLE (owner controls only for owner)
+                _buildGiftingDock(),
+              ],
+            ),
+          ),
+
+          // ENTRY BANNER OVERLAY
+          if (entryAlertText != null)
+            Positioned(
+              top: 112,
+              left: 16,
+              right: 16,
+              child: _buildEntryBanner(),
+            ),
+
+          // 3D / VIDEO GIFT STAGE OVERLAY
+          if (activeGift != null)
+            IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _giftAnimCtrl,
+                builder: (ctx, _) {
+                  final t = _giftAnimCtrl.value;
+                  final pulse = math.sin(t * math.pi).clamp(0.0, 1.0);
+                  final rotY = math.sin(t * math.pi * 2) * 0.22;
+                  final g = activeGift!;
+                  final media = g.hasVideo || g.hasAnimatedImage || g.imageUrl.isNotEmpty;
+                  return Container(
+                    color: Colors.black.withOpacity(0.55 * pulse),
+                    child: Center(
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.0012)
+                          ..rotateY(media ? 0.0 : rotY)
+                          ..scale(0.88 + 0.2 * pulse),
+                        child: Container(
+                          width: 300,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [g.c2, const Color(0xFF0A0F1A), g.c1.withOpacity(0.8)],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.amberAccent, width: 2),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildGiftArt(g),
+                              const SizedBox(height: 6),
+                              Text(g.name.toUpperCase(), textAlign: TextAlign.center, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.amberAccent)),
+                              if (g.songLabel.isNotEmpty) Text('🎵 ${g.songLabel}', style: const TextStyle(fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('By $activeGiftSender • 🪙 ${g.coins}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGiftArt(_LiveGiftModel g) {
+    final vc = _giftVideo;
+    if (g.hasVideo && vc != null && vc.value.isInitialized) {
+      return SizedBox(
+        height: 260,
+        child: AspectRatio(
+          aspectRatio: vc.value.aspectRatio,
+          child: VideoPlayer(vc),
+        ),
+      );
+    }
+    if (g.hasAnimatedImage) {
+      return SizedBox(
+        height: 220,
+        child: Image.network(
+          g.videoUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, err, st) => Text(g.art, style: const TextStyle(fontSize: 42)),
+        ),
+      );
+    }
+    if (g.imageUrl.isNotEmpty) {
+      return SizedBox(
+        height: 140,
+        child: Image.network(
+          g.imageUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, err, st) => Text(g.art, style: const TextStyle(fontSize: 42)),
+        ),
+      );
+    }
+    return Text(g.art, style: const TextStyle(fontSize: 42));
+  }
+
+  Widget _buildEntryBanner() {
+    final cols = entryColors.length >= 2 ? entryColors : [entryAlertColor, Colors.black87];
+    return AnimatedBuilder(
+      animation: _entryAnimCtrl,
+      builder: (ctx, _) {
+        final p = math.sin(_entryAnimCtrl.value * math.pi).clamp(0.0, 1.0).toDouble();
+        if (entryPremium) {
+          return Opacity(
+            opacity: p,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [...cols, Colors.black87]),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white, width: 2.4),
+                boxShadow: [
+                  BoxShadow(
+                    color: cols.first.withOpacity(0.85),
+                    blurRadius: 14 + 22 * p,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Text('👑', style: TextStyle(fontSize: 30)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      entryAlertText ?? '',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: Colors.white,
+                        letterSpacing: 0.6,
+                        shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('👑', style: TextStyle(fontSize: 30)),
+                ],
+              ),
+            ),
+          );
+        }
+        return Opacity(
+          opacity: p,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [entryAlertColor, Colors.black87]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.amberAccent, width: 1.5),
+            ),
+            child: Text(entryAlertText ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _modeTabBtn(int index, String label) {
+    final selected = activeTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => activeTab = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? Colors.amber.withOpacity(0.25) : Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: selected ? Colors.amberAccent : Colors.white12),
+          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: selected ? Colors.amberAccent : Colors.white70)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullScreenLiveView(String mm, String ss, List<MapEntry<String, int>> top4) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF151E32), Color(0xFF0A0E18)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          // 5-Min PK + WIN/LOSS + Top #1-#4 Gifters
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('⚔️ Me: $myPkScore', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+                    GestureDetector(
+                      onTap: _startPkTimer,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.amber.withOpacity(0.22), borderRadius: BorderRadius.circular(10)),
+                        child: Text(
+                          pkRunning ? '5m PK $mm:$ss' : (pkResult ?? 'RESULT'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: pkResult == 'WIN' ? Colors.greenAccent : (pkResult == 'LOSS' ? Colors.redAccent : Colors.amberAccent),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text('$rivalPkScore :Rival', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: List.generate(top4.length, (i) {
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(right: i == top4.length - 1 ? 0 : 4),
+                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.07), borderRadius: BorderRadius.circular(8)),
+                        child: Text('#${i + 1} ${top4[i].key}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 9.5)),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+
+          // Color-Ribbon Chat List
+          SizedBox(
+            height: 110,
+            child: ListView.builder(
+              reverse: true,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: chatList.length,
+              itemBuilder: (ctx, i) {
+                final m = chatList[chatList.length - 1 - i];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [m.ribbonColor.withOpacity(0.85), Colors.black54]),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Lv.${m.level} ${m.sender} (${m.userId}): ${m.text}',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Ribbon Color Selector + Chat Input
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 22,
+                  child: Row(
+                    children: [
+                      const Text('Patti Color: ', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                      ...chatRibbonPalette.map((col) {
+                        final sel = col == selectedChatRibbonColor;
+                        return GestureDetector(
+                          onTap: () => setState(() => selectedChatRibbonColor = col),
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(
+                              color: col,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: sel ? Colors.white : Colors.transparent, width: 2),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: chatInputCtrl,
+                        style: const TextStyle(fontSize: 12),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'Color patti chat likhein...',
+                          filled: true,
+                          fillColor: Colors.black45,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: _sendColorRibbonChat,
+                      icon: const Icon(Icons.send, color: Colors.amberAccent),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioBroadView() {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('🎙️ Audio Broad Seats + Mute + Seat Emoji', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              InkWell(
+                onTap: () => setState(() => hostMuted = !hostMuted),
+                child: Text(hostMuted ? '🔇 Host Muted' : '🎙️ Host Live', style: const TextStyle(fontSize: 11, color: Colors.cyanAccent)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: GridView.builder(
+              itemCount: seats.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.95,
+              ),
+              itemBuilder: (ctx, i) {
+                final s = seats[i];
+                final isTarget = selectedEmojiSeat == s.seatNo;
+                return GestureDetector(
+                  onTap: () => setState(() => selectedEmojiSeat = s.seatNo),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.45),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: isTarget ? Colors.amberAccent : Colors.white12),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildFramedAvatar(
+                          frames[s.frameIdx % frames.length],
+                          size: 38,
+                          muted: s.muted,
+                          fallback: s.occupied ? s.userName!.substring(0, 1) : '+${s.seatNo}',
+                          floatingEmoji: s.emoji,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(s.occupied ? '${s.userName}' : 'Seat ${s.seatNo}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        if (s.occupied)
+                          GestureDetector(
+                            onTap: () => setState(() => s.muted = !s.muted),
+                            child: Text(s.muted ? '🔇 Unmute' : '🔊 Mute', style: TextStyle(fontSize: 9.5, color: s.muted ? Colors.redAccent : Colors.greenAccent)),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              s.userName = 'Guest ${s.seatNo}';
+                              selectedEmojiSeat = s.seatNo;
+                            }),
+                            child: const Text('Tap to Join', style: TextStyle(fontSize: 9.5, color: Colors.cyanAccent)),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: reactionEmojis.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (ctx, i) {
+                final em = reactionEmojis[i];
+                return GestureDetector(
+                  onTap: () => _applySeatEmoji(em),
+                  child: Container(
+                    width: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(10)),
+                    child: Text(em, style: const TextStyle(fontSize: 16)),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileShortVideosView() {
+    final visibleVideos = profilePrivate
+        ? shortVideos
+        : shortVideos.where((v) => v.isPublic || !profilePrivate).toList();
+    final bg = _cosmeticByCode(activeCodes['bg']);
+
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: bg == null
+                ? null
+                : BoxDecoration(
+                    gradient: LinearGradient(colors: bg.colors),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+            child: Row(
+              children: [
+                _buildFramedAvatar(frames[activeFrameIdx], size: 46, muted: false),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$userName • $userId', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('👥 $followersCount Followers • ${profilePrivate ? "Private Profile" : "Public Profile"}', style: const TextStyle(fontSize: 11, color: Colors.amberAccent)),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _addShortVideoDialog,
+                  icon: const Icon(Icons.video_call, size: 16),
+                  label: const Text('Short Video', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('🎬 Profile Short Videos (Public / Private Toggle)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white70)),
+          const SizedBox(height: 6),
+          Expanded(
+            child: ListView.builder(
+              itemCount: visibleVideos.length,
+              itemBuilder: (ctx, i) {
+                final v = visibleVideos[i];
+                return Card(
+                  color: Colors.black.withOpacity(0.45),
+                  child: ListTile(
+                    leading: const Icon(Icons.play_circle_fill, color: Colors.amberAccent, size: 30),
+                    title: Text(v.title, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    subtitle: Text('${v.mediaSource} • ❤️ ${v.likes}', style: const TextStyle(fontSize: 10.5)),
+                    trailing: Chip(
+                      label: Text(v.isPublic ? 'Public' : 'Private', style: const TextStyle(fontSize: 10)),
+                      onDeleted: () => setState(() => v.isPublic = !v.isPublic),
+                      deleteIcon: const Icon(Icons.swap_horiz, size: 14),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGiftingDock() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(top: BorderSide(color: currentLevelTier.pattiStart.withOpacity(0.6))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '🎁 Gifts + Song • 🪙 $coins • XP: $progressCoins ($sbStatus)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amberAccent),
+                ),
+              ),
+              InkWell(
+                onTap: _openStoreSheet,
+                child: const Text('  🛍️ Store', style: TextStyle(fontSize: 10.5, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+              ),
+              if (isOwner)
+                InkWell(
+                  onTap: _ownerCoinsDialog,
+                  child: const Text('  +Coins', style: TextStyle(fontSize: 10.5, color: Colors.orangeAccent, fontWeight: FontWeight.bold)),
+                ),
+              if (isOwner)
+                InkWell(
+                  onTap: _addCustomGiftDialog,
+                  child: const Text('  + Gift', style: TextStyle(fontSize: 10.5, color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 98,
+            child: gifts.isEmpty
+                ? Center(
+                    child: Text(
+                      loading ? 'Gifts load ho rahe hain...' : 'Koi gift nahi mila. $loadError',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    ),
+                  )
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: gifts.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final g = gifts[i];
+                      final canEdit = isOwner && ownerEditMode;
+                      return GestureDetector(
+                        onTap: () => _sendGift(g),
+                        onLongPress: canEdit ? () => _editGiftPriceDialog(g) : null,
+                        child: Container(
+                          width: 108,
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [g.c2.withOpacity(0.9), g.c1.withOpacity(0.35)],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: g.c1.withOpacity(0.85)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              g.imageUrl.isNotEmpty
+                                  ? SizedBox(
+                                      height: 24,
+                                      child: Image.network(
+                                        g.imageUrl,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Text(g.art, style: const TextStyle(fontSize: 18)),
+                                      ),
+                                    )
+                                  : Text(g.art, style: const TextStyle(fontSize: 18)),
+                              Text(g.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              Text(
+                                g.soundUrl.isNotEmpty ? '🎵 Sound' : g.category,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 8.5, color: Colors.white70),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text('🪙 ${g.coins}', style: const TextStyle(fontSize: 10, color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+                                  if (canEdit)
+                                    GestureDetector(
+                                      onTap: () => _editGiftPriceDialog(g),
+                                      child: const Padding(
+                                        padding: EdgeInsets.only(left: 4),
+                                        child: Icon(Icons.edit, size: 11, color: Colors.cyanAccent),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFramedAvatar(
+    _ProfileFrameModel frame, {
+    required double size,
+    required bool muted,
+    String? fallback,
+    String? floatingEmoji,
+  }) {
+    final hasFrame = frame.id != 'none';
+    final extra = frame.isOwner ? 8.0 : 0.0;
+    final ringColors = frame.colors.length >= 2
+        ? [...frame.colors, frame.colors.first]
+        : [frame.c1, frame.c2, Colors.white, frame.c1];
+
+    return SizedBox(
+      width: size + 12 + extra,
+      height: size + 12 + extra,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          if (hasFrame)
+            RotationTransition(
+              turns: _frameAnimCtrl,
+              child: Container(
+                width: size + 6 + extra,
+                height: size + 6 + extra,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: SweepGradient(colors: ringColors),
+                  boxShadow: frame.isOwner
+                      ? [BoxShadow(color: frame.c2.withOpacity(0.75), blurRadius: 16, spreadRadius: 1)]
+                      : null,
+                ),
+              ),
+            ),
+          CircleAvatar(
+            radius: size / 2,
+            backgroundColor: const Color(0xFF1A2234),
+            child: fallback != null
+                ? Text(fallback, style: TextStyle(fontSize: size * 0.36, fontWeight: FontWeight.bold))
+                : Icon(muted ? Icons.mic_off : Icons.person, size: size * 0.48),
+          ),
+          if (hasFrame && frame.crown.isNotEmpty)
+            Positioned(
+              top: -2,
+              child: Text(frame.crown, style: TextStyle(fontSize: size * (frame.isOwner ? 0.42 : 0.3))),
+            ),
+          if (floatingEmoji != null)
+            Positioned(
+              right: -4,
+              top: -6,
+              child: AnimatedBuilder(
+                animation: _emojiAnimCtrl,
+                builder: (ctx, child) => Transform.translate(
+                  offset: Offset(0, -_emojiAnimCtrl.value * 5),
+                  child: child,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.amberAccent, width: 1),
+                  ),
+                  child: Text(floatingEmoji, style: TextStyle(fontSize: size * 0.36)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
