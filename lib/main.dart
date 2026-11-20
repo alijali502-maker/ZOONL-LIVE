@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -5,1840 +6,1052 @@ void main() {
   runApp(const ZoonlLiveApp());
 }
 
-/// ZOONL LIVE Color Palette (Dark + Champagne Gold + Teal)
-class ZoonlColors {
-  static const Color bgDark = Color(0xFF0A0D12);
-  static const Color surfaceDark = Color(0xFF131822);
-  static const Color cardDark = Color(0xFF1A2130);
-  static const Color champagneGold = Color(0xFFE6C27A);
-  static const Color tealAccent = Color(0xFF14B8A6);
+/// ZOONL LIVE Theme: Dark + Champagne Gold + Teal
+class ZoonlTheme {
+  static const Color bgDark = Color(0xFF07090F);
+  static const Color bgPanel = Color(0xFF101522);
+  static const Color bgCard = Color(0xFF171F30);
+  static const Color gold = Color(0xFFE6C27A);
+  static const Color goldBright = Color(0xFFFFE2A8);
+  static const Color teal = Color(0xFF14B8A6);
+  static const Color tealBright = Color(0xFF2DD4BF);
+  static const Color crimson = Color(0xFFFF3355);
   static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color borderSubtle = Color(0xFF263042);
+  static const Color textMuted = Color(0xFF94A3B8);
 }
 
-/// Live Supabase Sync Layer (Connects live transactions, gifts, wallets & records)
-class SupabaseSyncService {
-  String projectUrl;
-  String anonKey;
-  bool isLiveConnected;
-  String statusMessage;
+class ZoonlSystemRules {
+  /// 1★=10k, 2★=50k, 3★=200k, 4★=1M, 5★=2M
+  static int starFromCoins(int coins) {
+    if (coins >= 2000000) return 5;
+    if (coins >= 1000000) return 4;
+    if (coins >= 200000) return 3;
+    if (coins >= 50000) return 2;
+    return 1;
+  }
 
-  SupabaseSyncService({
-    this.projectUrl = '',
-    this.anonKey = '',
-    this.isLiveConnected = true,
-    this.statusMessage = 'Live Supabase Data Channel Active',
-  });
+  static int limitForStar(int star) {
+    switch (star) {
+      case 5:
+        return 2000000;
+      case 4:
+        return 1000000;
+      case 3:
+        return 200000;
+      case 2:
+        return 50000;
+      default:
+        return 10000;
+    }
+  }
 
-  Future<void> pushLiveEvent(String table, Map<String, dynamic> payload) async {
-    statusMessage = 'Live sync -> $table (${payload.keys.join(", ")})';
+  static String badgeForLevel(int level) {
+    if (level >= 25) return 'SUPREME CROWN BADGE';
+    if (level >= 20) return 'ROYAL GOLD BADGE';
+    if (level >= 15) return 'TEAL SOVEREIGN BADGE';
+    if (level >= 10) return 'STAR GUARD BADGE';
+    if (level >= 5) return 'RISING FLAME BADGE';
+    return 'ROOKIE BADGE';
+  }
+
+  static Color stripColorForLevel(int level) {
+    if (level >= 25) return const Color(0xFFD97706);
+    if (level >= 20) return const Color(0xFFB45309);
+    if (level >= 15) return const Color(0xFF0F766E);
+    if (level >= 10) return const Color(0xFF1D4ED8);
+    if (level >= 5) return const Color(0xFF047857);
+    return const Color(0xFF334155);
   }
 }
 
-class ChatMessageItem {
-  final String sender;
-  final String text;
-  final int level;
-  final bool isSvip;
-  final bool isOwner;
-  final bool isMuted;
-
-  ChatMessageItem({
-    required this.sender,
-    required this.text,
-    required this.level,
-    this.isSvip = false,
-    this.isOwner = false,
-    this.isMuted = false,
-  });
-}
-
-class AudioSeatItem {
-  final int seatNumber;
-  String? occupantName;
-  bool isLockedForJoinCall;
-  bool isMuted;
-  bool cameraOn;
-
-  AudioSeatItem({
-    required this.seatNumber,
-    this.occupantName,
-    this.isLockedForJoinCall = false,
-    this.isMuted = false,
-    this.cameraOn = false,
-  });
-}
-
-class AgencyRecord {
+class OfficialAgencyEntry {
+  final String officialId;
   final String agencyName;
-  final String phone;
-  final String whatsapp;
-  final String region;
+  final String mobileNumber;
+  final String agencyType; // 'Top-Up Agency', 'Streamer Agency', 'Top-Up + Streamer Both'
+  int streamerCount;
+  int topUpVolumeCoins;
+  bool isOfficialVerified;
 
-  AgencyRecord({
+  OfficialAgencyEntry({
+    required this.officialId,
     required this.agencyName,
-    required this.phone,
-    required this.whatsapp,
-    required this.region,
+    required this.mobileNumber,
+    required this.agencyType,
+    required this.streamerCount,
+    required this.topUpVolumeCoins,
+    this.isOfficialVerified = true,
   });
 }
 
-class ZoonlAppState {
-  static const String ownerId = '10001';
-  static const String ownerExclusiveFrame =
-      'Sovereign Royal Gold Frame (ID 10001)';
-  static const String ownerExclusiveEntry =
-      'Imperial Dragon & Gold Portal Entry (ID 10001)';
-  static const String ownerExclusiveBg =
-      'Animated Sovereign Nebula & Gold Motion BG (ID 10001)';
+class StreamerProfileRecord {
+  final String streamerId;
+  final String name;
+  final String joinMode; // 'Agency Linked' or 'Direct Self'
+  final String agencyCodeOrNumber;
+  int receivedGiftingCoins;
+  int earningCoins;
+  int validDaysCompleted; // Target: 20 days
+  int totalHoursLogged; // Target: 80 hours (min 2h/day)
+  int todayHoursLogged; // Min 2h/day required
+  bool reward40Claimed;
 
-  int coins;
-  int diamonds;
-  int beans;
-  int validDaysCompleted;
-  int validHoursLogged;
-  String selectedRegion;
-  String selectedLanguage; // English default; Hindi excluded
-  String activeAccountId;
-  bool isOwnerMode;
-  bool isApprovedStreamer;
-  bool isSvip;
-  int userLevel;
-  int newUserRewardDaysLeft;
-  String officialSupportPhone;
-  String officialSupportEmail;
-  double coinRatePerUsd; // $10 = 45,000 coins -> 4500 per USD
-  List<String> bagItems;
-  List<String> weeklyStarGifts;
-  String weeklyStarWinner;
-  Map<String, int> giftPrices;
-  List<AgencyRecord> registeredAgencies;
-  final SupabaseSyncService supabase;
+  StreamerProfileRecord({
+    required this.streamerId,
+    required this.name,
+    required this.joinMode,
+    required this.agencyCodeOrNumber,
+    required this.receivedGiftingCoins,
+    required this.earningCoins,
+    required this.validDaysCompleted,
+    required this.totalHoursLogged,
+    required this.todayHoursLogged,
+    this.reward40Claimed = false,
+  });
 
-  ZoonlAppState({
-    this.coins = 0,
-    this.diamonds = 0,
-    this.beans = 0,
-    this.validDaysCompleted = 0,
-    this.validHoursLogged = 0,
-    this.selectedRegion = 'United Arab Emirates',
-    this.selectedLanguage = 'English',
-    this.activeAccountId = ownerId,
-    this.isOwnerMode = true,
-    this.isApprovedStreamer = true,
-    this.isSvip = true,
-    this.userLevel = 99,
-    this.newUserRewardDaysLeft = 5,
-    this.officialSupportPhone = '',
-    this.officialSupportEmail = '',
-    this.coinRatePerUsd = 4500,
-    List<String>? bagItems,
-    List<String>? weeklyStarGifts,
-    this.weeklyStarWinner = '',
-    Map<String, int>? giftPrices,
-    List<AgencyRecord>? registeredAgencies,
-    SupabaseSyncService? supabaseService,
-  })  : supabase = supabaseService ?? SupabaseSyncService(),
-        bagItems = bagItems ??
-            [
-              ownerExclusiveFrame,
-              ownerExclusiveEntry,
-              ownerExclusiveBg,
-              'Starter Frame (5 Days)',
-              'Starter Entry (5 Days)',
-            ],
-        weeklyStarGifts = weeklyStarGifts ??
-            [
-              'Love Car',
-              'Love Kano',
-              'Royal Crown',
-              'Golden Falcon',
-              'Diamond Wave',
-            ],
-        giftPrices = giftPrices ??
-            {
-              'Rose Spark (100)': 100,
-              'Teal Pulse (500)': 500,
-              'Gold Wave (1,000)': 1000,
-              'Royal Crown': 2500,
-              'Golden Falcon': 5000,
-              'Diamond Wave': 7500,
-              'Love Car': 10000,
-              'Love Kano': 15000,
-            },
-        registeredAgencies = registeredAgencies ?? [];
+  bool get qualifiesFor40Reward =>
+      validDaysCompleted >= 20 && totalHoursLogged >= 80 && todayHoursLogged >= 2;
 }
 
-class ZoonlLiveApp extends StatefulWidget {
+class PayoutRequestItem {
+  final String id;
+  final String streamerId;
+  final String streamerName;
+  final String requestType; // 'Monthly Withdraw (1st-5th)' or 'Advance Request'
+  final int coinsAmount;
+  final String payoutLabel;
+  String status; // 'Pending', 'Accepted & Sent', 'Rejected'
+
+  PayoutRequestItem({
+    required this.id,
+    required this.streamerId,
+    required this.streamerName,
+    required this.requestType,
+    required this.coinsAmount,
+    required this.payoutLabel,
+    this.status = 'Pending',
+  });
+}
+
+class ZoonlLiveApp extends StatelessWidget {
   const ZoonlLiveApp({super.key});
 
   @override
-  State<ZoonlLiveApp> createState() => _ZoonlLiveAppState();
-}
-
-class _ZoonlLiveAppState extends State<ZoonlLiveApp> {
-  int _currentIndex = 0; // 0: Short Video First, 1: Live, 2: Profile & Hub
-  final ZoonlAppState _appState = ZoonlAppState();
-
-  void _updateState(VoidCallback fn) {
-    setState(fn);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      ShortVideoFirstTab(
-        state: _appState,
-        onGoLive: () => _updateState(() => _currentIndex = 1),
-      ),
-      LiveRoomsTab(
-        state: _appState,
-        onRegionChanged: (region) =>
-            _updateState(() => _appState.selectedRegion = region),
-        onStateChanged: _updateState,
-      ),
-      ProfileAndHubTab(
-        state: _appState,
-        onStateChanged: _updateState,
-      ),
-    ];
-
     return MaterialApp(
       title: 'ZOONL LIVE',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: ZoonlColors.bgDark,
-        primaryColor: ZoonlColors.champagneGold,
+        scaffoldBackgroundColor: ZoonlTheme.bgDark,
         colorScheme: const ColorScheme.dark(
-          primary: ZoonlColors.champagneGold,
-          secondary: ZoonlColors.tealAccent,
-          surface: ZoonlColors.surfaceDark,
+          primary: ZoonlTheme.gold,
+          secondary: ZoonlTheme.teal,
+          surface: ZoonlTheme.bgPanel,
         ),
-        useMaterial3: true,
-      ),
-      home: Scaffold(
-        body: SafeArea(child: pages[_currentIndex]),
-        bottomNavigationBar: Container(
-          decoration: const BoxDecoration(
-            color: ZoonlColors.surfaceDark,
-            border: Border(top: BorderSide(color: ZoonlColors.borderSubtle)),
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (idx) => _updateState(() => _currentIndex = idx),
-            backgroundColor: ZoonlColors.surfaceDark,
-            selectedItemColor: ZoonlColors.champagneGold,
-            unselectedItemColor: ZoonlColors.textSecondary,
-            type: BottomNavigationBarType.fixed,
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.play_circle_fill),
-                label: 'Short Video',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.live_tv),
-                label: 'Live',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: ZoonlTheme.bgPanel,
+          foregroundColor: ZoonlTheme.goldBright,
+          elevation: 0,
         ),
       ),
+      home: const ZoonlFullSystemScreen(),
     );
   }
 }
 
-/// 1. Short Video First Tab (Opens first on app launch)
-class ShortVideoFirstTab extends StatefulWidget {
-  final ZoonlAppState state;
-  final VoidCallback onGoLive;
-
-  const ShortVideoFirstTab({
-    super.key,
-    required this.state,
-    required this.onGoLive,
-  });
+class ZoonlFullSystemScreen extends StatefulWidget {
+  const ZoonlFullSystemScreen({super.key});
 
   @override
-  State<ShortVideoFirstTab> createState() => _ShortVideoFirstTabState();
+  State<ZoonlFullSystemScreen> createState() => _ZoonlFullSystemScreenState();
 }
 
-class _ShortVideoFirstTabState extends State<ShortVideoFirstTab> {
-  int _likes = 0;
-  bool _liked = false;
-  String _selectedFilter = 'Champagne Glow';
+class _ZoonlFullSystemScreenState extends State<ZoonlFullSystemScreen> {
+  // 0 = Earning, $40 Reward & Withdraw/Advance
+  // 1 = Official Agency Reg & Top-Up Under Agency
+  // 2 = Streamer Reg (Agency Code vs Direct Self) & Streamer Records
+  // 3 = Live, Star Limits, PK & Owner 10001
+  int tabIndex = 0;
 
-  static const List<String> _filters = [
-    'Champagne Glow',
-    'Teal Cinema',
-    'Noir Contrast',
-    'Warm Sunset',
+  // Owner & Current User State
+  String currentUserId = '10001';
+  String currentUserName = 'ZOONL OWNER';
+  String roleMode = 'Owner (10001)'; // 'Owner (10001)', 'Admin', 'Agency', 'Streamer'
+  int walletCoins = 500000;
+  int totalSentCoins = 215000;
+  int userLevel = 20;
+
+  // Withdraw Window (1st - 5th) & Advance Settings
+  bool forceFirstToFifthWindow = true;
+  int streamerEarningCoins = 185000;
+  int receivedGiftingCoins = 240000;
+  double bonus40UsdBalance = 0.0;
+
+  // Official Agencies (Top-Up Agency, Streamer Agency, or Both)
+  String selectedAgencyType = 'Top-Up + Streamer Both';
+  String activeTopUpAgencyId = 'AG-TOP-8801';
+  String activeTopUpAgencyName = 'ZOONL OFFICIAL TOP-UP';
+  String activeTopUpAgencyPhone = '+971501000101';
+
+  final List<OfficialAgencyEntry> officialAgencies = [
+    OfficialAgencyEntry(
+      officialId: 'AG-TOP-8801',
+      agencyName: 'ZOONL OFFICIAL TOP-UP',
+      mobileNumber: '+971501000101',
+      agencyType: 'Top-Up + Streamer Both',
+      streamerCount: 18,
+      topUpVolumeCoins: 1450000,
+    ),
+    OfficialAgencyEntry(
+      officialId: 'AG-STR-9902',
+      agencyName: 'TEAL STREAMER HUB',
+      mobileNumber: '+971502000202',
+      agencyType: 'Streamer Agency',
+      streamerCount: 11,
+      topUpVolumeCoins: 320000,
+    ),
   ];
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'ZOONL LIVE',
-                style: TextStyle(
-                  color: ZoonlColors.champagneGold,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: ZoonlColors.cardDark,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: ZoonlColors.tealAccent),
-                ),
-                child: Text(
-                  'Coins: ${widget.state.coins}',
-                  style: const TextStyle(
-                    color: ZoonlColors.tealAccent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _filters.map((filter) {
-                final active = _selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(filter),
-                    selected: active,
-                    selectedColor: ZoonlColors.champagneGold,
-                    labelStyle: TextStyle(
-                      color: active
-                          ? ZoonlColors.bgDark
-                          : ZoonlColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    onSelected: (_) => setState(() => _selectedFilter = filter),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: ZoonlColors.cardDark,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: ZoonlColors.borderSubtle),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.videocam,
-                    size: 54,
-                    color: ZoonlColors.champagneGold,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Short Video Feed • Filter: $_selectedFilter',
-                    style: const TextStyle(
-                      color: ZoonlColors.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Live Short Video stream & camera filter studio.',
-                    style: TextStyle(
-                      color: ZoonlColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _liked = !_liked;
-                            _likes += _liked ? 1 : -1;
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ZoonlColors.surfaceDark,
-                          foregroundColor: _liked
-                              ? Colors.redAccent
-                              : ZoonlColors.textPrimary,
-                        ),
-                        icon: Icon(
-                          _liked ? Icons.favorite : Icons.favorite_border,
-                        ),
-                        label: Text('Likes: $_likes'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: widget.onGoLive,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ZoonlColors.champagneGold,
-                          foregroundColor: ZoonlColors.bgDark,
-                        ),
-                        icon: const Icon(Icons.sensors),
-                        label: const Text(
-                          'Go Live',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+  // Streamer Registration (Agency Code vs Direct Self) & Records
+  String streamerJoinMode = 'Agency Linked'; // 'Agency Linked' or 'Direct Self'
+  int newValidDays = 20;
+  int newTotalHours = 80;
+  int newTodayHours = 2;
 
-/// 2. Live Rooms Discovery + Full Interactive Live Room Sheet
-class LiveRoomsTab extends StatelessWidget {
-  final ZoonlAppState state;
-  final ValueChanged<String> onRegionChanged;
-  final void Function(VoidCallback) onStateChanged;
-
-  const LiveRoomsTab({
-    super.key,
-    required this.state,
-    required this.onRegionChanged,
-    required this.onStateChanged,
-  });
-
-  static const List<String> _regions = [
-    'United Arab Emirates',
-    'Pakistan',
-    'Saudi Arabia',
-    'Global',
-    'United Kingdom',
-    'Canada',
+  final List<StreamerProfileRecord> streamerRecords = [
+    StreamerProfileRecord(
+      streamerId: '40101',
+      name: 'Nadia Teal',
+      joinMode: 'Agency Linked',
+      agencyCodeOrNumber: 'AG-TOP-8801',
+      receivedGiftingCoins: 240000,
+      earningCoins: 185000,
+      validDaysCompleted: 20,
+      totalHoursLogged: 82,
+      todayHoursLogged: 3,
+      reward40Claimed: false,
+    ),
+    StreamerProfileRecord(
+      streamerId: '40102',
+      name: 'Direct Star',
+      joinMode: 'Direct Self',
+      agencyCodeOrNumber: 'DIRECT-SELF-APP',
+      receivedGiftingCoins: 95000,
+      earningCoins: 72000,
+      validDaysCompleted: 14,
+      totalHoursLogged: 54,
+      todayHoursLogged: 2,
+      reward40Claimed: false,
+    ),
   ];
 
-  void _openLiveRoom(BuildContext context, int roomIndex) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: ZoonlColors.bgDark,
-      builder: (_) => LiveRoomWorkspace(
-        roomTitle: 'ZOONL Live Room #${roomIndex + 1}',
-        state: state,
-        onStateChanged: onStateChanged,
+  // Withdraw & Advance Requests
+  final List<PayoutRequestItem> payoutRequests = [
+    PayoutRequestItem(
+      id: 'WD-101',
+      streamerId: '40101',
+      streamerName: 'Nadia Teal',
+      requestType: 'Advance Request',
+      coinsAmount: 50000,
+      payoutLabel: 'Gifting Record Verified (240,000 Coins)',
+      status: 'Pending',
+    ),
+  ];
+
+  // PK & Broad State
+  int leftPkScore = 15200;
+  int rightPkScore = 11800;
+  String broadLine =
+      'ZOONL LIVE: Official Agency Top-Up, Earning, \$40 Reward & Withdraw System Ready';
+
+  // Controllers
+  final TextEditingController agNameCtrl = TextEditingController();
+  final TextEditingController agPhoneCtrl = TextEditingController();
+  final TextEditingController agCustomIdCtrl = TextEditingController(text: 'AG-OFF-');
+  final TextEditingController topUpAmtCtrl = TextEditingController(text: '50000');
+  final TextEditingController stNameCtrl = TextEditingController();
+  final TextEditingController stIdCtrl = TextEditingController(text: '40103');
+  final TextEditingController stAgencyCodeCtrl =
+      TextEditingController(text: 'AG-TOP-8801');
+  final TextEditingController withdrawCoinsCtrl =
+      TextEditingController(text: '40000');
+
+  @override
+  void dispose() {
+    agNameCtrl.dispose();
+    agPhoneCtrl.dispose();
+    agCustomIdCtrl.dispose();
+    topUpAmtCtrl.dispose();
+    stNameCtrl.dispose();
+    stIdCtrl.dispose();
+    stAgencyCodeCtrl.dispose();
+    withdrawCoinsCtrl.dispose();
+    super.dispose();
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: ZoonlTheme.bgCard,
+        content: Text(msg, style: const TextStyle(color: ZoonlTheme.goldBright)),
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Live & PK Arena',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: ZoonlColors.champagneGold,
-                ),
-              ),
-              const Spacer(),
-              DropdownButton<String>(
-                value: state.selectedRegion,
-                dropdownColor: ZoonlColors.cardDark,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                items: _regions
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) onRegionChanged(val);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ZoonlColors.cardDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: ZoonlColors.champagneGold.withValues(alpha: 0.45)),
-            ),
-            child: Text(
-              'Owner ID: ${ZoonlAppState.ownerId} • Weekly Star: ${state.weeklyStarWinner.isEmpty ? "Live Standings" : state.weeklyStarWinner} • Top Gifts: ${state.weeklyStarGifts.take(3).join(", ")}',
-              style: const TextStyle(
-                color: ZoonlColors.champagneGold,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Expanded(
-            child: GridView.builder(
-              itemCount: 4,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.85,
-              ),
-              itemBuilder: (context, idx) {
-                return InkWell(
-                  onTap: () => _openLiveRoom(context, idx),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: ZoonlColors.cardDark,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: ZoonlColors.borderSubtle),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: ZoonlColors.tealAccent
-                                    .withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'LIVE • 8-SEAT',
-                                style: TextStyle(
-                                  color: ZoonlColors.tealAccent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            const Icon(
-                              Icons.emoji_events,
-                              size: 18,
-                              color: ZoonlColors.champagneGold,
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Live Stage #${idx + 1}',
-                          style: const TextStyle(
-                            color: ZoonlColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Enter room, PK, call & gifts',
-                          style: TextStyle(
-                            color: ZoonlColors.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Interactive Live Room with 8 Audio Seats, PK (Friend/Random/Group 4 or 6),
-/// Guest Call (4 normal / 2 in PK), Combo Gifts (9, 99, 143, 999), Trophy & Chat Strip
-class LiveRoomWorkspace extends StatefulWidget {
-  final String roomTitle;
-  final ZoonlAppState state;
-  final void Function(VoidCallback) onStateChanged;
-
-  const LiveRoomWorkspace({
-    super.key,
-    required this.roomTitle,
-    required this.state,
-    required this.onStateChanged,
-  });
-
-  @override
-  State<LiveRoomWorkspace> createState() => _LiveRoomWorkspaceState();
-}
-
-class _LiveRoomWorkspaceState extends State<LiveRoomWorkspace> {
-  final TextEditingController _chatCtrl = TextEditingController();
-  bool _pkActive = false;
-  String _pkMode = 'Friend 1v1';
-  String _pkStatusBanner = 'PK Ready: Select 1v1 or Group (4 / 6 max)';
-  String _globalComboBanner = '';
-  int _selectedComboMultiplier = 9;
-  String _selectedGiftName = 'Love Car';
-  bool _guestCameraOn = true;
-  String _guestFilter = 'Champagne Glow';
-
-  final List<AudioSeatItem> _seats = List.generate(
-    8,
-    (i) => AudioSeatItem(seatNumber: i + 1),
-  );
-
-  final List<ChatMessageItem> _messages = [];
-
-  int get _maxCallGuests => _pkActive ? 2 : 4;
-
-  int get _activeCallCount =>
-      _seats.where((s) => s.occupantName != null).length;
-
-  Color _stripColorForLevel(int level) {
-    if (level >= 20) return const Color(0xFF9333EA);
-    if (level >= 18) return const Color(0xFFEC4899);
-    if (level >= 15) return const Color(0xFFF59E0B);
-    if (level >= 10) return const Color(0xFF0EA5E9);
-    if (level >= 5) return const Color(0xFF14B8A6);
-    return const Color(0xFF334155);
+  bool get isWithinWithdrawWindow {
+    if (forceFirstToFifthWindow) return true;
+    final day = DateTime.now().day;
+    return day >= 1 && day <= 5;
   }
 
-  void _togglePk(String mode) {
-    setState(() {
-      _pkMode = mode;
-      _pkActive = true;
-      _pkStatusBanner =
-          'PUNCH START! $mode PK Active • Winner Emoji & Cry Sticker Ready';
-    });
-  }
-
-  void _resolvePkOutcome(bool won) {
-    setState(() {
-      _pkStatusBanner = won
-          ? 'VICTORY! Winner Emoji Active • Cry Sticker Sent'
-          : 'DEFEAT! Cry Sticker Active • Winner Emoji Awarded';
-    });
-  }
-
-  void _joinOrToggleSeat(int index) {
-    final seat = _seats[index];
-    if (seat.occupantName == null) {
-      if (_activeCallCount >= _maxCallGuests) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Max $_maxCallGuests call guests allowed (${_pkActive ? "during PK" : "in normal live"}).',
-            ),
-          ),
-        );
-        return;
-      }
-      setState(() {
-        seat.occupantName = 'Live Caller #${seat.seatNumber}';
-        seat.cameraOn = _guestCameraOn;
-      });
-    } else {
-      setState(() {
-        seat.occupantName = null;
-        seat.isMuted = false;
-      });
-    }
-  }
-
-  Future<void> _sendGift() async {
-    final unitPrice = widget.state.giftPrices[_selectedGiftName] ?? 100;
-    final totalCoins = unitPrice * _selectedComboMultiplier;
-
-    if (!widget.state.isOwnerMode && widget.state.coins < totalCoins) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Insufficient coin balance.')),
-      );
+  void _registerOfficialAgency() {
+    final name = agNameCtrl.text.trim();
+    final phone = agPhoneCtrl.text.trim();
+    if (name.isEmpty) {
+      _toast('Agency name likhein');
       return;
     }
 
-    await widget.state.supabase.pushLiveEvent('gift_transactions', {
-      'account_id': widget.state.activeAccountId,
-      'gift_name': _selectedGiftName,
-      'multiplier': _selectedComboMultiplier,
-      'total_coins': totalCoins,
-    });
+    // Unique official ID generation (custom prefix/value + auto suffix if needed)
+    var baseId = agCustomIdCtrl.text.trim();
+    if (baseId.isEmpty || baseId == 'AG-OFF-') {
+      baseId = 'AG-OFF-${1000 + officialAgencies.length * 137}';
+    } else if (officialAgencies.any((a) => a.officialId == baseId)) {
+      baseId = '${baseId}-${officialAgencies.length + 1}';
+    }
 
-    widget.onStateChanged(() {
-      if (!widget.state.isOwnerMode) {
-        widget.state.coins -= totalCoins;
-      }
-      widget.state.beans += totalCoins;
-    });
-
-    setState(() {
-      _globalComboBanner = _selectedComboMultiplier > 1
-          ? 'BIG COMBO x$_selectedComboMultiplier! $_selectedGiftName ($totalCoins Coins) across Live Rooms!'
-          : 'Sent $_selectedGiftName ($totalCoins Coins)';
-      _messages.add(
-        ChatMessageItem(
-          sender: widget.state.isOwnerMode
-              ? 'Owner (ID ${ZoonlAppState.ownerId})'
-              : 'ID ${widget.state.activeAccountId}',
-          text:
-              'Sent $_selectedGiftName x$_selectedComboMultiplier ($totalCoins coins)',
-          level: widget.state.userLevel,
-          isSvip: widget.state.isSvip,
-          isOwner: widget.state.isOwnerMode,
-        ),
-      );
-    });
-  }
-
-  void _sendChat() {
-    final txt = _chatCtrl.text.trim();
-    if (txt.isEmpty) return;
-    setState(() {
-      _messages.add(
-        ChatMessageItem(
-          sender: widget.state.isOwnerMode
-              ? 'Owner (ID ${ZoonlAppState.ownerId})'
-              : 'ID ${widget.state.activeAccountId}',
-          text: txt,
-          level: widget.state.userLevel,
-          isSvip: widget.state.isSvip,
-          isOwner: widget.state.isOwnerMode,
-        ),
-      );
-      _chatCtrl.clear();
-    });
-  }
-
-  void _showTrophySheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: ZoonlColors.surfaceDark,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Top Rankings & Weekly Star',
-              style: TextStyle(
-                color: ZoonlColors.champagneGold,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '• Top 1 Sender (Weekly): Live Leaderboard Synced',
-              style: TextStyle(color: ZoonlColors.textPrimary),
-            ),
-            const Text(
-              '• Top 1 Sender (Monthly): Live Leaderboard Synced',
-              style: TextStyle(color: ZoonlColors.textPrimary),
-            ),
-            const Text(
-              '• Top 1 Sender (Total): Live Leaderboard Synced',
-              style: TextStyle(color: ZoonlColors.textPrimary),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '• Weekly Star (#1): ${widget.state.weeklyStarWinner.isEmpty ? "Pending Live Tally" : widget.state.weeklyStarWinner}',
-              style: const TextStyle(color: ZoonlColors.tealAccent),
-            ),
-          ],
-        ),
-      ),
+    final created = OfficialAgencyEntry(
+      officialId: baseId,
+      agencyName: name,
+      mobileNumber: phone.isEmpty ? '+971500000000' : phone,
+      agencyType: selectedAgencyType,
+      streamerCount: 0,
+      topUpVolumeCoins: 0,
+      isOfficialVerified: true,
     );
+
+    setState(() {
+      officialAgencies.insert(0, created);
+      activeTopUpAgencyId = created.officialId;
+      activeTopUpAgencyName = created.agencyName;
+      activeTopUpAgencyPhone = created.mobileNumber;
+      stAgencyCodeCtrl.text = created.officialId;
+      broadLine =
+          'OFFICIAL AGENCY REGISTERED: ${created.agencyName} • ID ${created.officialId} (${created.agencyType})';
+      agNameCtrl.clear();
+      agPhoneCtrl.clear();
+    });
+    _toast('Official Agency Created: ${created.officialId}');
+  }
+
+  void _executeTopUpUnderAgency() {
+    final coins = int.tryParse(topUpAmtCtrl.text.trim()) ?? 0;
+    if (coins <= 0) return;
+
+    setState(() {
+      walletCoins += coins;
+      final ag = officialAgencies.firstWhere(
+        (a) => a.officialId == activeTopUpAgencyId,
+        orElse: () => officialAgencies.first,
+      );
+      ag.topUpVolumeCoins += coins;
+      payoutRequests.insert(
+        0,
+        PayoutRequestItem(
+          id: 'TU-${500 + payoutRequests.length + 1}',
+          streamerId: currentUserId,
+          streamerName: currentUserName,
+          requestType: 'Top-Up Credit',
+          coinsAmount: coins,
+          payoutLabel:
+              'Official Agency: ${ag.agencyName} • No: ${ag.officialId} • Ph: ${ag.mobileNumber}',
+          status: 'Accepted & Sent',
+        ),
+      );
+      broadLine =
+          'TOP-UP RECORD: +$coins Coins via ${ag.agencyName} (Official ID: ${ag.officialId})';
+    });
+    _toast('Top-Up $coins Coins recorded under ${ag.officialId}');
+  }
+
+  void _registerStreamerWithMode() {
+    final name = stNameCtrl.text.trim();
+    if (name.isEmpty) {
+      _toast('Streamer ka naam likhein');
+      return;
+    }
+    final sid = stIdCtrl.text.trim().isEmpty
+        ? '40${200 + streamerRecords.length}'
+        : stIdCtrl.text.trim();
+    final code = streamerJoinMode == 'Direct Self'
+        ? 'DIRECT-SELF-APP'
+        : (stAgencyCodeCtrl.text.trim().isEmpty
+            ? activeTopUpAgencyId
+            : stAgencyCodeCtrl.text.trim());
+
+    setState(() {
+      streamerRecords.insert(
+        0,
+        StreamerProfileRecord(
+          streamerId: sid,
+          name: name,
+          joinMode: streamerJoinMode,
+          agencyCodeOrNumber: code,
+          receivedGiftingCoins: 60000,
+          earningCoins: 45000,
+          validDaysCompleted: newValidDays,
+          totalHoursLogged: newTotalHours,
+          todayHoursLogged: newTodayHours,
+          reward40Claimed: false,
+        ),
+      );
+      if (streamerJoinMode == 'Agency Linked') {
+        for (final ag in officialAgencies) {
+          if (ag.officialId == code) {
+            ag.streamerCount++;
+          }
+        }
+      }
+      stNameCtrl.clear();
+    });
+    _toast('Streamer Registered ($streamerJoinMode • $code)');
+  }
+
+  void _submitWithdrawOrAdvance(bool isAdvance) {
+    final amt = int.tryParse(withdrawCoinsCtrl.text.trim()) ?? 0;
+    if (amt <= 0) return;
+
+    if (!isAdvance && !isWithinWithdrawWindow) {
+      _toast('Monthly withdraw 1st se 5th tarikh tak open hota hai');
+      return;
+    }
+
+    if (isAdvance && receivedGiftingCoins <= 0) {
+      _toast('Advance ke liye gifting coin record zaroori hai');
+      return;
+    }
+
+    if (streamerEarningCoins < amt) {
+      _toast('Earning coins kam hain');
+      return;
+    }
+
+    setState(() {
+      streamerEarningCoins -= amt;
+      payoutRequests.insert(
+        0,
+        PayoutRequestItem(
+          id: isAdvance
+              ? 'ADV-${300 + payoutRequests.length}'
+              : 'WDR-${700 + payoutRequests.length}',
+          streamerId: currentUserId,
+          streamerName: currentUserName,
+          requestType: isAdvance
+              ? 'Advance Request'
+              : 'Monthly Withdraw (1st–5th)',
+          coinsAmount: amt,
+          payoutLabel: isAdvance
+              ? 'Gifting Record: $receivedGiftingCoins Coins'
+              : 'Monthly Clear (1st–5th Window)',
+          status: 'Pending',
+        ),
+      );
+    });
+
+    _toast(isAdvance
+        ? 'Advance Request bhej di gayi (Gifting record attached)'
+        : 'Withdraw Request bhej di gayi (1st–5th clear)');
+  }
+
+  void _decidePayoutRequest(PayoutRequestItem req, bool accept) {
+    if (roleMode != 'Owner (10001)' && roleMode != 'Admin') {
+      _toast('Sirf Owner 10001 ya Admin accept/send kar sakte hain');
+      return;
+    }
+    setState(() {
+      req.status = accept ? 'Accepted & Sent' : 'Rejected';
+      if (!accept) {
+        streamerEarningCoins += req.coinsAmount;
+      }
+    });
+    _toast('${req.id}: ${req.status}');
+  }
+
+  void _claim40DollarReward(StreamerProfileRecord rec) {
+    if (rec.reward40Claimed) {
+      _toast('\$40 reward pehle hi claim ho chuka hai');
+      return;
+    }
+    if (!rec.qualifiesFor40Reward) {
+      _toast(
+          'Shart: 20 valid days, 80 total hours aur aaj kam از کم 2 hours zaroori hain');
+      return;
+    }
+    setState(() {
+      rec.reward40Claimed = true;
+      bonus40UsdBalance += 40.0;
+    });
+    _toast('\$40 New Streamer Reward approved for ${rec.name}!');
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.roomTitle,
-                  style: const TextStyle(
-                    color: ZoonlColors.champagneGold,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              Text(
-                'Coins: ${widget.state.coins}',
+    final star = ZoonlSystemRules.starFromCoins(totalSentCoins);
+    final starLimit = ZoonlSystemRules.limitForStar(star);
+
+    final pages = [
+      _earningRewardWithdrawTab(),
+      _officialAgencyAndTopUpTab(),
+      _streamerRegAndRecordsTab(),
+      _liveStarPkAndOwnerTab(star, starLimit),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Icon(Icons.auto_awesome, color: ZoonlTheme.gold),
+            const SizedBox(width: 8),
+            const Text(
+              'ZOONL LIVE',
+              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.1),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '★$star',
+              style: const TextStyle(
+                  color: ZoonlTheme.tealBright, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Text(
+                '$walletCoins C',
                 style: const TextStyle(
-                  color: ZoonlColors.tealAccent,
+                  color: ZoonlTheme.goldBright,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _showTrophySheet,
-                icon: const Icon(
-                  Icons.emoji_events,
-                  color: ZoonlColors.champagneGold,
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            color: ZoonlTheme.bgPanel,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Role: $roleMode • Earn: $streamerEarningCoins C • \$${bonus40UsdBalance.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: ZoonlTheme.tealBright,
+                      fontWeight: FontWeight.bold),
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: ZoonlColors.textSecondary),
-              ),
-            ],
+                DropdownButton<String>(
+                  value: roleMode,
+                  isDense: true,
+                  dropdownColor: ZoonlTheme.bgCard,
+                  underline: const SizedBox(),
+                  style:
+                      const TextStyle(fontSize: 11, color: ZoonlTheme.goldBright),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'Owner (10001)', child: Text('Owner (10001)')),
+                    DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'Agency', child: Text('Agency')),
+                    DropdownMenuItem(value: 'Streamer', child: Text('Streamer')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setState(() => roleMode = v);
+                  },
+                ),
+              ],
+            ),
           ),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: ZoonlColors.cardDark,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: ZoonlColors.champagneGold.withValues(alpha: 0.5)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _pkStatusBanner,
-                  style: const TextStyle(
-                    color: ZoonlColors.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (_globalComboBanner.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _globalComboBanner,
-                    style: const TextStyle(
-                      color: ZoonlColors.champagneGold,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final mode in [
-                  'Friend 1v1',
-                  'Random 1v1',
-                  'Group 4',
-                  'Group 6'
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: OutlinedButton(
-                      onPressed: () => _togglePk(mode),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: _pkMode == mode && _pkActive
-                              ? ZoonlColors.champagneGold
-                              : ZoonlColors.borderSubtle,
-                        ),
-                      ),
-                      child: Text(
-                        mode,
-                        style: const TextStyle(
-                          color: ZoonlColors.textPrimary,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ),
-                TextButton(
-                  onPressed: () => _resolvePkOutcome(true),
-                  child: const Text(
-                    'Win Emoji',
-                    style: TextStyle(color: ZoonlColors.tealAccent, fontSize: 11),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => _resolvePkOutcome(false),
-                  child: const Text(
-                    'Cry Sticker',
-                    style: TextStyle(color: Colors.amber, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 8,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-              childAspectRatio: 1.05,
-            ),
-            itemBuilder: (context, idx) {
-              final seat = _seats[idx];
-              final occupied = seat.occupantName != null;
-              return Container(
-                decoration: BoxDecoration(
-                  color: ZoonlColors.cardDark,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: occupied
-                        ? ZoonlColors.tealAccent
-                        : ZoonlColors.borderSubtle,
-                  ),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      occupied ? seat.occupantName! : 'Seat ${seat.seatNumber}',
-                      style: const TextStyle(
-                        color: ZoonlColors.textPrimary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: () => _joinOrToggleSeat(idx),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: occupied
-                              ? Colors.redAccent.withValues(alpha: 0.25)
-                              : ZoonlColors.champagneGold,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          occupied
-                              ? 'Leave'
-                              : (seat.isLockedForJoinCall
-                                  ? 'JOIN CALL'
-                                  : '+ Join'),
-                          style: TextStyle(
-                            color: occupied
-                                ? Colors.redAccent
-                                : ZoonlColors.bgDark,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (occupied)
-                      InkWell(
-                        onTap: () =>
-                            setState(() => seat.isMuted = !seat.isMuted),
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text(
-                            seat.isMuted ? 'Muted' : 'Mic On',
-                            style: TextStyle(
-                              color: seat.isMuted
-                                  ? Colors.orangeAccent
-                                  : ZoonlColors.tealAccent,
-                              fontSize: 9,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              FilterChip(
-                label: Text(
-                  _guestCameraOn ? 'Cam ON' : 'Cam OFF',
-                  style: const TextStyle(fontSize: 11),
-                ),
-                selected: _guestCameraOn,
-                onSelected: (v) => setState(() => _guestCameraOn = v),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            color: ZoonlTheme.bgCard,
+            child: Text(
+              broadLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: ZoonlTheme.goldBright,
               ),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                value: _guestFilter,
-                dropdownColor: ZoonlColors.cardDark,
-                style:
-                    const TextStyle(color: ZoonlColors.textPrimary, fontSize: 12),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Champagne Glow',
-                    child: Text('Filter: Champagne Glow'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'Teal Beauty',
-                    child: Text('Filter: Teal Beauty'),
-                  ),
-                ],
-                onChanged: (v) {
-                  if (v != null) setState(() => _guestFilter = v);
-                },
-              ),
-            ],
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _messages.length,
-              itemBuilder: (context, idx) {
-                final m = _messages[idx];
-                final stripColor = _stripColorForLevel(m.level);
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        stripColor.withValues(alpha: 0.35),
-                        ZoonlColors.cardDark,
-                        stripColor.withValues(alpha: 0.35),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: m.isOwner
-                          ? ZoonlColors.champagneGold
-                          : stripColor.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        m.isOwner ? Icons.workspace_premium : Icons.auto_awesome,
-                        size: 14,
-                        color: ZoonlColors.champagneGold,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '[Lv.${m.level}] ${m.sender}: ',
-                                style: TextStyle(
-                                  color: (m.isSvip || m.isOwner)
-                                      ? Colors.redAccent
-                                      : ZoonlColors.champagneGold,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              TextSpan(
-                                text: m.isMuted ? '(Muted)' : m.text,
-                                style: const TextStyle(
-                                  color: ZoonlColors.textPrimary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Icon(
-                        Icons.auto_awesome,
-                        size: 14,
-                        color: ZoonlColors.tealAccent,
-                      ),
-                    ],
-                  ),
-                );
-              },
             ),
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                DropdownButton<String>(
-                  value: _selectedGiftName,
-                  dropdownColor: ZoonlColors.cardDark,
-                  style: const TextStyle(
-                    color: ZoonlColors.textPrimary,
-                    fontSize: 12,
-                  ),
-                  items: widget.state.giftPrices.keys
-                      .map(
-                        (g) => DropdownMenuItem(
-                          value: g,
-                          child: Text('$g (${widget.state.giftPrices[g]})'),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedGiftName = v);
-                  },
-                ),
-                const SizedBox(width: 6),
-                for (final mult in [1, 9, 99, 143, 999])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text(
-                        mult == 1 ? '1x' : 'x$mult',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                      selected: _selectedComboMultiplier == mult,
-                      selectedColor: ZoonlColors.champagneGold,
-                      onSelected: (_) =>
-                          setState(() => _selectedComboMultiplier = mult),
-                    ),
-                  ),
-                ElevatedButton(
-                  onPressed: _sendGift,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ZoonlColors.tealAccent,
-                    foregroundColor: ZoonlColors.bgDark,
-                  ),
-                  child: const Text(
-                    'Send Gift',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _chatCtrl,
-                  style: const TextStyle(color: ZoonlColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Type message inside chat strip...',
-                    hintStyle: const TextStyle(
-                      color: ZoonlColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                    filled: true,
-                    fillColor: ZoonlColors.cardDark,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _sendChat,
-                icon: const Icon(Icons.send, color: ZoonlColors.champagneGold),
-              ),
-            ],
-          ),
+          Expanded(child: pages[tabIndex]),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: tabIndex,
+        onTap: (i) => setState(() => tabIndex = i),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: ZoonlTheme.bgPanel,
+        selectedItemColor: ZoonlTheme.gold,
+        unselectedItemColor: ZoonlTheme.textMuted,
+        items: const [
+          BottomNavigationBarItem(
+              icon: Icon(Icons.payments), label: 'Earn/Wdr'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance), label: 'Agency/TopUp'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.badge), label: 'Streamers'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.live_tv), label: 'Live/PK/10001'),
         ],
       ),
     );
   }
-}
 
-/// 3. Profile, Owner ID 10001, Manual Top-Up ($10=45,000), Withdraw/Advance,
-/// Self/Agency KYC, Mini-Games, AI Support & Language (No Hindi)
-class ProfileAndHubTab extends StatefulWidget {
-  final ZoonlAppState state;
-  final void Function(VoidCallback) onStateChanged;
-
-  const ProfileAndHubTab({
-    super.key,
-    required this.state,
-    required this.onStateChanged,
-  });
-
-  @override
-  State<ProfileAndHubTab> createState() => _ProfileAndHubTabState();
-}
-
-class _ProfileAndHubTabState extends State<ProfileAndHubTab> {
-  static const List<String> _languages = [
-    'English',
-    'Urdu',
-    'Arabic',
-    'French',
-    'Spanish',
-  ];
-
-  final TextEditingController _agencyNameCtrl = TextEditingController();
-  final TextEditingController _agencyPhoneCtrl = TextEditingController();
-  final TextEditingController _agencyWaCtrl = TextEditingController();
-  final TextEditingController _withdrawAccountCtrl = TextEditingController();
-  final TextEditingController _withdrawNameCtrl = TextEditingController();
-  final TextEditingController _withdrawPhoneCtrl = TextEditingController();
-  final TextEditingController _supportPhoneCtrl = TextEditingController();
-  final TextEditingController _supportEmailCtrl = TextEditingController();
-
-  String _regPath = 'Self'; // Self or Agency
-  String _selectedWallet = 'EasyPaisa';
-  String _aiReply =
-      'AI & Voice Support active. Select a topic or enter your official contact.';
-
-  List<String> _walletsForRegion(String region) {
-    if (region == 'Pakistan') return ['EasyPaisa', 'JazzCash', 'Bank Account'];
-    if (region == 'United Arab Emirates') {
-      return ['Bank Account', 'Botim / Local Wallet'];
-    }
-    return ['Bank Account', 'Local Mobile Wallet'];
-  }
-
-  void _registerAgency() {
-    final name = _agencyNameCtrl.text.trim();
-    final phone = _agencyPhoneCtrl.text.trim();
-    final wa = _agencyWaCtrl.text.trim();
-    if (name.isEmpty || phone.isEmpty || wa.isEmpty) return;
-
-    widget.onStateChanged(() {
-      widget.state.registeredAgencies.add(
-        AgencyRecord(
-          agencyName: 'Official Agency: $name',
-          phone: phone,
-          whatsapp: wa,
-          region: widget.state.selectedRegion,
-        ),
-      );
-    });
-    _agencyNameCtrl.clear();
-    _agencyPhoneCtrl.clear();
-    _agencyWaCtrl.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool ownerActive = widget.state.isOwnerMode;
-    final wallets = _walletsForRegion(widget.state.selectedRegion);
-    if (!wallets.contains(_selectedWallet)) {
-      _selectedWallet = wallets.first;
-    }
-
+  /// TAB 0: Earning Section, $40 New Streamer Reward (80h / 20 valid days / 2h daily) & Withdraw / Advance (1st-5th)
+  Widget _earningRewardWithdrawTab() {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       children: [
-        // Owner ID 10001 / Profile Card
+        // Earning & 1st-5th Withdraw / Advance Box
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFF2A1E0A),
-                Color(0xFF142429),
-                Color(0xFF1A2130),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: ZoonlColors.champagneGold,
-              width: 2,
-            ),
+            color: ZoonlTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZoonlTheme.gold),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: ZoonlColors.champagneGold,
-                        width: 2.5,
-                      ),
-                    ),
-                    child: const CircleAvatar(
-                      radius: 26,
-                      backgroundColor: Color(0xFF3A280A),
-                      child: Icon(
-                        Icons.workspace_premium,
-                        color: ZoonlColors.champagneGold,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ownerActive
-                              ? 'OWNER • ID ${ZoonlAppState.ownerId}'
-                              : 'Account ID ${widget.state.activeAccountId}',
-                          style: TextStyle(
-                            color: (ownerActive || widget.state.isSvip)
-                                ? Colors.redAccent
-                                : ZoonlColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          ownerActive
-                              ? ZoonlAppState.ownerExclusiveFrame
-                              : '5-Day Starter Frame & Entry Active',
-                          style: const TextStyle(
-                            color: ZoonlColors.champagneGold,
-                            fontSize: 11,
-                          ),
-                        ),
-                        Text(
-                          ownerActive
-                              ? ZoonlAppState.ownerExclusiveEntry
-                              : 'Valid Days: ${widget.state.validDaysCompleted}/20 (2h/day = \$40 reward)',
-                          style: const TextStyle(
-                            color: ZoonlColors.tealAccent,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (ownerActive) ...[
-                const SizedBox(height: 8),
-                Text(
-                  ZoonlAppState.ownerExclusiveBg,
-                  style: const TextStyle(
-                    color: ZoonlColors.textSecondary,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // 3 Separate Boxes: Top-Up Coins / Diamonds / Valid-Beans
-        Row(
-          children: [
-            Expanded(
-                child: _StatBox(label: 'Top-Up Coins', value: '${widget.state.coins}')),
-            const SizedBox(width: 8),
-            Expanded(
-                child: _StatBox(label: 'Diamonds', value: '${widget.state.diamonds}')),
-            const SizedBox(width: 8),
-            Expanded(
-                child: _StatBox(label: 'Valid/Beans', value: '${widget.state.beans}')),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // Manual Top-Up ($10 = 45,000 coins up to ~$100) + Agency Directory below Top-Up
-        _SectionCard(
-          title: 'Manual Top-Up (\$10 = 45,000 Coins up to \$100)',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [10, 20, 50, 100].map((usd) {
-                  final pkgCoins = (usd * widget.state.coinRatePerUsd).toInt();
-                  return ElevatedButton(
-                    onPressed: () {
-                      widget.onStateChanged(() => widget.state.coins += pkgCoins);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Top-up request logged: \$$usd ($pkgCoins coins) via $_selectedWallet.',
-                          ),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: ZoonlColors.champagneGold,
-                      foregroundColor: ZoonlColors.bgDark,
-                    ),
-                    child: Text(
-                      '\$$usd = $pkgCoins',
-                      style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Text(
-                    'Method: ',
-                    style: TextStyle(color: ZoonlColors.textSecondary, fontSize: 12),
-                  ),
-                  DropdownButton<String>(
-                    value: _selectedWallet,
-                    dropdownColor: ZoonlColors.surfaceDark,
-                    style: const TextStyle(
-                        color: ZoonlColors.tealAccent, fontSize: 12),
-                    items: wallets
-                        .map((w) => DropdownMenuItem(value: w, child: Text(w)))
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _selectedWallet = v);
-                    },
-                  ),
-                ],
-              ),
-              if (widget.state.registeredAgencies.isNotEmpty) ...[
-                const Divider(color: ZoonlColors.borderSubtle),
-                const Text(
-                  'Official Agencies (Auto-Listed Under Top-Up)',
-                  style: TextStyle(
-                    color: ZoonlColors.champagneGold,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                ...widget.state.registeredAgencies.map(
-                  (ag) => Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '${ag.agencyName} • Tel: ${ag.phone} • WA: ${ag.whatsapp} (${ag.region})',
-                      style: const TextStyle(
-                          color: ZoonlColors.textPrimary, fontSize: 11),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Withdraw (1st-5th) & Advance Request
-        _SectionCard(
-          title: 'Streamer Withdraw (1st–5th) & Advance Request',
-          child: Column(
-            children: [
-              TextField(
-                controller: _withdrawAccountCtrl,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Bank Account / Wallet Number (Required)',
-                  labelStyle: TextStyle(fontSize: 12),
-                ),
-              ),
-              TextField(
-                controller: _withdrawNameCtrl,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Account Holder Name (Required)',
-                  labelStyle: TextStyle(fontSize: 12),
-                ),
-              ),
-              TextField(
-                controller: _withdrawPhoneCtrl,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Receiver Mobile Number (Required)',
-                  labelStyle: TextStyle(fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Monthly payout window: request on 1st, paid by 5th.',
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ZoonlColors.tealAccent,
-                        foregroundColor: ZoonlColors.bgDark,
-                      ),
-                      child: const Text(
-                        'Submit Withdraw',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Advance request sent for owner review based on coins/gifting.',
-                            ),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Request Advance',
-                        style: TextStyle(
-                            color: ZoonlColors.champagneGold, fontSize: 11),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Self vs Agency Registration + KYC + $40 Reward (20 valid days x 2h)
-        _SectionCard(
-          title: 'Registration (Self / Agency) & KYC',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('Self'),
-                    selected: _regPath == 'Self',
-                    onSelected: (_) => setState(() => _regPath = 'Self'),
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Agency'),
-                    selected: _regPath == 'Agency',
-                    onSelected: (_) => setState(() => _regPath = 'Agency'),
-                  ),
-                ],
+              const Text(
+                'EARNING • WITHDRAW (1st–5th) • ADVANCE REQUEST',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'KYC Guide: 1) Front ID  2) Back ID  3) Photo holding ID card + Name, DOB & Country. New streamer reward: \$40 after 20 valid days (2h/day), with or without gifting.',
-                style:
-                    const TextStyle(color: ZoonlColors.textSecondary, fontSize: 11),
-              ),
-              if (_regPath == 'Agency') ...[
-                TextField(
-                  controller: _agencyNameCtrl,
-                  style: const TextStyle(color: ZoonlColors.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Agency Name',
-                    labelStyle: TextStyle(fontSize: 12),
-                  ),
-                ),
-                TextField(
-                  controller: _agencyPhoneCtrl,
-                  style: const TextStyle(color: ZoonlColors.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Professional Phone Number',
-                    labelStyle: TextStyle(fontSize: 12),
-                  ),
-                ),
-                TextField(
-                  controller: _agencyWaCtrl,
-                  style: const TextStyle(color: ZoonlColors.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'WhatsApp Number',
-                    labelStyle: TextStyle(fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _registerAgency,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ZoonlColors.champagneGold,
-                    foregroundColor: ZoonlColors.bgDark,
-                  ),
-                  child: const Text(
-                    'Register Official Agency',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // AI / Voice Support + Official Contact + Language (No Hindi)
-        _SectionCard(
-          title: 'AI / Voice Support & Official Contact',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
               Text(
-                _aiReply,
-                style: const TextStyle(
-                    color: ZoonlColors.tealAccent, fontSize: 12),
+                'Earning Balance: $streamerEarningCoins Coins • Gifting Record: $receivedGiftingCoins Coins',
+                style: const TextStyle(fontSize: 12, color: ZoonlTheme.tealBright),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Enable 1st–5th Withdraw Window (Test/Clear)'),
+                value: forceFirstToFifthWindow,
+                activeTrackColor: ZoonlTheme.teal,
+                onChanged: (v) => setState(() => forceFirstToFifthWindow = v),
+              ),
+              TextField(
+                controller: withdrawCoinsCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Withdraw / Advance Coins Amount',
+                  isDense: true,
+                ),
               ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 children: [
                   ElevatedButton(
-                    onPressed: () => setState(() {
-                      _aiReply =
-                          'Voice Guide: ZOONL LIVE supports Short Video first, Live PK/Audio, Manual Top-Up, 1st–5th Withdraw, and \$40 (20 days x 2h) streamer reward.';
-                    }),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: ZoonlColors.champagneGold,
-                      foregroundColor: ZoonlColors.bgDark,
-                    ),
-                    child: const Text(
-                      'Voice App Guide',
-                      style:
-                          TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
+                        backgroundColor: ZoonlTheme.gold,
+                        foregroundColor: Colors.black),
+                    onPressed: () => _submitWithdrawOrAdvance(false),
+                    child: const Text('Monthly Withdraw (1st–5th)'),
                   ),
-                  OutlinedButton(
-                    onPressed: () => setState(() {
-                      _aiReply =
-                          'Official Contact -> Phone/WA: ${widget.state.officialSupportPhone.isEmpty ? "Set below" : widget.state.officialSupportPhone} | Email: ${widget.state.officialSupportEmail.isEmpty ? "Set below" : widget.state.officialSupportEmail}';
-                    }),
-                    child: const Text(
-                      'Official Contact',
-                      style:
-                          TextStyle(color: ZoonlColors.textPrimary, fontSize: 11),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: ZoonlTheme.teal,
+                        foregroundColor: Colors.black),
+                    onPressed: () => _submitWithdrawOrAdvance(true),
+                    child: const Text('Advance Request'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Payout & Advance Records (Admin/Owner Accept & Send)
+        const Text(
+          'WITHDRAW & ADVANCE RECORDS (ACCEPT & SEND)',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
+        ),
+        ...payoutRequests.map((req) => Card(
+              color: ZoonlTheme.bgCard,
+              child: ListTile(
+                title: Text(
+                    '${req.id} • ${req.streamerName} (${req.requestType})'),
+                subtitle: Text(
+                    '${req.coinsAmount} Coins • ${req.payoutLabel} • ${req.status}'),
+                trailing: req.status == 'Pending'
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.check_circle,
+                                color: ZoonlTheme.tealBright),
+                            onPressed: () => _decidePayoutRequest(req, true),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.cancel,
+                                color: ZoonlTheme.crimson),
+                            onPressed: () => _decidePayoutRequest(req, false),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        req.status,
+                        style: const TextStyle(
+                            color: ZoonlTheme.tealBright,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11),
+                      ),
+              ),
+            )),
+      ],
+    );
+  }
+
+  /// TAB 1: Official Agency Registration (Top-Up Agency / Streamer Agency / Both) + Top-Up Under Agency
+  Widget _officialAgencyAndTopUpTab() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ZoonlTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZoonlTheme.gold),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'OFFICIAL AGENCY REGISTRATION (UNIQUE OFFICIAL ID)',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
+              ),
+              const SizedBox(height: 6),
+              DropdownButton<String>(
+                value: selectedAgencyType,
+                isExpanded: true,
+                dropdownColor: ZoonlTheme.bgPanel,
+                items: const [
+                  DropdownMenuItem(
+                      value: 'Top-Up + Streamer Both',
+                      child: Text('Top-Up + Streamer Agency (Both)')),
+                  DropdownMenuItem(
+                      value: 'Top-Up Agency', child: Text('Top-Up Agency')),
+                  DropdownMenuItem(
+                      value: 'Streamer Agency',
+                      child: Text('Streamer Agency')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => selectedAgencyType = v);
+                },
+              ),
+              TextField(
+                controller: agNameCtrl,
+                decoration: const InputDecoration(labelText: 'Agency Name'),
+              ),
+              TextField(
+                controller: agPhoneCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Agency Mobile Number'),
+              ),
+              TextField(
+                controller: agCustomIdCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Official Agency ID Number (Auto-Unique)'),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: ZoonlTheme.gold,
+                    foregroundColor: Colors.black),
+                onPressed: _registerOfficialAgency,
+                child: const Text('Register Official Agency'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Top-Up System Showing Official Agency Number & Name Below
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ZoonlTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZoonlTheme.teal),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'TOP-UP SYSTEM (OFFICIAL AGENCY RECORD BELOW)',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: ZoonlTheme.tealBright),
+              ),
+              TextField(
+                controller: topUpAmtCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Top-Up Coins'),
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: ZoonlTheme.teal,
+                    foregroundColor: Colors.black),
+                onPressed: _executeTopUpUnderAgency,
+                child: const Text('Execute Top-Up'),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: ZoonlTheme.bgPanel,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ZoonlTheme.gold),
+                ),
+                child: Text(
+                  'OFFICIAL AGENCY • ID: $activeTopUpAgencyId • Name: $activeTopUpAgencyName • Ph: $activeTopUpAgencyPhone',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: ZoonlTheme.goldBright),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        const Text(
+          'ALL OFFICIAL AGENCY RECORDS',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
+        ),
+        ...officialAgencies.map((ag) => Card(
+              color: ZoonlTheme.bgCard,
+              child: ListTile(
+                title: Text(
+                    '${ag.agencyName} • Official ID: ${ag.officialId}'),
+                subtitle: Text(
+                    '${ag.agencyType} • Ph: ${ag.mobileNumber} • Streamers: ${ag.streamerCount} • TopUp: ${ag.topUpVolumeCoins}'),
+                trailing: const Icon(Icons.verified, color: ZoonlTheme.tealBright),
+              ),
+            )),
+      ],
+    );
+  }
+
+  /// TAB 2: Streamer Registration (Agency Code vs Direct Self) + $40 Reward Tracker (80h / 20d / 2h/d) + Streamer Records
+  Widget _streamerRegAndRecordsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ZoonlTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZoonlTheme.gold),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'STREAMER REGISTRATION (AGENCY CODE OR DIRECT SELF)',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Agency Linked'),
+                    selected: streamerJoinMode == 'Agency Linked',
+                    selectedColor: ZoonlTheme.gold,
+                    labelStyle: TextStyle(
+                      color: streamerJoinMode == 'Agency Linked'
+                          ? Colors.black
+                          : ZoonlTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
                     ),
+                    onSelected: (_) =>
+                        setState(() => streamerJoinMode = 'Agency Linked'),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Direct Self'),
+                    selected: streamerJoinMode == 'Direct Self',
+                    selectedColor: ZoonlTheme.teal,
+                    labelStyle: TextStyle(
+                      color: streamerJoinMode == 'Direct Self'
+                          ? Colors.black
+                          : ZoonlTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (_) =>
+                        setState(() => streamerJoinMode = 'Direct Self'),
                   ),
                 ],
               ),
               TextField(
-                controller: _supportPhoneCtrl,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Set Official Phone / WhatsApp',
-                  labelStyle: TextStyle(fontSize: 12),
-                ),
+                controller: stNameCtrl,
+                decoration: const InputDecoration(labelText: 'Streamer Name'),
               ),
               TextField(
-                controller: _supportEmailCtrl,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-                decoration: const InputDecoration(
-                  labelText: 'Set Official Email',
-                  labelStyle: TextStyle(fontSize: 12),
+                controller: stIdCtrl,
+                decoration: const InputDecoration(labelText: 'Streamer ID'),
+              ),
+              if (streamerJoinMode == 'Agency Linked')
+                TextField(
+                  controller: stAgencyCodeCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Agency Code / Official Number'),
                 ),
+              const SizedBox(height: 8),
+              Text(
+                'New Streamer \$40 Target: Valid Days $newValidDays/20 • Total Hours $newTotalHours/80 • Today $newTodayHours/2h min',
+                style: const TextStyle(fontSize: 11, color: ZoonlTheme.tealBright),
+              ),
+              Slider(
+                value: newValidDays.toDouble(),
+                min: 1,
+                max: 25,
+                divisions: 24,
+                activeColor: ZoonlTheme.gold,
+                label: 'Valid Days: $newValidDays',
+                onChanged: (v) => setState(() => newValidDays = v.round()),
+              ),
+              Slider(
+                value: newTotalHours.toDouble(),
+                min: 10,
+                max: 120,
+                divisions: 110,
+                activeColor: ZoonlTheme.tealBright,
+                label: 'Total Hours: $newTotalHours',
+                onChanged: (v) => setState(() => newTotalHours = v.round()),
               ),
               const SizedBox(height: 6),
               ElevatedButton(
-                onPressed: () {
-                  widget.onStateChanged(() {
-                    widget.state.officialSupportPhone =
-                        _supportPhoneCtrl.text.trim();
-                    widget.state.officialSupportEmail =
-                        _supportEmailCtrl.text.trim();
-                  });
-                },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: ZoonlColors.tealAccent,
-                  foregroundColor: ZoonlColors.bgDark,
-                ),
-                child: const Text(
-                  'Save Official Contact',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                ),
+                    backgroundColor: ZoonlTheme.gold,
+                    foregroundColor: Colors.black),
+                onPressed: _registerStreamerWithMode,
+                child: const Text('Register Streamer'),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
 
-        // Language Selector (No Hindi)
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: ZoonlColors.cardDark,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: ZoonlColors.borderSubtle),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.language, color: ZoonlColors.tealAccent),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Language (No Hindi)',
-                  style: TextStyle(color: ZoonlColors.textPrimary),
-                ),
-              ),
-              DropdownButton<String>(
-                value: widget.state.selectedLanguage,
-                dropdownColor: ZoonlColors.surfaceDark,
-                style: const TextStyle(color: ZoonlColors.champagneGold),
-                items: _languages
-                    .map((lang) =>
-                        DropdownMenuItem(value: lang, child: Text(lang)))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    widget.onStateChanged(
-                        () => widget.state.selectedLanguage = val);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Bag & Auto Backup
         const Text(
-          'Bag & Auto Backup',
+          'STREAMER RECORDS & \$40 NEW REWARD STATUS',
           style: TextStyle(
-            color: ZoonlColors.champagneGold,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
+              fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
         ),
-        const SizedBox(height: 8),
-        ...widget.state.bagItems.map(
-          (item) => Card(
-            color: ZoonlColors.cardDark,
-            child: ListTile(
-              leading: const Icon(
-                Icons.card_giftcard,
-                color: ZoonlColors.tealAccent,
+        ...streamerRecords.map((st) => Card(
+              color: ZoonlTheme.bgCard,
+              child: ListTile(
+                title: Text(
+                    '${st.name} (ID ${st.streamerId}) • ${st.joinMode} (${st.agencyCodeOrNumber})'),
+                subtitle: Text(
+                    'Earn: ${st.earningCoins} • Gift: ${st.receivedGiftingCoins} • Days: ${st.validDaysCompleted}/20 • Hrs: ${st.totalHoursLogged}/80 (Today ${st.todayHoursLogged}h)'),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: st.reward40Claimed
+                        ? ZoonlTheme.bgPanel
+                        : (st.qualifiesFor40Reward
+                            ? ZoonlTheme.teal
+                            : ZoonlTheme.gold),
+                    foregroundColor:
+                        st.reward40Claimed ? ZoonlTheme.textMuted : Colors.black,
+                  ),
+                  onPressed: () => _claim40DollarReward(st),
+                  child: Text(
+                    st.reward40Claimed
+                        ? '\$40 Paid'
+                        : (st.qualifiesFor40Reward ? 'Claim \$40' : '80h/20d'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-              title: Text(
-                item,
-                style: const TextStyle(color: ZoonlColors.textPrimary),
-              ),
-            ),
-          ),
-        ),
+            )),
       ],
     );
   }
-}
 
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final Widget child;
-
-  const _SectionCard({required this.title, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: ZoonlColors.cardDark,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ZoonlColors.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: ZoonlColors.champagneGold,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _StatBox extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StatBox({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+  /// TAB 3: Live Star Limits (1..5), PK Punch & Owner 10001 Controls
+  Widget _liveStarPkAndOwnerTab(int star, int starLimit) {
+    return ListView(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ZoonlColors.cardDark,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ZoonlColors.borderSubtle),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: ZoonlColors.champagneGold,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: ZoonlTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ZoonlTheme.gold),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: ZoonlColors.textSecondary,
-              fontSize: 10,
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'STAR TIER ★$star (Limit $starLimit) • Sent $totalSentCoins • ${ZoonlSystemRules.badgeForLevel(userLevel)}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: ZoonlTheme.goldBright),
+              ),
+              const SizedBox(height: 8),
+              Text('PK Score: Left $leftPkScore vs Right $rightPkScore'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: ZoonlTheme.gold,
+                        foregroundColor: Colors.black),
+                    onPressed: () => setState(() {
+                      leftPkScore += 450;
+                      rightPkScore = (rightPkScore - 150).clamp(0, 99999999);
+                    }),
+                    child: const Text('Left Punch'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: ZoonlTheme.teal,
+                        foregroundColor: Colors.black),
+                    onPressed: () => setState(() {
+                      rightPkScore += 450;
+                      leftPkScore = (leftPkScore - 150).clamp(0, 99999999);
+                    }),
+                    child: const Text('Right Punch'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
