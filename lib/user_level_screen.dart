@@ -16,13 +16,13 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
   int _level = 1, _sentCoins = 0;
   List<Map<String, dynamic>> _levels = [];
 
-  static const List<Color> _rankColors = [
-    Color(0xFFB8C5D8), Color(0xFF67D7C5), Color(0xFF63B8F4),
-    Color(0xFF9C83F5), Color(0xFFE78AC8), Color(0xFFE7A16B),
-    Color(0xFFE5D17C), Color(0xFFEC777F), Color(0xFF78D9EA),
-    Color(0xFFD5B8FF),
-  ];
-  Color _rankColor(int level) => _rankColors[(level - 1).clamp(0, _rankColors.length - 1).toInt()];
+  Color _rankColor(int level) {
+    if (level >= 100) return const Color(0xFFE8D28B);
+    final hue = ((level - 1) * 137.508) % 360;
+    final saturation = 0.52 + ((level % 3) * 0.08);
+    final value = 0.78 + ((level % 2) * 0.08);
+    return HSVColor.fromAHSV(1, hue, saturation, value).toColor();
+  }
 
   @override
   void initState() { super.initState(); _load(); }
