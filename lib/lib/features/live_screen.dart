@@ -7,7 +7,7 @@ import '../../event_control_screen.dart';
 import '../../streamer_progress_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
-    show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, CameraPosition;
+    show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, LocalVideoTrackExt, CameraPosition;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
