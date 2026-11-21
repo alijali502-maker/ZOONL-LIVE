@@ -107,7 +107,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 
   Widget _bar(double v,List<Color> c)=>ClipRRect(borderRadius:BorderRadius.circular(20),child:Stack(children:[
     Container(height:13,color:Colors.white12),
-    FractionallySizedBox(widthFactor:v.clamp(0.0,1.0),child:Container(height:13,decoration:BoxDecoration(
+    FractionallySizedBox(widthFactor:v.clamp(0.0,1.0).toDouble(),child:Container(height:13,decoration:BoxDecoration(
       gradient:LinearGradient(colors:[c.last,c.first,Colors.white]),boxShadow:[BoxShadow(color:c[1].withOpacity(.8),blurRadius:12)]))),
     Positioned.fill(child:IgnorePointer(child:AnimatedBuilder(animation:_shine,builder:(_,__)=>Align(
       alignment:Alignment(-1+_shine.value*2,0),child:Container(width:25,height:13,
@@ -204,7 +204,10 @@ class _EmblemPainter extends CustomPainter{
     else{p.moveTo(cx,h*.03);p.lineTo(w*.92,h*.2);p.lineTo(w*.84,h*.64);p.lineTo(w*.68,h*.82);p.lineTo(cx,h*.97);p.lineTo(w*.32,h*.82);p.lineTo(w*.16,h*.64);p.lineTo(w*.08,h*.2);}
     p.close();
     final shadow=Paint()..color=Colors.black87..maskFilter=const MaskFilter.blur(BlurStyle.normal,7);
-    canvas.save();canvas.translate(2,6);canvas.drawPath(p,shadow);canvas.restore();
+    canvas.save();canvas.translate(2,7);canvas.drawPath(p,shadow);canvas.restore();
+    final side=Paint()..shader=LinearGradient(begin:Alignment.topCenter,end:Alignment.bottomCenter,
+      colors:[colors.last,const Color(0xFF05070D)]).createShader(Offset(0,0)&s);
+    canvas.drawPath(p.shift(const Offset(0,5)),side);
     canvas.drawPath(p,Paint()..shader=LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,
       colors:[colors[1],colors[0],colors.last,const Color(0xFF090D18)],stops:const[0,.28,.68,1]).createShader(Offset.zero&s));
     final inner=Path()..addPath(p,Offset.zero);inner.scale(.86,.86,Offset(cx,h*.5));
