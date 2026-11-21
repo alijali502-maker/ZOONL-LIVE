@@ -1074,9 +1074,9 @@ class _LiveScreenState extends State<LiveScreen> {
           title: const Text('Live Privacy Settings', style: TextStyle(color: Color(0xFFE5BD70))),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Private Room', style: TextStyle(color: Colors.white)),
-              value: privateValue, onChanged: (v) => setDialogState(() { privateValue = v; if (v) lockedValue = true; })),
+              value: privateValue, onChanged: !_canUsePrivateRooms ? null : (v) => setDialogState(() { privateValue = v; if (v) lockedValue = true; })),
             SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
-              value: lockedValue, onChanged: (v) => setDialogState(() => lockedValue = v)),
+              value: lockedValue, onChanged: !_canUsePrivateRooms ? null : (v) => setDialogState(() => lockedValue = v)),
             const Text('Only invited members or approved guest seats can enter a private or locked room.',
               style: TextStyle(color: Colors.white60, fontSize: 11)),
           ]),
