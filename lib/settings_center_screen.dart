@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/backend.dart';
@@ -7,15 +8,15 @@ import 'profile_edit_screen.dart';
 class SettingsCenterScreen extends StatelessWidget {
   const SettingsCenterScreen({super.key});
 
-  static const Color _gold = Color(0xFFD6B46A);
-  static const Color _panel = Color(0xFF17232E);
-  static const Color _muted = Color(0xFFAAB5BE);
+  static const Color _gold = Color(0xFFF5F5F5);
+  static const Color _panel = Color(0xCC101010);
+  static const Color _muted = Color(0xFFBDBDBD);
 
   void _showDetails(BuildContext context, String title, String detail) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF17232E),
+        backgroundColor: const Color(0xFF101010),
         title: Text(title, style: const TextStyle(color: _gold)),
         content: Text(detail, style: const TextStyle(color: _muted, height: 1.5)),
         actions: [
@@ -78,7 +79,8 @@ class SettingsCenterScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF354653)),
+        border: Border.all(color: const Color(0x55FFFFFF)),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 22, offset: Offset(0, 8))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +126,7 @@ class SettingsCenterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080D14),
+      backgroundColor: const Color(0xFF050505),
       appBar: AppBar(
         title: const Text('Settings Center'),
       ),
@@ -136,7 +138,7 @@ class SettingsCenterScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF293B49), Color(0xFF17232E)],
+                colors: [Color(0xCC292929), Color(0xCC090909)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -217,7 +219,7 @@ class SettingsCenterScreen extends StatelessWidget {
               () => _showDetails(
                 context,
                 'Appearance',
-                'The current application theme is Premium Obsidian with Champagne Gold and Teal accents.',
+                'The current appearance uses neutral black glass surfaces, soft white edges and clear white typography.',
               ),
             ),
             _SettingItem(
