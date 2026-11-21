@@ -380,210 +380,84 @@ class _AudioRoomThemeBackdropState extends State<_AudioRoomThemeBackdrop>
 
   Widget _buildLiveRoom() {
     final viewers = _lk?.remoteParticipants.length ?? 0;
-
-    return Column(
+    final hostName = _roomOwnerId == _myId ? widget.userName : _roomName;
+    return LayoutBuilder(builder: (context, constraints) => Stack(
+      fit: StackFit.expand,
       children: [
-        Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                color: const Color(0xFF1B2844),
-                child: _selectedRoomType == 'audio'
-                    ? _AudioRoomThemeBackdrop(
-                        themeCode: _audioThemeCode,
-                        child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.headphones, size: 100, color: Colors.white),
-                          SizedBox(height: 12),
-                          Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                        ])),
-                      )
-                    : _videoLayer(),
-              ),
-              if (_giftBanner != null)
-                Positioned.fill(child: _liveGiftBanner()),
-              Positioned(
-                top: 14,
-                left: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF542CA0), Color(0xFF211735)]),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE6C47A), width: 1),
-                    boxShadow: const [BoxShadow(color: Color(0x559360F5), blurRadius: 14)],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 27,
-                        height: 27,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE6C47A), Color(0xFF9360F5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(color: Colors.white70, width: 1),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x669360F5), blurRadius: 9),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$_hostLevel',
-                            style: const TextStyle(
-                              color: Color(0xFF160F22),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _privateRoom || _lockedRoom ? 'PRIVATE LIVE' : 'LIVE NOW',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: .7,
-                            ),
-                          ),
-                          Text(
-                            '$_liveLevelSticker  •  LEVEL $_hostLevel',
-                            style: const TextStyle(
-                              color: Color(0xFFE6C47A),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.visibility,
-                        color: Colors.white,
-                        size: 17,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$viewers',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_isHost && _guestSeats.any((seat) => seat['seat_status'] == 'occupied') || _isGuest)
-                Positioned(
-                  right: 14,
-                  bottom: 54,
-                  child: _guestMiniOverlay(),
-                ),
-              Positioned(
-                left: 14,
-                bottom: 14,
-                child: Text(
-                  _roomName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        Positioned.fill(
+          child: _selectedRoomType == 'audio'
+            ? _AudioRoomThemeBackdrop(themeCode: _audioThemeCode,
+                child: const Center(child: Icon(Icons.graphic_eq, size: 120, color: Colors.white70)))
+            : _videoLayer(),
         ),
-
-        if (_chatEnabled)
-          Container(
-            height: 145,
-            padding: const EdgeInsets.all(10),
-            color: const Color(0xFF1B1225),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    reverse: true,
-                    itemCount: _messages.length,
+        const Positioned.fill(child: IgnorePointer(child: DecoratedBox(
+          decoration: BoxDecoration(gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [Color(0x99080510), Colors.transparent, Color(0xEE080510)],
+            stops: [0, .45, 1]))))),
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8, left: 12, right: 12,
+          child: Row(children: [
+            _glassPanel(child: Row(mainAxisSize: MainAxisSize.min, children: [
+              CircleAvatar(radius: 21, backgroundColor: const Color(0xFF302047),
+                backgroundImage: (_hostAvatarUrl ?? '').isNotEmpty ? NetworkImage(_hostAvatarUrl!) : null,
+                child: (_hostAvatarUrl ?? '').isEmpty ? const Icon(Icons.person, color: Color(0xFFE6C47A)) : null),
+              const SizedBox(width: 9),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(hostName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                Text('ZOONL LIVE • LEVEL $_hostLevel', style: const TextStyle(color: Color(0xFFE6C47A), fontSize: 9)),
+              ]),
+            ])),
+            const Spacer(),
+            _glassPanel(child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.visibility, color: Colors.white, size: 16),
+              const SizedBox(width: 5),
+              Text('$viewers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ])),
+          ]),
+        ),
+        if ((_isHost && _guestSeats.any((seat) => seat['seat_status'] == 'occupied')) || _isGuest)
+          Positioned(right: 12, top: MediaQuery.of(context).padding.top + 72, child: _guestMiniOverlay()),
+        if (_giftBanner != null) Positioned.fill(child: _liveGiftBanner()),
+        Positioned(
+          left: 12, right: 12, bottom: MediaQuery.of(context).padding.bottom + 10,
+          child: _glassPanel(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (_roomName.isNotEmpty)
+                Align(alignment: Alignment.centerLeft, child: Text(_roomName,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900, fontSize: 12))),
+              if (_chatEnabled) ...[
+                SizedBox(height: math.min(88, constraints.maxHeight * .14),
+                  child: ListView.builder(reverse: true, itemCount: _messages.length,
                     itemBuilder: (context, index) {
-                      final item =
-                          _messages[_messages.length - 1 - index];
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: _buildChatLine(item),
-                      );
-                    },
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        maxLength: 300,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          hintText: 'Write a message...',
-                          hintStyle: TextStyle(color: Colors.white54),
-                          counterText: '',
-                          isDense: true,
-                        ),
-                        onSubmitted: (_) => _sendMessage(),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _sendMessage,
-                      icon: const Icon(
-                        Icons.send,
-                        color: Color(0xFFB9AEFF),
-                      ),
-                    ),
-                  ],
-                ),
+                      final item = _messages[_messages.length - 1 - index];
+                      return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: _buildChatLine(item));
+                    })),
+                Row(children: [
+                  Expanded(child: TextField(controller: _messageController, maxLength: 300,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(hintText: 'Write a message…', counterText: '',
+                      hintStyle: const TextStyle(color: Colors.white54),
+                      filled: true, fillColor: const Color(0x55302047),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)),
+                    onSubmitted: (_) => _sendMessage())),
+                  IconButton(onPressed: _sendMessage, icon: const Icon(Icons.send, color: Color(0xFFE6C47A))),
+                ]),
               ],
-            ),
-          ),
-
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 14,
-          ),
-          color: const Color(0xFF1B1225),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: _isHost ? _hostControls() : _viewerControls()),
+              const SizedBox(height: 4),
+              SizedBox(height: 76, child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: (_isHost ? _hostControls() : _viewerControls())
+                  .map((control) => Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: control)).toList()),
+              )),
+            ]),
           ),
         ),
       ],
-    );
+    ));
   }
 
   List<Widget> _hostControls() {
