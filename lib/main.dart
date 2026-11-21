@@ -2502,7 +2502,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               }),
               const SizedBox(height: 4),
               const Text(
-                'Prime purchases debit wallet Coins on the server and activate a time-limited membership. The Owner controls each tier's price and duration.',
+                "Prime purchases debit wallet Coins on the server and activate a time-limited membership. The Owner controls each tier's price and duration.",
                 style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
             ],
@@ -3289,7 +3289,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       final expiry = item['expires_at'];
       return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
     });
-    final activeBgUrl = hasEquippedBg ? activeBgItem?['media_url']?.toString() ?? '' : '';
+    final activeBgUrl = hasEquippedBg ? (activeBgItem?['media_url']?.toString() ?? '') : '';
     final effectiveBgUrl = activeBgUrl.startsWith('http') ? activeBgUrl : profileBackgroundUrl;
     final hasPremiumBg = hasEquippedBg;
     final hasEquippedFrame = activeFrameItem != null && store.userBaggage.any((item) {
