@@ -194,7 +194,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
         final roomId = invitation['room_id'].toString();
         final room = await Backend.client
             .from('live_rooms')
-            .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
+            .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked, is_live')
             .eq('id', roomId)
             .maybeSingle();
         if (room == null || room['is_live'] != true) {
