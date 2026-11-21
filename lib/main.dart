@@ -103,6 +103,7 @@ class ZoonlStore extends ChangeNotifier {
   List<Map<String, dynamic>> cosmeticsCatalog = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> userBaggage = <Map<String, dynamic>>[];
+  Map<String, dynamic> userTrial = <String, dynamic>{};
 
   String officialHostingEmail = 'hosting@zoonllive.com';
   String officialHostingContact = '';
@@ -240,6 +241,7 @@ class ZoonlStore extends ChangeNotifier {
     cosmeticsCatalog = <Map<String, dynamic>>[];
     primeTiers = <Map<String, dynamic>>[];
     userBaggage = <Map<String, dynamic>>[];
+    userTrial = <String, dynamic>{};
     streamers.clear();
     shortVideos.clear();
     privateRooms.clear();
@@ -2181,6 +2183,20 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Text(activePrime.isEmpty
                   ? 'No active Prime membership on this account.'
                   : 'Active Prime memberships: ${activePrime.length}'),
+              if (store.userTrial.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    store.userTrial['trial_status'] == 'active' &&
+                            store.userTrial['svip_active'] == true
+                        ? 'SVIP Trial ACTIVE • expires ${store.userTrial['expires_at']}'
+                        : 'SVIP Trial EXPIRED • trial cosmetics are in Backup',
+                    style: const TextStyle(
+                        color: Color(0xFFD6B46A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                ),
               const SizedBox(height: 8),
               ...store.primeTiers.map((tier) {
                 final tierId = (tier['id'] as num?)?.toInt() ?? 0;
@@ -2299,13 +2315,17 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 final name =
                     (catalogItem['zoonl_item_name'] ?? code).toString();
                 final expiry = item['expires_at']?.toString();
+                final expiryDate = expiry == null ? null : DateTime.tryParse(expiry);
+                final expired = expiryDate != null && expiryDate.isBefore(DateTime.now());
                 return ListTile(
                   title: Text(name),
                   subtitle: Text(
-                    expiry == null ? 'Permanent item' : 'Expires: $expiry',
+                    expired
+                        ? 'Expired • moved to Backup'
+                        : expiry == null ? 'Permanent item' : 'Expires: $expiry',
                   ),
                   trailing: Text(
-                    item['is_equipped'] == true ? 'EQUIPPED' : 'OWNED',
+                    expired ? 'BACKUP' : item['is_equipped'] == true ? 'EQUIPPED' : 'OWNED',
                     style: const TextStyle(
                         color: Color(0xFFD6B46A), fontSize: 10),
                   ),
