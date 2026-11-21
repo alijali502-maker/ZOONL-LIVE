@@ -749,8 +749,6 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
     final members = (dashboard['members'] as List? ?? const [])
         .map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final gross = agencies.fold<double>(0, (sum, a) => sum + ((a['gross_earnings'] as num?)?.toDouble() ?? 0));
-    final commission = agencies.fold<double>(0, (sum, a) => sum + ((a['agency_commission'] as num?)?.toDouble() ?? 0));
 
     return Scaffold(
       backgroundColor: _bg,
@@ -763,7 +761,7 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
           : ListView(padding: const EdgeInsets.all(16), children: [
               _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
               const SizedBox(height: 12),
-              _portalCard('YOUR AGENCY WORKSPACE', 'This portal shows agencies approved for your account, linked streamers, verified earnings and the official contact details assigned by the Owner.', Icons.business),
+              _portalCard('YOUR AGENCY WORKSPACE', 'This portal shows agencies approved for your account, linked streamer roster, registration status and official contact details assigned by the Owner.', Icons.business),
               if (error != null)
                 Padding(padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text('Dashboard load failed: $error', style: const TextStyle(color: Color(0xFFE47777)))),
@@ -774,21 +772,15 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
                   Expanded(child: _agencyMetric('STREAMERS', members.length.toString(), Icons.people_alt)),
                 ]),
                 const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _agencyMetric('GROSS EARNINGS', gross.toStringAsFixed(2) + ' USD', Icons.payments)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _agencyMetric('AGENCY COMMISSION', commission.toStringAsFixed(2) + ' USD', Icons.account_balance)),
-                ]),
                 const SizedBox(height: 12),
                 for (final agency in agencies) ...[
                   _portalCard(
                     (agency['agency_name'] ?? 'Agency').toString(),
-                    'Agency ID: ' + (agency['agency_zoonl_id'] ?? 'Not linked').toString() +
-                    ' • Code: ' + (agency['agency_code'] ?? 'Pending').toString() +
+                    'Owner ZOONL ID: ' + (agency['agency_zoonl_id'] ?? 'Not linked').toString() +
+                    ' • Agency Code: ' + (agency['agency_code'] ?? 'Pending').toString() +
                     '\nType: ' + (agency['agency_type'] ?? 'streamer').toString().toUpperCase() +
                     ' • Status: ' + (agency['agency_status'] ?? 'pending').toString() +
-                    '\nApproved streamers: ' + (agency['member_count'] ?? 0).toString() +
-                    ' • Commission: ' + (agency['commission_percent'] ?? 0).toString() + '%',
+                    '\nApproved streamers: ' + (agency['member_count'] ?? 0).toString(),
                     Icons.verified,
                   ),
                   if ((agency['official_topup_number'] ?? '').toString().isNotEmpty)
@@ -796,11 +788,16 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
                       'Number: ' + agency['official_topup_number'].toString() +
                       '\nWhatsApp: ' + (agency['official_whatsapp_number'] ?? 'Not configured').toString(),
                       Icons.phone_android),
-                  _portalCard('EARNING SUMMARY',
-                    'Gross: ' + (agency['gross_earnings'] ?? 0).toString() +
-                    ' USD\nAgency commission: ' + (agency['agency_commission'] ?? 0).toString() +
-                    ' USD\nStreamer share: ' + (agency['streamer_earnings'] ?? 0).toString() + ' USD',
-                    Icons.analytics),
+                  final contact = agency['contact_details'] is Map
+                      ? Map<String, dynamic>.from(agency['contact_details'] as Map)
+                      : <String, dynamic>{};
+                  if (contact.isNotEmpty)
+                    _portalCard('REGISTERED AGENCY CONTACT',
+                      'Country: ' + (contact['country'] ?? agency['country'] ?? 'Not supplied').toString() +
+                      '\nEmail: ' + (contact['email'] ?? 'Not supplied').toString() +
+                      '\nPhone: ' + (contact['phone'] ?? 'Not supplied').toString() +
+                      '\nWhatsApp: ' + (contact['whatsapp'] ?? 'Not supplied').toString(),
+                      Icons.contact_phone),
                 ],
                 const SizedBox(height: 8),
                 const Text('REGISTERED STREAMERS', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
@@ -814,8 +811,7 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
                       subtitle: Text(
                         'ZOONL ID: ' + (member['zoonl_id'] ?? 'Not assigned').toString() +
                         ' • ' + (member['member_role'] ?? 'streamer').toString() +
-                        '\nStatus: ' + (member['member_status'] ?? 'pending').toString() +
-                        ' • Earnings: ' + (member['total_earned'] ?? 0).toString() + ' USD',
+                        '\nStatus: ' + (member['member_status'] ?? 'pending').toString(),
                         style: const TextStyle(color: _muted, fontSize: 10),
                       ),
                     )),
