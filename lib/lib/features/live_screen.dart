@@ -1797,18 +1797,63 @@ class _LiveScreenState extends State<LiveScreen> {
   Widget _liveGiftBanner() {
     final gift = _giftBanner ?? <String, dynamic>{};
     final image = (gift['media_url'] ?? gift['image_url'] ?? '').toString();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF5145A8), Color(0xFF1B2A4A)]),
-        borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFB9AEFF), width: 1.2)),
-      child: Row(children: [
-        if (image.isNotEmpty) _LiveGiftMedia(url: image, size: 42)
-        else const Icon(Icons.card_giftcard, color: Color(0xFFB9AEFF), size: 30),
-        const SizedBox(width: 10),
-        Expanded(child: Text('${gift['sender_name'] ?? 'Viewer'} sent ${gift['gift_name'] ?? 'a gift'} ×${gift['quantity'] ?? 1}',
-          maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
-        Text('${gift['total_coins'] ?? 0} coins', style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 10)),
-      ]),
+    final screen = MediaQuery.of(context).size;
+    final mediaSize = math.min(screen.width * 0.82, screen.height * 0.52)
+        .clamp(150.0, 360.0).toDouble();
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: 1,
+        duration: const Duration(milliseconds: 240),
+        child: Container(
+          color: const Color(0xCC080510),
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF302047), Color(0xFF171126), Color(0xFF100B1D)],
+                ),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: const Color(0xFFE6C47A), width: 1.4),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x669360F5), blurRadius: 34, spreadRadius: 3),
+                  BoxShadow(color: Color(0x55E6C47A), blurRadius: 20),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('GIFT ARRIVED',
+                    style: TextStyle(color: Color(0xFFE6C47A), fontSize: 12,
+                      fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  const SizedBox(height: 12),
+                  if (image.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: _LiveGiftMedia(url: image, size: mediaSize),
+                    )
+                  else
+                    SizedBox(width: mediaSize, height: mediaSize,
+                      child: const Icon(Icons.card_giftcard, color: Color(0xFFE6C47A), size: 100)),
+                  const SizedBox(height: 14),
+                  Text((gift['gift_name'] ?? 'Live Gift').toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 22,
+                      fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Text('${gift['sender_name'] ?? 'Viewer'}  •  ×${gift['quantity'] ?? 1}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFFD9C9EC), fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2440,7 +2485,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     : _videoLayer(),
               ),
               if (_giftBanner != null)
-                Positioned(top: 62, left: 14, right: 14, child: _liveGiftBanner()),
+                Positioned.fill(child: _liveGiftBanner()),
               Positioned(
                 top: 14,
                 left: 14,
@@ -2450,8 +2495,10 @@ class _LiveScreenState extends State<LiveScreen> {
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    gradient: const LinearGradient(colors: [Color(0xFF542CA0), Color(0xFF211735)]),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE6C47A), width: 1),
+                    boxShadow: const [BoxShadow(color: Color(0x559360F5), blurRadius: 14)],
                   ),
                   child: Row(
                     children: [
