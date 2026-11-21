@@ -174,6 +174,7 @@ class ZoonlAuthGate extends StatelessWidget {
                     final appStore = zoonl.ZoonlStore.instance;
                     appStore.setAppMode(zoonl.ZoonlAppMode.live);
                     appStore.memberships = home.memberships;
+                    appStore.walletTransactions = home.walletTransactions;
                     appStore.agencyApplications = home.agencyApplications;
                     appStore.giftCatalog = home.gifts;
                     appStore.cosmeticsCatalog = home.cosmetics;
