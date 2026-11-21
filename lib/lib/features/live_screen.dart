@@ -81,6 +81,16 @@ class _LiveScreenState extends State<LiveScreen> {
 
   String? get _myId => _supabase.auth.currentUser?.id;
 
+  static const List<String> _levelStickers = <String>[
+    '🌱 ROOKIE', '💠 RISING', '🦅 FALCON', '🦁 JUNGLE LORD', '🏰 PALACE DUKE',
+    '💎 MILLIONAIRE', '🔥 SULTAN FIRE', '👑 ROYAL KING', '💖 HEART EMPEROR', '🏆 SUPREME LEGEND',
+  ];
+
+  String get _liveLevelSticker {
+    final index = ((_hostLevel - 1) ~/ 10).clamp(0, _levelStickers.length - 1);
+    return _levelStickers[index];
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1608,7 +1618,7 @@ class _LiveScreenState extends State<LiveScreen> {
                       Icon(Icons.circle, size: 8, color: Colors.white),
                       SizedBox(width: 6),
                       Text(
-                        _privateRoom || _lockedRoom ? 'PRIVATE LIVE • LEVEL $_hostLevel' : 'LIVE • LEVEL $_hostLevel',
+                        _privateRoom || _lockedRoom ? 'PRIVATE LIVE • $_liveLevelSticker • LV $_hostLevel' : 'LIVE • $_liveLevelSticker • LV $_hostLevel',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
