@@ -2404,6 +2404,26 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  Widget _walletBalanceTile(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF6C4A82)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFD6B46A), size: 20),
+          const SizedBox(height: 5),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildWalletAndEarningScreen() {
     final int coins =
         (store.currentUser['coins'] as num?)?.toInt() ?? 0;
@@ -2439,12 +2459,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               ...const <(String, String)>[
-                ('$10', '30,000 Coins'),
-                ('$20', '60,000 Coins'),
-                ('$30', '90,000 Coins'),
-                ('$40', '120,000 Coins'),
-                ('$50', '150,000 Coins'),
-                ('$60', '180,000 Coins'),
+                ('\$10', '30,000 Coins'),
+                ('\$20', '60,000 Coins'),
+                ('\$30', '90,000 Coins'),
+                ('\$40', '120,000 Coins'),
+                ('\$50', '150,000 Coins'),
+                ('\$60', '180,000 Coins'),
               ].map((package) => ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
