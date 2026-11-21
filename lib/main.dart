@@ -1225,11 +1225,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                   Navigator.pop(sheetContext);
                   Navigator.of(context).push<void>(
                     MaterialPageRoute<void>(
-                      builder: (_) => LiveScreen(
-                        userName: (store.currentUser['name'] ?? 'ZOONL Host').toString(),
-                        userId: (store.currentUser['id'] ?? '').toString(),
-                        roomType: 'video',
-                      ),
+                      builder: (_) => const FeatureHubScreen(),
                     ),
                   );
                 },
