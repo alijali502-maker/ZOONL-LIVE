@@ -507,6 +507,11 @@ class _LiveScreenState extends State<LiveScreen> {
       );
 
       if (accept) {
+        if (seatId == null) {
+          _guestInviteDialogShown = false;
+          _showMessage('Guest invitation expired or the seat is no longer available.');
+          return;
+        }
         await _disconnectLiveKit();
         await _connectLiveKit(roomId);
         if (mounted) {
