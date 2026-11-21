@@ -963,8 +963,8 @@ class _LiveScreenState extends State<LiveScreen> {
     final userId = member['user_id']?.toString() ?? '';
     if (userId.isEmpty) return;
     try {
-      final profile = await _supabase.from('profiles')
-          .select('display_name').eq('id', userId).maybeSingle();
+      final publicProfile = await _supabase.from('user_public_profiles')
+          .select('username,zoonl_id').eq('user_id', userId).maybeSingle();
       final code = member['entry_code']?.toString() ?? '';
       Map<String, dynamic>? effect;
       if (code.isNotEmpty) {
@@ -978,7 +978,9 @@ class _LiveScreenState extends State<LiveScreen> {
       if (!mounted) return;
       _entryBannerTimer?.cancel();
       setState(() {
-        _entryBannerName = profile?['display_name']?.toString() ?? 'ZOONL Member';
+        _entryBannerName = (publicProfile?['username']?.toString().trim().isNotEmpty == true)
+            ? publicProfile!['username'].toString()
+            : 'ID ${publicProfile?['zoonl_id'] ?? 'Member'}';
         _entryBannerEffect = effect?['zoonl_item_name']?.toString() ?? 'Standard Entry';
         _entryBannerMedia = effect?['media_url']?.toString();
       });
