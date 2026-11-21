@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../event_control_screen.dart';
+import '../../streamer_progress_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
@@ -2011,6 +2012,15 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Widget> _hostControls() {
     return [
       _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
+      _control(
+        icon: Icons.stars,
+        label: 'Stars & History',
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const StreamerProgressScreen(),
+          ),
+        ),
+      ),
       _control(icon: Icons.sports_mma, label: 'PK Battle', onTap: _openPkBattle),
       _control(icon: _privateRoom || _lockedRoom ? Icons.lock : Icons.lock_open,
           label: 'Privacy', onTap: _showPrivacySettings),
