@@ -13,6 +13,7 @@ import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
+import 'manual_topup_panel.dart';
 import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
 
@@ -2731,12 +2732,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               ...const <(String, String)>[
-                ('\$10', '30,000 Coins'),
-                ('\$20', '60,000 Coins'),
-                ('\$30', '90,000 Coins'),
-                ('\$40', '120,000 Coins'),
-                ('\$50', '150,000 Coins'),
-                ('\$60', '180,000 Coins'),
+                (r'\$10', '45,000 Coins'),
+                (r'\$20', '90,000 Coins'),
+                (r'\$30', '135,000 Coins'),
+                (r'\$40', '180,000 Coins'),
+                (r'\$50', '225,000 Coins'),
+                (r'\$60', '270,000 Coins'),
+                (r'\$70', '315,000 Coins'),
+                (r'\$80', '360,000 Coins'),
+                (r'\$90', '405,000 Coins'),
+                (r'\$100', '450,000 Coins'),
               ].map((package) => ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
@@ -2745,12 +2750,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 trailing: Text(package.$2, style: const TextStyle(color: Color(0xFFD6B46A))),
               )),
               const Text(
-                'Payment checkout is not connected yet. These package values are shown for reference only; no purchase or coin credit is triggered here.',
+                'Manual top-ups are credited only after an authorized reviewer verifies the receipt.',
                 style: TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ],
           ),
         ),
+        ManualTopupPanel(userId: Backend.currentUserId ?? ''),
         _luxuryCard(
           title: 'Wallet Transaction History',
           child: store.walletTransactions.isEmpty
