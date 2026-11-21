@@ -1216,8 +1216,14 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _showMessage(
-                    'Private Room needs secure server integration.',
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => LiveScreen(
+                        userName: (store.currentUser['name'] ?? 'ZOONL Host').toString(),
+                        userId: (store.currentUser['id'] ?? '').toString(),
+                        roomType: 'video',
+                      ),
+                    ),
                   );
                 },
               ),
