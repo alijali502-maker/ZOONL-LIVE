@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
 import 'package:permission_handler/permission_handler.dart';
@@ -40,6 +41,14 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _chatEnabled = true;
   bool _hostSeen = false;
   late String _selectedRoomType = widget.roomType;
+  CameraController? _previewCamera;
+  List<CameraDescription> _availableCameras = <CameraDescription>[];
+  bool _previewLoading = false;
+  bool _frontCamera = true;
+  String? _previewError;
+  String _previewFilter = 'Natural';
+  double _filterStrength = 0.35;
+  static const List<String> _previewFilters = <String>['Natural', 'Warm', 'Cool', 'Mono', 'Rose'];
 
   String? _roomId;
   String? _roomOwnerId;
@@ -64,6 +73,8 @@ class _LiveScreenState extends State<LiveScreen> {
     if (!_isHost) {
       _busy = true;
       _joinAsViewer();
+    } else if (_selectedRoomType == 'video') {
+      unawaited(_initializePreviewCamera());
     }
   }
 
