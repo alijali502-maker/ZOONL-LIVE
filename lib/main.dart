@@ -2405,83 +2405,92 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildWalletAndEarningScreen() {
-    final int nowDay = DateTime.now().day;
-    final bool inPayoutWindow = nowDay >= 1 && nowDay <= 5;
-
     final int coins =
         (store.currentUser['coins'] as num?)?.toInt() ?? 0;
-    final double walletBalance =
-        (store.currentUser['walletBalance'] as num?)?.toDouble() ??
-            0.0;
+    final int diamonds =
+        (store.currentUser['diamonds'] as num?)?.toInt() ?? 0;
 
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title: 'Wallet & 65% Streamer Earning',
+          title: 'Wallet • Live Supabase Balance',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Coins: $coins'),
-              Text(
-                'Streamer Wallet Balance: \$'
-                '${walletBalance.toStringAsFixed(2)}',
+              Row(
+                children: <Widget>[
+                  Expanded(child: _walletBalanceTile('COINS', coins.toString(), Icons.monetization_on)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _walletBalanceTile('DIAMONDS', diamonds.toString(), Icons.diamond)),
+                ],
               ),
-              Text(
-                inPayoutWindow
-                    ? 'Payout Window Open (1–5)'
-                    : 'Payout window: monthly, from day 1 to day 5.',
-                style: const TextStyle(
-                  color: Color(0xFFD6B46A),
-                ),
+              const SizedBox(height: 8),
+              const Text(
+                'Balances are loaded from the authenticated wallet record. Coin additions and gift deductions are written by secured Supabase functions.',
+                style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
-              const SizedBox(height: 6),
-              Text(
-                store.isTestMode
-                    ? 'TEST MODE: This balance is test-session data only.'
-                    : 'LIVE MODE: Balance and payout must come from the verified server ledger.',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white60,
-                ),
-              ),
-              if (store.isTestMode) ...<Widget>[
-                const Divider(height: 20),
-                const Text(
-                  'Add test Coins for Gift System checks',
-                  style: TextStyle(
-                    color: Color(0xFFD6B46A),
-                  ),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(1000);
-                        _showMessage('1,000 test Coins added.');
-                      },
-                      child: const Text('+1,000 TEST'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(10000);
-                        _showMessage('10,000 test Coins added.');
-                      },
-                      child: const Text('+10,000 TEST'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(200000);
-                        _showMessage('200,000 test Coins added.');
-                      },
-                      child: const Text('+200,000 TEST'),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
+        ),
+        _luxuryCard(
+          title: 'Top-up Packages',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              ...const <(String, String)>[
+                ('$10', '30,000 Coins'),
+                ('$20', '60,000 Coins'),
+                ('$30', '90,000 Coins'),
+                ('$40', '120,000 Coins'),
+                ('$50', '150,000 Coins'),
+                ('$60', '180,000 Coins'),
+              ].map((package) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.payments_outlined, color: Color(0xFFD6B46A)),
+                title: Text(package.$1, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                trailing: Text(package.$2, style: const TextStyle(color: Color(0xFFD6B46A))),
+              )),
+              const Text(
+                'Payment checkout is not connected yet. These package values are shown for reference only; no purchase or coin credit is triggered here.',
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'Wallet Transaction History',
+          child: store.walletTransactions.isEmpty
+              ? const Text('No wallet transactions found for this account.',
+                  style: TextStyle(color: Colors.white60))
+              : Column(
+                  children: store.walletTransactions.take(20).map((tx) {
+                    final amount = (tx['amount'] as num?)?.toInt() ?? 0;
+                    final currency = (tx['currency'] ?? '').toString().toUpperCase();
+                    final type = (tx['transaction_type'] ?? 'transaction').toString();
+                    final description = (tx['description'] ?? '').toString();
+                    final created = (tx['created_at'] ?? '').toString();
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        amount >= 0 ? Icons.arrow_downward : Icons.arrow_upward,
+                        color: amount >= 0 ? Colors.greenAccent : Colors.orangeAccent,
+                      ),
+                      title: Text(
+                        '${amount >= 0 ? '+' : ''}$amount $currency',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        '$type • $description\n$created',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                    );
+                  }).toList(),
+                ),
         ),
         _luxuryCard(
           title: 'Earning Folder — Direct / Agency Registration',
