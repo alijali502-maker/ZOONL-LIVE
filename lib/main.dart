@@ -14,6 +14,7 @@ import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'manual_topup_panel.dart';
+import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
 
@@ -1464,6 +1465,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
   String kycCountry = 'Pakistan';
   String kycDob = '';
+  final TextEditingController kycLegalNameCtrl = TextEditingController();
 
   bool kycFrontUploaded = false;
   bool kycBackUploaded = false;
@@ -1530,6 +1532,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     shortCaptionCtrl.dispose();
     payoutAccountCtrl.dispose();
     agencyTrackCtrl.dispose();
+    kycLegalNameCtrl.dispose();
     super.dispose();
   }
 
@@ -2648,8 +2651,78 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     }
   }
 
+
+  Future<void> _pickKycDateOfBirth() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Select your real date of birth',
+    );
+    if (picked != null && mounted) {
+      setState(() => kycDob =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}');
+    }
+  }
+
+  Widget _kycDocumentCard({
+    required String title,
+    required String guidance,
+    required IconData icon,
+    required bool uploaded,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: uploaded ? const Color(0xFF4BC2B0) : const Color(0xFF6C4A82)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: const Color(0xFF34234A),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: const Color(0xFFD6B46A), size: 31),
+        ),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(guidance, style: const TextStyle(color: Colors.white60, fontSize: 10)),
+        ])),
+        const SizedBox(width: 6),
+        Icon(uploaded ? Icons.check_circle : Icons.upload_file,
+          color: uploaded ? const Color(0xFF4BC2B0) : const Color(0xFFD6B46A)),
+        IconButton(
+          tooltip: 'Choose from gallery',
+          onPressed: kycUploading || registrationSubmitted ? null : onTap,
+          icon: const Icon(Icons.photo_library_outlined, color: Color(0xFFD6B46A)),
+        ),
+      ]),
+    );
+  }
+
   Future<void> _submitKyc() async {
     if (registrationSubmitted || kycSubmitting) return;
+    final dob = DateTime.tryParse(kycDob);
+    final now = DateTime.now();
+    final age = dob == null ? 0 : now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
+    if (kycLegalNameCtrl.text.trim().length < 3 || dob == null) {
+      _showMessage('Enter your legal name and real date of birth first.');
+      return;
+    }
+    if (age < 18) {
+      _showMessage('Host verification is only available to adults aged 18 or above.');
+      return;
+    }
     if (kycFrontPath == null || kycBackPath == null || kycSelfiePath == null) {
       _showMessage('Upload ID front, ID back and selfie with ID first.');
       return;
@@ -2659,6 +2732,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       await Backend.client.rpc(
         'submit_host_verification',
         params: <String, dynamic>{
+          'p_legal_name': kycLegalNameCtrl.text.trim(),
+          'p_date_of_birth': kycDob,
           'p_country': kycCountry,
           'p_id_front_path': kycFrontPath,
           'p_id_back_path': kycBackPath,
@@ -2800,55 +2875,67 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              TextField(
+                controller: kycLegalNameCtrl,
+                enabled: !registrationSubmitted,
+                decoration: const InputDecoration(labelText: 'Legal name as shown on ID'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: registrationSubmitted ? null : _pickKycDateOfBirth,
+                icon: const Icon(Icons.calendar_month),
+                label: Text(kycDob.isEmpty ? 'SELECT DATE OF BIRTH' : 'DATE OF BIRTH: $kycDob'),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Host verification and creator payouts are for adults aged 18+. Enter your real date of birth. Under-18 accounts cannot submit this application.',
+                style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
+              ),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: kycCountry,
                 items: const <String>[
-                  'Pakistan',
-                  'UAE',
+                  'United Arab Emirates',
                   'Saudi Arabia',
+                  'Qatar',
+                  'Kuwait',
+                  'Bahrain',
+                  'Oman',
+                  'Pakistan',
                   'India',
+                  'Bangladesh',
+                  'United Kingdom',
+                  'United States',
                   'Other',
-                ].map((String country) {
-                  return DropdownMenuItem<String>(
-                    value: country,
-                    child: Text(country),
-                  );
-                }).toList(),
-                onChanged: (String? value) {
-                  setState(() {
-                    kycCountry = value ?? 'Pakistan';
-                  });
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Country',
-                ),
+                ].map((String country) => DropdownMenuItem<String>(
+                  value: country, child: Text(country),
+                )).toList(),
+                onChanged: (String? value) => setState(() => kycCountry = value ?? 'United Arab Emirates'),
+                decoration: const InputDecoration(labelText: 'Country'),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'KYC document submission is handled through the secure verification service.',
+              const SizedBox(height: 12),
+              const Text('DOCUMENT PHOTO GUIDE', style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+              const SizedBox(height: 7),
+              _kycDocumentCard(
+                title: '1. ID Front Side',
+                guidance: 'Keep the full front side visible, sharp and without glare.',
+                icon: Icons.credit_card,
+                uploaded: kycFrontUploaded,
+                onTap: () => _pickKycDocument('id-front'),
               ),
-              Wrap(
-                spacing: 8,
-                children: <Widget>[
-                  OutlinedButton(
-                    onPressed: kycUploading || registrationSubmitted
-                        ? null
-                        : () => _pickKycDocument('id-front'),
-                    child: Text(kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front'),
-                  ),
-                  OutlinedButton(
-                    onPressed: kycUploading || registrationSubmitted
-                        ? null
-                        : () => _pickKycDocument('id-back'),
-                    child: Text(kycBackUploaded ? 'Back ID ✓' : 'Upload ID Back'),
-                  ),
-                  OutlinedButton(
-                    onPressed: kycUploading || registrationSubmitted
-                        ? null
-                        : () => _pickKycDocument('selfie-with-id'),
-                    child: Text(kycCardSelfieUploaded ? 'Selfie ✓' : 'Upload Selfie with ID'),
-                  ),
-                ],
+              _kycDocumentCard(
+                title: '2. ID Back Side',
+                guidance: 'Show the complete reverse side and all readable details.',
+                icon: Icons.badge_outlined,
+                uploaded: kycBackUploaded,
+                onTap: () => _pickKycDocument('id-back'),
+              ),
+              _kycDocumentCard(
+                title: '3. Selfie With ID',
+                guidance: 'Face and ID should both be clearly visible in one photo.',
+                icon: Icons.face_retouching_natural,
+                uploaded: kycCardSelfieUploaded,
+                onTap: () => _pickKycDocument('selfie-with-id'),
               ),
               if (kycMessage != null)
                 Padding(
@@ -2862,12 +2949,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 label: Text(kycSubmitting ? 'Submitting...' : registrationSubmitted ? 'Verification Submitted' : 'SUBMIT HOST VERIFICATION'),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: payoutAccountCtrl,
-                enabled: !registrationSubmitted,
-                decoration: const InputDecoration(
-                  labelText: 'Payout Account',
-                ),
+              const Text(
+                'Payout account linking will be connected through an approved payment provider. Do not enter bank passwords, card security codes or full card details in this form.',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -2878,31 +2962,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: registrationSubmitted
-                    ? null
-                    : () {
-                        if (store.isLiveMode) {
-                          _showMessage(
-                            'KYC submission requires the secure server service.',
-                          );
-                          return;
-                        }
-                        if (payoutAccountCtrl.text.trim().isEmpty) {
-                          _showMessage(
-                            'Enter a payout account for this TEST form.',
-                          );
-                          return;
-                        }
-                        _showMessage(
-                          'TEST form is not submitted to a real KYC service.',
-                        );
-                      },
-                child: Text(
-                  registrationSubmitted
-                      ? 'Registration Submitted'
-                      : 'Submit Registration',
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const AgencyPortalScreen()),
                 ),
+                icon: const Icon(Icons.business_center),
+                label: const Text('OPEN AGENCY REGISTRATION PORTAL'),
               ),
             ],
           ),
