@@ -61,11 +61,11 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF100B18),
+      backgroundColor: const Color(0xFF070B17),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B1225),
+        backgroundColor: const Color(0xFF0D1426),
         title: Text(widget.onlyMine ? 'MY SHORTS' : 'SHORT VIDEO FEED',
-          style: const TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+          style: const TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
       body: _loading
@@ -73,7 +73,7 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
           : _error != null
               ? Center(child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Text(_error!, style: const TextStyle(color: Colors.orangeAccent)),
+                  child: Text(_error!, style: const TextStyle(color: const Color(0xFF9B8CFF))),
                 ))
               : _videos.isEmpty
                   ? const Center(child: Text('No short videos yet.', style: TextStyle(color: Colors.white70)))
@@ -85,11 +85,11 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
                         itemBuilder: (context,index) {
                           final video = _videos[index];
                           return Card(
-                            color: const Color(0xFF21152F),
+                            color: const Color(0xFF141E35),
                             child: ListTile(
                               leading: const CircleAvatar(
-                                backgroundColor: Color(0xFF49305E),
-                                child: Icon(Icons.play_arrow, color: Color(0xFFE5BD70)),
+                                backgroundColor: Color(0xFF29395D),
+                                child: Icon(Icons.play_arrow, color: Color(0xFFB9AEFF)),
                               ),
                               title: Text(
                                 (video['caption'] ?? 'ZOONL Short').toString().isEmpty
@@ -101,7 +101,7 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
                                 'ID ${video['zoonl_id']} • ${video['duration_seconds']} sec • ${video['likes_count']} likes',
                                 style: const TextStyle(color: Colors.white60, fontSize: 11),
                               ),
-                              trailing: const Icon(Icons.chevron_right, color: Color(0xFFE5BD70)),
+                              trailing: const Icon(Icons.chevron_right, color: Color(0xFFB9AEFF)),
                               onTap: () async {
                                 await Navigator.of(context).push(MaterialPageRoute<void>(
                                   builder: (_) => ShortVideoPlayerScreen(video: video),
@@ -206,8 +206,8 @@ class _ShortVideoPlayerScreenState extends State<ShortVideoPlayerScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B1225),
-        title: const Text('ZOONL SHORT', style: TextStyle(color: Color(0xFFE5BD70))),
+        backgroundColor: const Color(0xFF0D1426),
+        title: const Text('ZOONL SHORT', style: TextStyle(color: Color(0xFFB9AEFF))),
       ),
       body: Column(
         children: [
@@ -226,7 +226,7 @@ class _ShortVideoPlayerScreenState extends State<ShortVideoPlayerScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: const Color(0xFF1B1225),
+            color: const Color(0xFF0D1426),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
