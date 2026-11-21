@@ -949,6 +949,81 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {});
   }
 
+  Future<void> _showLiveViewerList() async {
+    final room = _lk;
+    if (room == null || !mounted) return;
+    final participants = room.remoteParticipants.values.where((p) =>
+      _isHost || p.identity != _roomOwnerId
+    ).toList();
+    final ids = participants.map((p) => p.identity).where((id) => id.isNotEmpty).toList();
+    if (ids.isEmpty) {
+      _showMessage('अभी कोई viewer नहीं है।');
+      return;
+    }
+    try {
+      final profiles = await _supabase.from('profiles')
+          .select('id,display_name,avatar_url').inFilter('id', ids);
+      final publicProfiles = await _supabase.from('user_public_profiles')
+          .select('user_id,zoonl_id').inFilter('user_id', ids);
+      final profileById = <String, Map<String, dynamic>>{
+        for (final row in profiles) row['id'].toString(): Map<String, dynamic>.from(row),
+      };
+      final publicById = <String, Map<String, dynamic>>{
+        for (final row in publicProfiles) row['user_id'].toString(): Map<String, dynamic>.from(row),
+      };
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF101010),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * .62,
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                child: Row(children: [
+                  const Icon(Icons.visibility, color: Colors.white70),
+                  const SizedBox(width: 9),
+                  Text('LIVE VIEWERS  •  ${ids.length}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                ]),
+              ),
+              const Divider(color: Color(0x33FFFFFF), height: 1),
+              Expanded(child: ListView.separated(
+                itemCount: ids.length,
+                separatorBuilder: (_, __) => const Divider(color: Color(0x1FFFFFFF), height: 1),
+                itemBuilder: (_, index) {
+                  final id = ids[index];
+                  final profile = profileById[id] ?? const <String, dynamic>{};
+                  final publicProfile = publicById[id] ?? const <String, dynamic>{};
+                  final name = (profile['display_name'] ?? participants[index].name).toString();
+                  final zoonlId = (publicProfile['zoonl_id'] ?? 'Not set').toString();
+                  final avatar = profile['avatar_url']?.toString() ?? '';
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF303030),
+                      backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                      child: avatar.isEmpty ? const Icon(Icons.person, color: Colors.white70) : null,
+                    ),
+                    title: Text(name.isEmpty ? 'Viewer' : name,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    subtitle: Text('ZOONL ID: $zoonlId',
+                      style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                    trailing: const Icon(Icons.circle, color: Color(0xFF54D68B), size: 9),
+                  );
+                },
+              )),
+            ]),
+          ),
+        ),
+      );
+    } catch (error) {
+      _showMessage('Viewer list नहीं खुली: ${_readable(error)}');
+    }
+  }
+
   Future<void> _disconnectLiveKit() async {
     final room = _lk;
     _lk = null;
@@ -2557,7 +2632,10 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _buildLiveRoom() {
-    final viewers = _lk?.remoteParticipants.length ?? 0;
+    final liveParticipants = _lk?.remoteParticipants.values.where((p) =>
+      _isHost || p.identity != _roomOwnerId
+    ).toList() ?? <Participant>[];
+    final viewers = liveParticipants.length;
 
     return Column(
       children: [
@@ -2588,25 +2666,34 @@ class _LiveScreenState extends State<LiveScreen> {
               Positioned(
                 top: 14,
                 right: 14,
-                child: Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.visibility,
-                        color: Colors.white,
-                        size: 17,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _showLiveViewerList,
+                    borderRadius: BorderRadius.circular(22),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(22),
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xAA050505),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0x77FFFFFF)),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.visibility, color: Colors.white, size: 17),
+                            const SizedBox(width: 6),
+                            Text('$viewers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                            const SizedBox(width: 5),
+                            const Text('VIEWERS', style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right, color: Colors.white70, size: 15),
+                          ]),
+                        ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$viewers',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
