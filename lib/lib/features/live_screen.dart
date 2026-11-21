@@ -379,6 +379,308 @@ class _LiveScreenState extends State<LiveScreen> {
     return null;
   }
 
+  Future<void> _refreshGuestState() async {
+    final roomId = _roomId;
+    final myId = _myId;
+    if (!mounted || !_isLive || roomId == null || myId == null) return;
+
+    try {
+      if (_isHost) {
+        final rows = await _supabase
+            .from('room_guest_seats')
+            .select('id, seat_number, user_id, seat_status, is_video_enabled, is_audio_enabled')
+            .eq('room_id', roomId)
+            .order('seat_number', ascending: true);
+        if (mounted) {
+          setState(() {
+            _guestSeats = (rows as List)
+                .map((row) => Map<String, dynamic>.from(row as Map))
+                .toList();
+          });
+        }
+        return;
+      }
+
+      final invitations = await _supabase
+          .from('room_guest_invitations')
+          .select('id, seat_number, inviter_id, invite_status, expires_at, is_video_enabled, is_audio_enabled')
+          .eq('room_id', roomId)
+          .eq('invitee_id', myId)
+          .eq('invite_status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      if ((invitations as List).isNotEmpty && !_guestInviteDialogShown) {
+        unawaited(_showIncomingGuestInvite(
+          Map<String, dynamic>.from(invitations.first as Map),
+        ));
+      }
+
+      if (_isGuest) {
+        final seat = await _supabase
+            .from('room_guest_seats')
+            .select('id, seat_number, is_video_enabled, is_audio_enabled')
+            .eq('room_id', roomId)
+            .eq('user_id', myId)
+            .eq('seat_status', 'occupied')
+            .maybeSingle();
+        if (mounted && seat != null) {
+          setState(() => _guestSeatId = seat['id']?.toString());
+        }
+      }
+    } catch (error) {
+      // Guest polling is best-effort; the main live session stays connected.
+    }
+  }
+
+  Future<void> _showIncomingGuestInvite(Map<String, dynamic> invitation) async {
+    if (!mounted || _guestInviteDialogShown) return;
+    _guestInviteDialogShown = true;
+    final accept = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF241630),
+        title: const Text('Guest Seat Invitation',
+            style: TextStyle(color: Color(0xFFE5BD70))),
+        content: Text(
+          'The host invited you to guest seat ${invitation['seat_number']}. Join this live room as a guest?',
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Decline'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+
+    if (accept == null) return;
+    await _respondGuestInvitation(invitation['id'].toString(), accept);
+  }
+
+  Future<void> _respondGuestInvitation(String invitationId, bool accept) async {
+    final roomId = _roomId;
+    if (roomId == null) return;
+    try {
+      if (accept) {
+        final mic = await Permission.microphone.request();
+        if (!mic.isGranted) {
+          _showMessage('Microphone permission is required to join as a guest.');
+          _guestInviteDialogShown = false;
+          return;
+        }
+        if (_selectedRoomType == 'video') {
+          await Permission.camera.request();
+        }
+      }
+
+      final seatId = await _supabase.rpc(
+        'room_respond_guest_invitation',
+        params: <String, dynamic>{
+          'p_invitation_id': invitationId,
+          'p_accept': accept,
+        },
+      );
+
+      if (accept) {
+        await _disconnectLiveKit();
+        await _connectLiveKit(roomId);
+        if (mounted) {
+          setState(() {
+            _isGuest = true;
+            _guestSeatId = seatId?.toString();
+          });
+        }
+        _showMessage('You joined the live as a guest.');
+      } else {
+        _showMessage('Guest invitation declined.');
+      }
+    } catch (error) {
+      _guestInviteDialogShown = false;
+      _showMessage('Guest invitation failed: ${_readable(error)}');
+    }
+  }
+
+  Future<void> _showGuestInviteDialog() async {
+    final roomId = _roomId;
+    if (roomId == null || !_isHost) return;
+    final idController = TextEditingController();
+    int seatNumber = 1;
+    bool videoEnabled = _selectedRoomType == 'video';
+    bool audioEnabled = true;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF241630),
+          title: const Text('Invite Guest', style: TextStyle(color: Color(0xFFE5BD70))),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: idController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'Guest ZOONL ID',
+                  labelStyle: TextStyle(color: Colors.white70),
+                ),
+              ),
+              const SizedBox(height: 10),
+              DropdownButton<int>(
+                value: seatNumber,
+                dropdownColor: const Color(0xFF241630),
+                isExpanded: true,
+                items: List<DropdownMenuItem<int>>.generate(
+                  6,
+                  (index) => DropdownMenuItem<int>(
+                    value: index + 1,
+                    child: Text('Guest Seat ${index + 1}'),
+                  ),
+                ),
+                onChanged: (value) {
+                  if (value != null) setDialogState(() => seatNumber = value);
+                },
+              ),
+              if (_selectedRoomType == 'video')
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Guest Video', style: TextStyle(color: Colors.white)),
+                  value: videoEnabled,
+                  onChanged: (value) => setDialogState(() => videoEnabled = value ?? false),
+                ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Guest Audio', style: TextStyle(color: Colors.white)),
+                value: audioEnabled,
+                onChanged: (value) => setDialogState(() => audioEnabled = value ?? false),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, <String, dynamic>{
+                'zoonl_id': idController.text.trim(),
+                'seat_number': seatNumber,
+                'video_enabled': videoEnabled,
+                'audio_enabled': audioEnabled,
+              }),
+              child: const Text('Send Invite'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final guestId = (result?['zoonl_id'] ?? '').toString();
+    idController.dispose();
+    if (result == null || guestId.isEmpty) return;
+
+    try {
+      await _supabase.rpc(
+        'room_invite_guest',
+        params: <String, dynamic>{
+          'p_room_id': roomId,
+          'p_target_zoonl_id': guestId,
+          'p_seat_number': result['seat_number'],
+          'p_video_enabled': result['video_enabled'],
+          'p_audio_enabled': result['audio_enabled'],
+        },
+      );
+      _showMessage('Guest invitation sent.');
+    } catch (error) {
+      _showMessage('Could not invite guest: ${_readable(error)}');
+    }
+  }
+
+  Widget _guestMiniOverlay() {
+    final room = _lk;
+    if (room == null) return const SizedBox.shrink();
+
+    if (_isGuest) {
+      VideoTrack? localTrack;
+      for (final publication
+          in room.localParticipant?.videoTrackPublications ?? const []) {
+        if (publication.track is VideoTrack) {
+          localTrack = publication.track as VideoTrack;
+          break;
+        }
+      }
+      if (localTrack == null) return const SizedBox.shrink();
+      return Container(
+        width: 112,
+        height: 156,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xFF21152F),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE5BD70), width: 2),
+        ),
+        child: VideoTrackRenderer(localTrack),
+      );
+    }
+
+    if (!_isHost) return const SizedBox.shrink();
+    final guests = room.remoteParticipants.values.where((participant) {
+      if (participant.identity == _roomOwnerId) return false;
+      return participant.videoTrackPublications.any(
+        (publication) => publication.track is VideoTrack,
+      );
+    }).toList();
+    if (guests.isEmpty) return const SizedBox.shrink();
+
+    final participant = guests.first;
+    VideoTrack? guestTrack;
+    for (final publication in participant.videoTrackPublications) {
+      if (publication.track is VideoTrack) {
+        guestTrack = publication.track as VideoTrack;
+        break;
+      }
+    }
+    if (guestTrack == null) return const SizedBox.shrink();
+    return Container(
+      width: 112,
+      height: 156,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: const Color(0xFF21152F),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE5BD70), width: 2),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          VideoTrackRenderer(guestTrack),
+          Positioned(
+            left: 4,
+            right: 4,
+            bottom: 4,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              color: Colors.black54,
+              child: Text(
+                'Guest ${participant.identity.substring(0, participant.identity.length > 6 ? 6 : participant.identity.length)}',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ---------- Realtime: chat + room end ----------
   void _subscribeRealtime(String roomId) {
     _channel = _supabase
@@ -1017,6 +1319,12 @@ class _LiveScreenState extends State<LiveScreen> {
                   ),
                 ),
               ),
+              if (_isHost && _guestSeats.any((seat) => seat['seat_status'] == 'occupied') || _isGuest)
+                Positioned(
+                  right: 14,
+                  bottom: 54,
+                  child: _guestMiniOverlay(),
+                ),
               Positioned(
                 left: 14,
                 bottom: 14,
@@ -1120,6 +1428,11 @@ class _LiveScreenState extends State<LiveScreen> {
         onTap: () => setState(() => _chatEnabled = !_chatEnabled),
       ),
       _control(
+        icon: Icons.person_add_alt_1,
+        label: 'Guest',
+        onTap: _showGuestInviteDialog,
+      ),
+      _control(
         icon: Icons.call_end,
         label: 'End Live',
         color: Colors.red,
@@ -1129,6 +1442,27 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   List<Widget> _viewerControls() {
+    if (_isGuest) {
+      return [
+        _control(
+          icon: _microphoneEnabled ? Icons.mic : Icons.mic_off,
+          label: 'Mic',
+          onTap: _toggleMicrophone,
+        ),
+        if (_selectedRoomType == 'video')
+          _control(
+            icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
+            label: 'Camera',
+            onTap: _toggleCamera,
+          ),
+        _control(
+          icon: Icons.exit_to_app,
+          label: 'Leave Guest',
+          color: Colors.red,
+          onTap: _leaveViewer,
+        ),
+      ];
+    }
     return [
       _control(
         icon: Icons.chat,
