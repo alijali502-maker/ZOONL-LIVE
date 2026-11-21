@@ -56,6 +56,11 @@ class _LiveScreenState extends State<LiveScreen> {
 
   RealtimeChannel? _channel;
   Room? _lk;
+  Timer? _guestPoller;
+  bool _isGuest = false;
+  bool _guestInviteDialogShown = false;
+  String? _guestSeatId;
+  List<Map<String, dynamic>> _guestSeats = <Map<String, dynamic>>[];
 
   final TextEditingController _titleController =
       TextEditingController();
@@ -76,6 +81,10 @@ class _LiveScreenState extends State<LiveScreen> {
     } else if (_selectedRoomType == 'video') {
       unawaited(_initializePreviewCamera());
     }
+    _guestPoller = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _refreshGuestState(),
+    );
   }
 
 
@@ -291,10 +300,24 @@ class _LiveScreenState extends State<LiveScreen> {
       ),
     );
 
-    if (_isHost) {
-      await room.localParticipant?.setMicrophoneEnabled(_microphoneEnabled);
+    _isGuest = data['is_guest'] == true;
+    _guestSeatId = data['seat_id']?.toString();
+    if (_isHost || _isGuest) {
+      final audioAllowed = _isHost || data['audio_enabled'] == true;
+      final videoAllowed = _selectedRoomType == 'video' &&
+          (_isHost || data['video_enabled'] == true);
+      if (_isGuest) {
+        final micPermission = await Permission.microphone.request();
+        if (!micPermission.isGranted) {
+          throw StateError('Microphone permission is required for guest audio.');
+        }
+        if (videoAllowed) await Permission.camera.request();
+      }
+      await room.localParticipant?.setMicrophoneEnabled(
+        audioAllowed && _microphoneEnabled,
+      );
       if (_selectedRoomType == 'video') {
-        await room.localParticipant?.setCameraEnabled(true);
+        await room.localParticipant?.setCameraEnabled(videoAllowed);
       }
     }
   }
@@ -458,7 +481,19 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() => _busy = true);
 
     final roomId = _roomId;
-    if (roomId != null) await _markRoomEnded(roomId);
+    if (roomId != null) {
+      for (final seat in _guestSeats) {
+        final seatId = seat['id']?.toString();
+        if (seatId == null || seat['seat_status'] != 'occupied') continue;
+        try {
+          await _supabase.rpc(
+            'room_remove_guest',
+            params: <String, dynamic>{'p_seat_id': seatId},
+          );
+        } catch (_) {}
+      }
+      await _markRoomEnded(roomId);
+    }
 
     await _closeChannel();
     await _disconnectLiveKit();
@@ -467,6 +502,9 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {
       _busy = false;
       _isLive = false;
+      _isGuest = false;
+      _guestSeatId = null;
+      _guestSeats.clear();
       _roomId = null;
       _messages.clear();
       _seenMessageIds.clear();
@@ -477,6 +515,17 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _leaveViewer() async {
+    final seatId = _guestSeatId;
+    if (_isGuest && seatId != null) {
+      try {
+        await _supabase.rpc(
+          'room_leave_guest_seat',
+          params: <String, dynamic>{'p_seat_id': seatId},
+        );
+      } catch (_) {}
+    }
+    _isGuest = false;
+    _guestSeatId = null;
     await _closeChannel();
     await _disconnectLiveKit();
 
@@ -568,6 +617,13 @@ class _LiveScreenState extends State<LiveScreen> {
     unawaited(_closeChannel());
     unawaited(_disconnectLiveKit());
 
+    _guestPoller?.cancel();
+    if (_isGuest && _guestSeatId != null) {
+      unawaited(_supabase.rpc(
+        'room_leave_guest_seat',
+        params: <String, dynamic>{'p_seat_id': _guestSeatId},
+      ).then((_) {}).catchError((_) {}));
+    }
     final preview = _previewCamera;
     _previewCamera = null;
     if (preview != null) unawaited(preview.dispose());
