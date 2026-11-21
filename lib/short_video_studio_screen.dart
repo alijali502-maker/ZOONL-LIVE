@@ -230,11 +230,11 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
     final camera = _camera;
     final preview = _preview;
     return Scaffold(
-      backgroundColor: const Color(0xFF100B18),
+      backgroundColor: const Color(0xFF070B17),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B1225),
+        backgroundColor: const Color(0xFF0D1426),
         title: const Text('SHORT VIDEO STUDIO',
-            style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+            style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: ListView(
@@ -244,9 +244,9 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
               height: 430,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: const Color(0xFF21152F),
+                color: const Color(0xFF141E35),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF6C4A82)),
+                border: Border.all(color: const Color(0xFF56638F)),
               ),
               child: _cameraLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -264,7 +264,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.no_photography, color: Color(0xFFE5BD70), size: 48),
+                                  const Icon(Icons.no_photography, color: Color(0xFFB9AEFF), size: 48),
                                   Text(_error ?? 'Camera unavailable',
                                       style: const TextStyle(color: Colors.white70)),
                                   TextButton(onPressed: _initializeCamera, child: const Text('Retry')),
@@ -302,7 +302,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
             ),
             Text(
               'Duration: $_recordingSeconds / 60 sec',
-              style: const TextStyle(color: Color(0xFFE5BD70)),
+              style: const TextStyle(color: Color(0xFFB9AEFF)),
             ),
             const SizedBox(height: 10),
             if (_recording)
