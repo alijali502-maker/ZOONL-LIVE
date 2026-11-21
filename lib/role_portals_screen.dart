@@ -553,8 +553,49 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
   XFile? _receipt;
   bool _uploading = false;
   bool _submitting = false;
+  bool _checkingEligibility = true;
+  bool _adultVerified = false;
+  String? _eligibilityError;
   String? _receiptPath;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdultVerification();
+  }
+
+  Future<void> _checkAdultVerification() async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      if (mounted) setState(() {
+        _checkingEligibility = false;
+        _eligibilityError = 'Please sign in first.';
+      });
+      return;
+    }
+    try {
+      final now = DateTime.now();
+      final cutoff = DateTime(now.year - 18, now.month, now.day);
+      final cutoffText = '\${cutoff.year.toString().padLeft(4, '0')}-\${cutoff.month.toString().padLeft(2, '0')}-\${cutoff.day.toString().padLeft(2, '0')}';
+      final rows = await _db.from('host_verification_submissions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('verification_status', 'approved')
+          .lte('date_of_birth', cutoffText)
+          .limit(1);
+      if (mounted) setState(() {
+        _adultVerified = (rows as List).isNotEmpty;
+        _checkingEligibility = false;
+      });
+    } catch (error) {
+      if (mounted) setState(() {
+        _adultVerified = false;
+        _checkingEligibility = false;
+        _eligibilityError = 'Adult verification status could not be confirmed: $error';
+      });
+    }
+  }
 
   Future<void> _pickReceipt() async {
     try {
@@ -590,6 +631,10 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
   }
 
   Future<void> _submit() async {
+    if (!_adultVerified) {
+      setState(() => _error = 'Approved adult verification (18+) is required before an agency application.');
+      return;
+    }
     if (_name.text.trim().isEmpty ||
         _email.text.trim().isEmpty ||
         _phone.text.trim().isEmpty ||
@@ -642,7 +687,29 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: _bg,
     appBar: AppBar(title: const Text('Agency Application')),
-    body: ListView(padding: const EdgeInsets.all(16), children: [
+    body: _checkingEligibility
+        ? const Center(child: CircularProgressIndicator(color: _gold))
+        : !_adultVerified
+            ? ListView(padding: const EdgeInsets.all(18), children: [
+                const SizedBox(height: 60),
+                _portalCard(
+                  'ADULT VERIFICATION REQUIRED',
+                  'Agency applications include a USD 300 deposit and are available only to applicants with approved identity verification confirming age 18 or older. If you are under 18, do not submit identity documents, deposit receipts or payments.',
+                  Icons.lock_outline,
+                ),
+                if (_eligibilityError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_eligibilityError!, style: const TextStyle(color: Color(0xFFE47777))),
+                  ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _checkAdultVerification,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('CHECK ELIGIBILITY'),
+                ),
+              ])
+            : ListView(padding: const EdgeInsets.all(16), children: [
       _portalCard('AGENCY DEPOSIT', 'Required deposit: USD 300. Upload the receipt for manual verification. This form does not charge a card or process a payment.', Icons.receipt_long),
       const SizedBox(height: 12),
       TextField(controller: _name, decoration: const InputDecoration(labelText: 'Proposed agency name')),
