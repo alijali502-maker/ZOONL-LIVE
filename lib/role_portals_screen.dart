@@ -280,6 +280,20 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
           decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search records'),
         ),
       ),
+      if (selected == 1)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AdminTopupLimitScreen()),
+              ),
+              icon: const Icon(Icons.tune),
+              label: const Text('SET ADMIN TOP-UP LIMITS'),
+            ),
+          ),
+        ),
       if (selected == 5)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -375,6 +389,100 @@ class AdminOperationsPortalScreen extends StatelessWidget {
       )),
     ]);
   }
+}
+
+class AdminTopupLimitScreen extends StatefulWidget {
+  const AdminTopupLimitScreen({super.key});
+  @override
+  State<AdminTopupLimitScreen> createState() => _AdminTopupLimitScreenState();
+}
+
+class _AdminTopupLimitScreenState extends State<AdminTopupLimitScreen> {
+  final TextEditingController _adminId = TextEditingController();
+  final TextEditingController _perTransaction = TextEditingController(text: '180000');
+  final TextEditingController _dailyLimit = TextEditingController(text: '360000');
+  bool _busy = false;
+  String? _adminName;
+  String? _message;
+  bool _success = false;
+
+  Future<void> _save() async {
+    final id = _adminId.text.trim();
+    final perTx = int.tryParse(_perTransaction.text.trim());
+    final daily = int.tryParse(_dailyLimit.text.trim());
+    if (!RegExp(r'^[0-9]+$').hasMatch(id) || perTx == null || daily == null ||
+        perTx <= 0 || daily < perTx) {
+      setState(() { _success = false; _message = 'Enter a valid Admin ZOONL ID and limits. Daily limit must be at least the per-transaction limit.'; });
+      return;
+    }
+    setState(() { _busy = true; _message = null; });
+    try {
+      final publicProfile = await Backend.client
+          .from('user_public_profiles')
+          .select('user_id,zoonl_id')
+          .eq('zoonl_id', id)
+          .maybeSingle();
+      if (publicProfile == null) throw StateError('Admin ZOONL ID not found.');
+      final profile = await Backend.client
+          .from('profiles')
+          .select('display_name')
+          .eq('id', publicProfile['user_id'])
+          .maybeSingle();
+      final result = await Backend.client.rpc(
+        'owner_set_admin_topup_limits',
+        params: <String, dynamic>{
+          'p_admin_user_id': publicProfile['user_id'],
+          'p_max_coins_per_transaction': perTx,
+          'p_daily_coin_limit': daily,
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _adminName = (profile?['display_name'] ?? 'ZOONL Admin').toString();
+          _success = result == true;
+          _message = _success
+              ? 'Limits saved for $_adminName • $perTx coins per transaction • $daily coins per day.'
+              : 'Limit update was not confirmed.';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() { _success = false; _message = error.toString(); });
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _adminId.dispose();
+    _perTransaction.dispose();
+    _dailyLimit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Admin Top-up Limits')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      _portalCard('OWNER-ONLY LIMIT CONTROL', 'The Owner sets both limits. Supabase enforces them for every Admin top-up and resets the daily counter by date.', Icons.shield),
+      const SizedBox(height: 14),
+      TextField(controller: _adminId, keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: 'Admin ZOONL ID')),
+      TextField(controller: _perTransaction, keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: 'Maximum coins per transaction')),
+      TextField(controller: _dailyLimit, keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: 'Maximum coins per day')),
+      const SizedBox(height: 12),
+      FilledButton.icon(onPressed: _busy ? null : _save,
+        icon: const Icon(Icons.save), label: Text(_busy ? 'Saving...' : 'SAVE ADMIN LIMITS')),
+      if (_message != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(_message!, style: TextStyle(color: _success ? _teal : const Color(0xFFE47777))),
+        ),
+    ]),
+  );
 }
 
 class CoinAdjustmentScreen extends StatefulWidget {
