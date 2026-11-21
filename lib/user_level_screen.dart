@@ -77,7 +77,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
         _badge=inventory.any((e)=>e['zoonl_item_code']=='ZOONL_OWNER_BADGE'&&valid(Map<String,dynamic>.from(e)))?'Sovereign VIP badge':'Not found';
         _loading=false;_error=null;
       });
-    }catch(e){if(mounted)setState(()=>{_loading=false,_error=e.toString()});}
+    }catch(e){if(mounted)setState((){_loading=false;_error=e.toString();});}
   }
 
   Widget _glass(Widget child,Color c,{EdgeInsets padding=const EdgeInsets.all(15)})=>ClipRRect(
