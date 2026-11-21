@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,226 +9,213 @@ class UserLevelScreen extends StatefulWidget {
   State<UserLevelScreen> createState() => _UserLevelScreenState();
 }
 
-class _UserLevelScreenState extends State<UserLevelScreen> {
-  final SupabaseClient _db = Supabase.instance.client;
-  bool _loading = true, _isOwner = false;
+class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderStateMixin {
+  final _db = Supabase.instance.client;
+  late final AnimationController _shine = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))..repeat();
+  late final AnimationController _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 5200))..repeat(reverse: true);
+  bool _loading = true, _owner = false;
   String? _error;
-  String _primeStatus = 'Checking…', _entryStatus = 'Checking…', _frameStatus = 'Checking…', _badgeStatus = 'Checking…';
-  int _level = 1, _sentCoins = 0;
-  List<Map<String, dynamic>> _levels = [];
+  int _level = 1, _exp = 0;
+  String _prime = 'Checking…', _entry = 'Checking…', _frame = 'Checking…', _badge = 'Checking…';
+  List<Map<String,dynamic>> _levels = [];
 
-  Color _rankColor(int level) {
-    if (level >= 100) return const Color(0xFFE8D28B);
-    final hue = ((level - 1) * 137.508) % 360;
-    final saturation = 0.52 + ((level % 3) * 0.08);
-    final value = 0.78 + ((level % 2) * 0.08);
-    return HSVColor.fromAHSV(1, hue, saturation, value).toColor();
+  static const _palettes = <List<Color>>[
+    [Color(0xFF607D8B),Color(0xFFCFD8DC),Color(0xFF263746)],
+    [Color(0xFF287A9D),Color(0xFF8CEBFF),Color(0xFF16405D)],
+    [Color(0xFF7151A5),Color(0xFFD2B5FF),Color(0xFF34205E)],
+    [Color(0xFFAD5A26),Color(0xFFFFD18A),Color(0xFF663016)],
+    [Color(0xFF9A315F),Color(0xFFFFB2D1),Color(0xFF541A3C)],
+    [Color(0xFF168B91),Color(0xFF9DFFFF),Color(0xFF07545C)],
+    [Color(0xFF9D2E34),Color(0xFFFFA69B),Color(0xFF54151D)],
+    [Color(0xFF9A6A16),Color(0xFFFFE89B),Color(0xFF56370C)],
+    [Color(0xFF8B3D77),Color(0xFFFFB7EA),Color(0xFF4B1B4B)],
+    [Color(0xFFB57A20),Color(0xFFFFF0AE),Color(0xFF62400C)],
+  ];
+  int _tier(int n) => n >= 100 ? 9 : n <= 10 ? n-1 : ((n-1) ~/ 10).clamp(1,9);
+  List<Color> _colors(int n) => n >= 100
+      ? const [Color(0xFFFFE6A1),Color(0xFFFFFFFF),Color(0xFFB77A22),Color(0xFF57320D)]
+      : _palettes[_tier(n)];
+  String _name(int n) {
+    if(n>=100) return 'SOVEREIGN OWNER';
+    const titles=['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
+    return '${titles[_tier(n)]} • LEVEL $n';
   }
+  String _fmt(int n) => n>=1000000000 ? '${(n/1000000000).toStringAsFixed(2)}B' :
+      n>=1000000 ? '${(n/1000000).toStringAsFixed(2)}M' :
+      n>=1000 ? '${(n/1000).toStringAsFixed(1)}K' : '$n';
 
-  @override
-  void initState() { super.initState(); _load(); }
+  @override void initState(){super.initState();_load();}
+  @override void dispose(){_shine.dispose();_float.dispose();super.dispose();}
 
   Future<void> _load() async {
-    final user = _db.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() { _loading = false; _error = 'Login required.'; });
-      return;
-    }
-    if (mounted) setState(() { _loading = true; _error = null; });
-    try {
-      final r = await Future.wait<dynamic>([
+    final user=_db.auth.currentUser;
+    if(user==null){if(mounted)setState(()=>_error='Login required.');return;}
+    setState(()=>_loading=true);
+    try{
+      final r=await Future.wait<dynamic>([
         _db.rpc('zoonl_my_level'),
-        _db.from('gift_sends').select('total_coins').eq('sender_id', user.id),
-        _db.from('level_definitions').select('level,required_exp,level_name').order('level'),
+        _db.rpc('zoonl_my_lifetime_gift_exp'),
+        _db.from('level_definitions').select('level,required_exp,level_name,level_config').order('level'),
         _db.rpc('is_zoonl_owner'),
-        _db.from('user_prime_memberships').select('id,prime_tier_id,expires_at,is_active').eq('user_id', user.id).eq('is_active', true),
-        _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,is_equipped,expires_at').eq('user_id', user.id).eq('project_name', 'ZOONL LIVE'),
+        _db.from('user_prime_memberships').select('expires_at,is_active').eq('user_id',user.id).eq('is_active',true),
+        _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,is_equipped,expires_at').eq('user_id',user.id).eq('project_name','ZOONL LIVE'),
       ]);
-      final sent = (r[1] as List).fold<int>(0, (sum, row) => sum + ((row['total_coins'] as num?)?.toInt() ?? 0));
-      final now = DateTime.now();
-      final prime = (r[4] as List).any((row) {
-        final exp = row['expires_at'];
-        return exp == null || (DateTime.tryParse(exp.toString())?.isAfter(now) ?? false);
+      final now=DateTime.now();
+      bool valid(Map e){final x=e['expires_at'];return x==null||(DateTime.tryParse(x.toString())?.isAfter(now)??false);}
+      final inventory=r[5] as List;
+      final activePrime=(r[4] as List).any((e)=>valid(Map<String,dynamic>.from(e)));
+      final entries=inventory.where((e)=>e['item_type']=='ENTRY_EFFECT'&&valid(Map<String,dynamic>.from(e))).toList();
+      if(!mounted)return;
+      setState((){
+        _level=(r[0] as num?)?.toInt()??1;
+        _exp=(r[1] as num?)?.toInt()??0;
+        _levels=(r[2] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+        _owner=r[3]==true;
+        _prime=activePrime?'ACTIVE':'Not assigned';
+        _entry=entries.isEmpty?'No active Entry':entries.map((e)=>e['zoonl_item_code'].toString()).join(', ');
+        _frame=inventory.any((e)=>e['zoonl_item_code']=='ZOONL_OWNER_FRAME'&&valid(Map<String,dynamic>.from(e)))?'Imperial Owner Frame':'Not found';
+        _badge=inventory.any((e)=>e['zoonl_item_code']=='ZOONL_OWNER_BADGE'&&valid(Map<String,dynamic>.from(e)))?'Sovereign VIP badge':'Not found';
+        _loading=false;_error=null;
       });
-      final inventory = r[5] as List;
-      final entries = inventory.where((row) {
-        if (row['item_type']?.toString() != 'ENTRY_EFFECT') return false;
-        final exp = row['expires_at'];
-        return exp == null || (DateTime.tryParse(exp.toString())?.isAfter(now) ?? false);
-      }).toList();
-      if (!mounted) return;
-      setState(() {
-        _level = (r[0] as num?)?.toInt() ?? 1;
-        _sentCoins = sent;
-        _levels = (r[2] as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        _isOwner = r[3] == true;
-        _primeStatus = prime ? 'ACTIVE' : 'Not assigned to this account';
-        _entryStatus = entries.isEmpty ? 'No Entry effect in account inventory' : entries.map((e) => e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_ENTRY' ? 'Owner Royal Entry' : (e['zoonl_item_code']?.toString() ?? 'Entry effect')).join(', ');
-        _frameStatus = inventory.any((e) => e['item_type']?.toString() == 'AVATAR_FRAME' && e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_FRAME') ? 'Owner Imperial Frame • Permanent' : 'No Owner frame found';
-        _badgeStatus = inventory.any((e) => e['item_type']?.toString() == 'ID_BADGE' && e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_BADGE') ? 'Sovereign Owner Glass Badge • Equipped' : 'No Owner badge found';
-        _loading = false;
-      });
-    } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString(); });
-    }
+    }catch(e){if(mounted)setState(()=>{_loading=false,_error=e.toString()});}
   }
 
-  Widget _glass({required Widget child, Color? accent, EdgeInsets padding = const EdgeInsets.all(16)}) {
-    final edge = accent ?? Colors.white;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: const Color(0xB9161720),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: edge.withOpacity(.48), width: 1.1),
-            boxShadow: [
-              BoxShadow(color: edge.withOpacity(.12), blurRadius: 24, spreadRadius: 1),
-              const BoxShadow(color: Colors.black26, blurRadius: 18, offset: Offset(0, 9)),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
+  Widget _glass(Widget child,Color c,{EdgeInsets padding=const EdgeInsets.all(15)})=>ClipRRect(
+    borderRadius:BorderRadius.circular(19),
+    child:BackdropFilter(filter:ImageFilter.blur(sigmaX:15,sigmaY:15),child:Container(
+      padding:padding,
+      decoration:BoxDecoration(color:const Color(0xD90C101B),borderRadius:BorderRadius.circular(19),
+        border:Border.all(color:c.withOpacity(.46),width:1.1),
+        boxShadow:[BoxShadow(color:c.withOpacity(.15),blurRadius:22),const BoxShadow(color:Colors.black54,blurRadius:18,offset:Offset(0,9))]),
+      child:child)));
+
+  Widget _emblem(int n,{double size=90,bool animated=true}){
+    final colors=_colors(n);
+    return AnimatedBuilder(animation:Listenable.merge([_shine,_float]),builder:(context,_){
+      final rotation=animated?math.sin(_float.value*math.pi*2)*.035:0.0;
+      return Transform(alignment:Alignment.center,transform:Matrix4.identity()..setEntry(3,2,.002)..rotateY(rotation),
+        child:SizedBox(width:size*1.2,height:size*1.28,child:Stack(alignment:Alignment.center,children:[
+          CustomPaint(size:Size(size*1.08,size*1.16),painter:_EmblemPainter(colors:colors,tier:_tier(n),shine:_shine.value,owner:n>=100)),
+          Positioned(top:size*.36,child:Text('$n',style:TextStyle(color:Colors.white,fontSize:size*.27,fontWeight:FontWeight.w900,
+            shadows:[Shadow(color:Colors.black,blurRadius:5,offset:Offset(1,3)),Shadow(color:colors[1],blurRadius:size*.16)]))),
+          Positioned(bottom:size*.15,child:Text(n>=100?'VIP':n<=10?'RANK':'ELITE',
+            style:TextStyle(color:Colors.white,fontSize:size*.075,fontWeight:FontWeight.w900,letterSpacing:1.5,
+              shadows:[Shadow(color:colors[1],blurRadius:8)]))),
+        ])));
+    });
   }
 
-  Widget _statusLine(IconData icon, String title, String value, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: [
-        Container(width: 38, height: 38,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(.14), border: Border.all(color: color.withOpacity(.5))),
-          child: Icon(icon, color: color, size: 19)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 3),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
-        ])),
-      ]),
-    );
+  Widget _bar(double v,List<Color> c)=>ClipRRect(borderRadius:BorderRadius.circular(20),child:Stack(children:[
+    Container(height:13,color:Colors.white12),
+    FractionallySizedBox(widthFactor:v.clamp(0.0,1.0),child:Container(height:13,decoration:BoxDecoration(
+      gradient:LinearGradient(colors:[c.last,c.first,Colors.white]),boxShadow:[BoxShadow(color:c[1].withOpacity(.8),blurRadius:12)]))),
+    Positioned.fill(child:IgnorePointer(child:AnimatedBuilder(animation:_shine,builder:(_,__)=>Align(
+      alignment:Alignment(-1+_shine.value*2,0),child:Container(width:25,height:13,
+        decoration:BoxDecoration(gradient:LinearGradient(colors:[Colors.transparent,Colors.white70,Colors.transparent]))))))),
+  ]));
+
+  Widget _metric(String title,String value)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text(title,style:const TextStyle(color:Colors.white54,fontSize:7,fontWeight:FontWeight.w800)),
+    const SizedBox(height:4),Text(value,style:const TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900))]);
+
+  Widget _status(IconData icon,String title,String value,Color color)=>Padding(
+    padding:const EdgeInsets.symmetric(vertical:7),child:Row(children:[
+      Container(width:36,height:36,decoration:BoxDecoration(gradient:LinearGradient(colors:[color.withOpacity(.3),Colors.black54]),
+        borderRadius:BorderRadius.circular(11),border:Border.all(color:color.withOpacity(.7)),
+        boxShadow:[BoxShadow(color:color.withOpacity(.18),blurRadius:12)]),child:Icon(icon,color:color,size:18)),
+      const SizedBox(width:11),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(title,style:const TextStyle(color:Colors.white60,fontSize:10,fontWeight:FontWeight.w800)),
+        Text(value,style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.w800))]))]));
+
+  Widget _row(Map<String,dynamic> data){
+    final n=(data['level'] as num).toInt(),goal=(data['required_exp'] as num).toInt();
+    final reached=n<=_level,active=n==_level,c=_colors(n);
+    return Padding(padding:const EdgeInsets.only(bottom:8),child:_glass(Row(children:[
+      SizedBox(width:49,height:51,child:_emblem(n,size:36,animated:false)),
+      const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(_name(n),style:TextStyle(color:reached?Colors.white:Colors.white38,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:.5)),
+        const SizedBox(height:4),Text('Lifetime target  ${_fmt(goal)} EXP',style:const TextStyle(color:Colors.white54,fontSize:9))])),
+      Icon(active?Icons.auto_awesome:reached?Icons.verified:Icons.lock_outline,color:active||reached?c[1]:Colors.white24,size:18),
+    ]),active?c[1]:reached?c[0]:Colors.white24,padding:const EdgeInsets.symmetric(horizontal:11,vertical:8)));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    Map<String, dynamic>? current, next;
-    for (final row in _levels) {
-      final n = (row['level'] as num?)?.toInt() ?? 0;
-      if (n == _level) current = row;
-      if (n > _level && next == null) next = row;
-    }
-    final currentExp = (current?['required_exp'] as num?)?.toInt() ?? 0;
-    final nextExp = (next?['required_exp'] as num?)?.toInt() ?? currentExp;
-    final progress = next == null ? 1.0 : ((_sentCoins - currentExp) / (nextExp - currentExp).clamp(1, 1 << 30)).clamp(0.0, 1.0).toDouble();
-    final accent = _rankColor(_level);
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF08090E),
-      appBar: AppBar(title: const Text('LEVEL & RANK'), backgroundColor: const Color(0xFF090A10),
-        actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
-      body: _loading ? const Center(child: CircularProgressIndicator())
-        : _error != null ? Center(child: Padding(padding: const EdgeInsets.all(22), child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 14),
-            OutlinedButton(onPressed: _load, child: const Text('RETRY')),
-          ])))
-        : RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
-            _glass(accent: accent, padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const Expanded(child: Text('ZOONL MEMBER RANK', style: TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1.7, fontWeight: FontWeight.w900))),
-                if (_isOwner) Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                  decoration: BoxDecoration(color: const Color(0xFFE8D28B).withOpacity(.13), borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: const Color(0xFFE8D28B).withOpacity(.8)),
-                    boxShadow: const [BoxShadow(color: Color(0x55E8D28B), blurRadius: 13)]),
-                  child: const Text('✦ OWNER', style: TextStyle(color: Color(0xFFFFE9A8), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.1))),
-              ]),
-              const SizedBox(height: 20),
-              Row(children: [
-                Container(width: 88, height: 88, decoration: BoxDecoration(shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [accent.withOpacity(.42), const Color(0xFF14151D), const Color(0xFF0A0B10)], stops: const [0, .62, 1]),
-                  border: Border.all(color: accent.withOpacity(.95), width: 2),
-                  boxShadow: [BoxShadow(color: accent.withOpacity(.4), blurRadius: 25, spreadRadius: 2), const BoxShadow(color: Colors.white10, blurRadius: 5, offset: Offset(-2, -2))]),
-                  child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.workspace_premium_rounded, color: accent, size: 22),
-                    Text('$_level', style: TextStyle(color: Colors.white, fontSize: 29, fontWeight: FontWeight.w900, shadows: [Shadow(color: accent, blurRadius: 14)])),
-                  ]))),
-                const SizedBox(width: 16),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(current?['level_name']?.toString() ?? 'Level $_level', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 5),
-                  Text(_isOwner ? 'Sovereign Owner • Level $_level' : 'ZOONL LIVE • Level $_level', style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 8),
-                  Text('$_sentCoins EXP earned from gifts', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                ])),
-              ]),
-              const SizedBox(height: 22),
-              Row(children: [
-                const Expanded(child: Text('LEVEL PROGRESS', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1))),
-                Text(next == null ? 'MAX RANK' : '${(progress * 100).round()}%', style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w900)),
-              ]),
-              const SizedBox(height: 9),
-              ClipRRect(borderRadius: BorderRadius.circular(20), child: Stack(children: [
-                Container(height: 11, color: Colors.white12),
-                FractionallySizedBox(widthFactor: progress, child: Container(height: 11, decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [accent.withOpacity(.55), accent, Colors.white.withOpacity(.9)]),
-                  borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: accent.withOpacity(.6), blurRadius: 10)]))),
-              ])),
-              const SizedBox(height: 9),
-              Text(next == null ? 'Highest level currently configured.' : '${(nextExp - _sentCoins).clamp(0, nextExp)} EXP to Level ${next['level']}',
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
-            ])),
-            if (_isOwner) ...[
-              const SizedBox(height: 14),
-              _glass(accent: const Color(0xFFE8D28B), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('OWNER ACCOUNT STATUS', style: TextStyle(color: Color(0xFFFFE9A8), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
-                const SizedBox(height: 8),
-                _statusLine(Icons.verified_user_rounded, 'Trusted role', 'OWNER verified by Supabase', const Color(0xFFFFD98B)),
-                _statusLine(Icons.workspace_premium_rounded, 'Prime membership', _primeStatus, const Color(0xFFBCA0FF)),
-                _statusLine(Icons.bolt_rounded, 'Entry effect', _entryStatus, const Color(0xFF83DDF0)),
-                _statusLine(Icons.shield_moon_rounded, 'Avatar frame', _frameStatus, const Color(0xFFE3A1D0)),
-                _statusLine(Icons.workspace_premium_rounded, 'Level ID badge', _badgeStatus, const Color(0xFFFFE6A1)),
-                const Divider(color: Colors.white12, height: 18),
-                const Text('Owner identity is verified separately from the public ZOONL ID. Prime and Entry status above is read from the real account records.',
-                  style: TextStyle(color: Colors.white60, fontSize: 10, height: 1.45)),
-              ])),
-            ],
-            const SizedBox(height: 22),
-            const Text('LEVEL COLLECTION', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-            const SizedBox(height: 5),
-            const Text('Every rank has its own glass material, edge light and visual identity.', style: TextStyle(color: Colors.white54, fontSize: 11)),
-            const SizedBox(height: 12),
-            for (final row in _levels) _levelTile(row),
-          ])),
-    );
+  @override Widget build(BuildContext context){
+    Map<String,dynamic>? current,next;
+    for(final r in _levels){final n=(r['level'] as num).toInt();if(n==_level)current=r;if(n>_level&&next==null)next=r;}
+    final start=(current?['required_exp'] as num?)?.toInt()??0;
+    final target=(next?['required_exp'] as num?)?.toInt()??start;
+    final remain=(target-_exp).clamp(0,target);
+    final progress=next==null?1.0:((_exp-start)/(target-start).clamp(1,1<<62)).clamp(0.0,1.0).toDouble();
+    final c=_colors(_level);
+    return Scaffold(backgroundColor:const Color(0xFF070A12),appBar:AppBar(
+      title:const Text('LEVEL & RANK CENTER',style:TextStyle(fontSize:13,letterSpacing:1,fontWeight:FontWeight.w900)),
+      backgroundColor:const Color(0xFF080B13),actions:[IconButton(onPressed:_loading?null:_load,icon:const Icon(Icons.refresh))]),
+      body:_loading?const Center(child:CircularProgressIndicator()):_error!=null
+        ?Center(child:Padding(padding:const EdgeInsets.all(22),child:Column(mainAxisSize:MainAxisSize.min,children:[
+          Text(_error!,textAlign:TextAlign.center),const SizedBox(height:12),OutlinedButton(onPressed:_load,child:const Text('RETRY'))]))
+        :RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.all(14),children:[
+          _glass(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Row(children:[const Expanded(child:Text('YOUR CURRENT RANK',style:TextStyle(color:Colors.white60,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:1.6))),
+              if(_owner)Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:6),decoration:BoxDecoration(
+                gradient:const LinearGradient(colors:[Color(0xFFFFF2BE),Color(0xFFB87A22),Color(0xFFFFE8A0)]),
+                borderRadius:BorderRadius.circular(20),border:Border.all(color:Colors.white),
+                boxShadow:const [BoxShadow(color:Color(0x99E8C46E),blurRadius:14)]),
+                child:const Text('✦ SOVEREIGN OWNER',style:TextStyle(color:Color(0xFF3B2509),fontSize:8,fontWeight:FontWeight.w900)))]),
+            const SizedBox(height:7),Row(children:[_emblem(_level),const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(_name(_level),style:TextStyle(color:c[1],fontSize:13,fontWeight:FontWeight.w900)),
+              const SizedBox(height:5),Text('${_fmt(_exp)} EXP',style:const TextStyle(color:Colors.white,fontSize:24,fontWeight:FontWeight.w900)),
+              const Text('LIFETIME GIFT EXP • RECORD KEPT',style:TextStyle(color:Colors.white54,fontSize:8,letterSpacing:1))]))]),
+            const SizedBox(height:12),Container(padding:const EdgeInsets.all(11),decoration:BoxDecoration(
+              color:Colors.black38,borderRadius:BorderRadius.circular(12),border:Border.all(color:c[1].withOpacity(.22))),
+              child:Row(children:[Expanded(child:_metric('CURRENT LEVEL','$_level')),Expanded(child:_metric('NEXT RANK',next==null?'MAX':'${next['level']}')),
+                Expanded(child:_metric('REMAINING',next==null?'—':_fmt(remain)))])),
+            const SizedBox(height:12),Row(children:[const Expanded(child:Text('NEXT LEVEL PROGRESS',style:TextStyle(color:Colors.white70,fontSize:9,fontWeight:FontWeight.w900))),
+              Text(next==null?'MAX RANK':'${(progress*100).round()}%',style:TextStyle(color:c[1],fontWeight:FontWeight.w900,fontSize:10))]),
+            const SizedBox(height:8),_bar(progress,c),const SizedBox(height:7),
+            Text(next==null?'Highest rank configured.':'${_fmt(_exp)} / ${_fmt(target)} EXP • ${_fmt(remain)} EXP left',
+              style:const TextStyle(color:Colors.white60,fontSize:10)),
+          ]),c[1]),
+          if(_owner)...[
+            const SizedBox(height:12),_glass(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              const Text('SOVEREIGN OWNER ENTITLEMENTS',style:TextStyle(color:Color(0xFFFFE6A1),fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.1)),
+              _status(Icons.verified_user,'Trusted Owner','Verified by Supabase authority',const Color(0xFFFFD98B)),
+              _status(Icons.workspace_premium,'Prime membership',_prime,const Color(0xFFC9A7FF)),
+              _status(Icons.bolt,'Royal entry',_entry,const Color(0xFF8BEAFF)),
+              _status(Icons.shield,'Imperial frame',_frame,const Color(0xFFFFA9D6)),
+              _status(Icons.military_tech,'VIP identity badge',_badge,const Color(0xFFFFE6A1)),
+            ]),const Color(0xFFFFE6A1)),
+          ],
+          const SizedBox(height:19),const Text('RANK LADDER',style:TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900,letterSpacing:1.2)),
+          const SizedBox(height:4),const Text('Lifetime EXP stays with your account. Every next rank has a higher target.',style:TextStyle(color:Colors.white54,fontSize:10)),
+          const SizedBox(height:10),
+          for(final r in _levels.where((r)=>(r['level'] as num).toInt()<100))_row(r),
+          if(_owner&&_levels.any((r)=>(r['level'] as num).toInt()==100))_row(_levels.firstWhere((r)=>(r['level'] as num).toInt()==100)),
+        ])));
   }
+}
 
-  Widget _levelTile(Map<String, dynamic> row) {
-    final level = (row['level'] as num?)?.toInt() ?? 1;
-    final exp = (row['required_exp'] as num?)?.toInt() ?? 0;
-    final reached = level <= _level, selected = level == _level;
-    final color = _rankColor(level);
-    return Padding(padding: const EdgeInsets.only(bottom: 10), child: _glass(
-      accent: selected ? color : (reached ? color.withOpacity(.6) : Colors.white24),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      child: Row(children: [
-        Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [color.withOpacity(reached ? .42 : .12), const Color(0xFF12131A)]),
-          border: Border.all(color: color.withOpacity(reached ? .85 : .25), width: selected ? 2 : 1),
-          boxShadow: selected ? [BoxShadow(color: color.withOpacity(.3), blurRadius: 15)] : []),
-          child: Center(child: Text('$level', style: TextStyle(color: reached ? Colors.white : Colors.white38, fontSize: 17, fontWeight: FontWeight.w900)))),
-        const SizedBox(width: 13),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(row['level_name']?.toString() ?? 'Level $level', style: TextStyle(color: reached ? Colors.white : Colors.white54, fontSize: 13, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          Text('$exp EXP required', style: const TextStyle(color: Colors.white54, fontSize: 10)),
-        ])),
-        if (selected) Icon(Icons.stars_rounded, color: color, size: 23)
-        else if (reached) Icon(Icons.check_circle_rounded, color: color, size: 20)
-        else const Icon(Icons.lock_outline_rounded, color: Colors.white30, size: 19),
-      ]),
-    ));
+class _EmblemPainter extends CustomPainter{
+  final List<Color> colors;final int tier;final double shine;final bool owner;
+  _EmblemPainter({required this.colors,required this.tier,required this.shine,required this.owner});
+  @override void paint(Canvas canvas,Size s){
+    final w=s.width,h=s.height,cx=w/2;final p=Path();
+    if(owner){p.moveTo(cx,h*.03);p.lineTo(w*.9,h*.2);p.lineTo(w*.82,h*.72);p.lineTo(cx,h*.98);p.lineTo(w*.18,h*.72);p.lineTo(w*.1,h*.2);}
+    else if(tier<=2){p.moveTo(cx,h*.07);p.lineTo(w*.84,h*.25);p.lineTo(w*.74,h*.72);p.lineTo(cx,h*.93);p.lineTo(w*.26,h*.72);p.lineTo(w*.16,h*.25);}
+    else{p.moveTo(cx,h*.03);p.lineTo(w*.92,h*.2);p.lineTo(w*.84,h*.64);p.lineTo(w*.68,h*.82);p.lineTo(cx,h*.97);p.lineTo(w*.32,h*.82);p.lineTo(w*.16,h*.64);p.lineTo(w*.08,h*.2);}
+    p.close();
+    final shadow=Paint()..color=Colors.black87..maskFilter=const MaskFilter.blur(BlurStyle.normal,7);
+    canvas.save();canvas.translate(2,6);canvas.drawPath(p,shadow);canvas.restore();
+    canvas.drawPath(p,Paint()..shader=LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,
+      colors:[colors[1],colors[0],colors.last,const Color(0xFF090D18)],stops:const[0,.28,.68,1]).createShader(Offset.zero&s));
+    final inner=Path()..addPath(p,Offset.zero);inner.scale(.86,.86,Offset(cx,h*.5));
+    canvas.drawPath(inner,Paint()..style=PaintingStyle.stroke..strokeWidth=1.5
+      ..shader=LinearGradient(colors:[Colors.white,colors[1],colors.last]).createShader(Offset.zero&s));
+    canvas.drawPath(p,Paint()..style=PaintingStyle.stroke..strokeWidth=owner?3:2
+      ..shader=LinearGradient(colors:[Colors.white,colors[1],colors.last,colors[0]]).createShader(Offset.zero&s));
+    final sheen=Rect.fromLTWH(w*(shine*1.5-.25),0,w*.2,h);canvas.save();canvas.clipPath(p);
+    canvas.drawRect(sheen,Paint()..shader=LinearGradient(colors:[Colors.transparent,Colors.white54,Colors.transparent]).createShader(sheen));canvas.restore();
+    final dots=Paint()..color=Colors.white.withOpacity(.9);
+    for(final q in [Offset(w*.25,h*.34),Offset(w*.75,h*.34),Offset(cx,h*.18),Offset(w*.3,h*.7),Offset(w*.7,h*.7)])canvas.drawCircle(q,owner?2.2:1.4,dots);
   }
+  @override bool shouldRepaint(covariant _EmblemPainter old)=>old.shine!=shine||old.tier!=tier||old.owner!=owner||old.colors!=colors;
 }
