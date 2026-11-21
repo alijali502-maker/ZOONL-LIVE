@@ -100,6 +100,7 @@ class ZoonlStore extends ChangeNotifier {
       <String, Map<String, dynamic>>{};
 
   List<Map<String, dynamic>> memberships = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> agencyApplications =
       <Map<String, dynamic>>[];
   List<Map<String, dynamic>> giftCatalog = <Map<String, dynamic>>[];
@@ -239,6 +240,7 @@ class ZoonlStore extends ChangeNotifier {
     // No sample users, fake Coins, fake gifts, or fabricated wallet records.
     // TEST mode uses only explicitly entered test data.
     memberships = <Map<String, dynamic>>[];
+    walletTransactions = <Map<String, dynamic>>[];
     agencyApplications = <Map<String, dynamic>>[];
     giftCatalog = <Map<String, dynamic>>[];
     cosmeticsCatalog = <Map<String, dynamic>>[];
@@ -719,38 +721,12 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
     super.initState();
     store.checkTrialExpiryAndMoveToBackup();
     store.addListener(_onStoreChanged);
-    _loadKycStatus();
   }
 
   @override
   void dispose() {
     store.removeListener(_onStoreChanged);
     super.dispose();
-  }
-
-  Future<void> _loadKycStatus() async {
-    final userId = Backend.currentUserId;
-    if (userId == null) return;
-    try {
-      final row = await Backend.client
-          .from('host_verification_submissions')
-          .select('country, verification_status, review_note')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      if (!mounted || row == null) return;
-      final status = (row['verification_status'] ?? '').toString();
-      setState(() {
-        kycCountry = (row['country'] ?? kycCountry).toString();
-        registrationSubmitted = status == 'pending' || status == 'approved';
-        kycMessage = status == 'approved'
-            ? 'Host verification approved.'
-            : status == 'pending'
-                ? 'Host verification is waiting for Owner review.'
-                : (row['review_note'] ?? 'Previous application was not approved.').toString();
-      });
-    } catch (_) {}
   }
 
   void _onStoreChanged() {
