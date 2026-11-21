@@ -376,10 +376,20 @@ class _LiveScreenState extends State<LiveScreen> {
         }
       }
     } else {
-      for (final participant in room.remoteParticipants.values) {
+      final remote = room.remoteParticipants.values.toList();
+      if (_roomOwnerId != null) {
+        final host = remote.where((p) => p.identity == _roomOwnerId);
+        for (final participant in host) {
+          for (final pub in participant.videoTrackPublications) {
+            final track = pub.track;
+            if (pub.subscribed && track is VideoTrack) return track;
+          }
+        }
+      }
+      for (final participant in remote) {
         for (final pub in participant.videoTrackPublications) {
           final track = pub.track;
-          if (pub.subscribed && track != null) return track;
+          if (pub.subscribed && track is VideoTrack) return track;
         }
       }
     }
@@ -516,6 +526,30 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  Future<void> _removeGuestSeat(Map<String, dynamic> seat) async {
+    final roomId = _roomId;
+    final seatId = seat['id']?.toString();
+    final guestId = seat['user_id']?.toString();
+    if (roomId == null || seatId == null || guestId == null) return;
+    try {
+      await _supabase.rpc(
+        'room_remove_guest',
+        params: <String, dynamic>{'p_seat_id': seatId},
+      );
+      await _supabase.functions.invoke(
+        'livekit-kick-guest',
+        body: <String, dynamic>{
+          'room_id': roomId,
+          'participant_identity': guestId,
+        },
+      );
+      await _refreshGuestState();
+      _showMessage('Guest removed from the live room.');
+    } catch (error) {
+      _showMessage('Guest removal failed: ${_readable(error)}');
+    }
+  }
+
   Future<void> _showGuestInviteDialog() async {
     final roomId = _roomId;
     if (roomId == null || !_isHost) return;
@@ -649,6 +683,10 @@ class _LiveScreenState extends State<LiveScreen> {
     if (guests.isEmpty) return const SizedBox.shrink();
 
     final participant = guests.first;
+    final seat = _guestSeats.firstWhere(
+      (item) => item['user_id']?.toString() == participant.identity,
+      orElse: () => <String, dynamic>{},
+    );
     VideoTrack? guestTrack;
     for (final publication in participant.videoTrackPublications) {
       if (publication.track is VideoTrack) {
@@ -670,6 +708,18 @@ class _LiveScreenState extends State<LiveScreen> {
         fit: StackFit.expand,
         children: [
           VideoTrackRenderer(guestTrack),
+          if (seat.isNotEmpty)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+                onPressed: () => _removeGuestSeat(seat),
+                icon: const Icon(Icons.close, color: Colors.white, size: 18),
+                style: IconButton.styleFrom(backgroundColor: Colors.redAccent),
+              ),
+            ),
           Positioned(
             left: 4,
             right: 4,
@@ -1452,6 +1502,11 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Widget> _viewerControls() {
     if (_isGuest) {
       return [
+        _control(
+          icon: Icons.chat,
+          label: 'Chat',
+          onTap: () => setState(() => _chatEnabled = !_chatEnabled),
+        ),
         if (_guestAudioAllowed)
           _control(
           icon: _microphoneEnabled ? Icons.mic : Icons.mic_off,
