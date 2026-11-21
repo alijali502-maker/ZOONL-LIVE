@@ -1296,16 +1296,25 @@ class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
         .select('id').eq('following_id', widget.userId);
     final following = await client.from('user_follows')
         .select('id').eq('follower_id', widget.userId);
+    final publicProfile = await client.from('user_public_profiles')
+        .select('zoonl_id')
+        .eq('user_id', widget.userId)
+        .maybeSingle();
     final videos = await client.from('short_videos')
-        .select('id,caption,video_url,duration_seconds,likes_count,created_at')
+        .select('id,user_id,caption,video_url,duration_seconds,likes_count,created_at')
         .eq('user_id', widget.userId)
         .order('created_at', ascending: false)
         .limit(4);
+    final publicId = publicProfile?['zoonl_id']?.toString() ?? '';
     return {
       'followers': (followers as List).length,
       'following': (following as List).length,
-      'videos': (videos as List)
-          .map((row) => Map<String, dynamic>.from(row as Map)).toList(),
+      'videos': (videos as List).map((row) {
+        return <String, dynamic>{
+          ...Map<String, dynamic>.from(row as Map),
+          'zoonl_id': publicId,
+        };
+      }).toList(),
     };
   }
 
@@ -1392,6 +1401,11 @@ class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
                       title: Text((video['caption'] ?? 'ZOONL Short').toString(),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                       subtitle: Text('${video['duration_seconds'] ?? 0}s • ${video['likes_count'] ?? 0} likes'),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ShortVideoPlayerScreen(video: video),
+                        ),
+                      ),
                     )),
                 ],
               );
