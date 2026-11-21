@@ -8,7 +8,8 @@ import 'short_video_studio_screen.dart';
 import 'short_video_feed_screen.dart';
 
 class FeatureHubScreen extends StatefulWidget {
-  const FeatureHubScreen({super.key});
+  final String? roomTypeFilter;
+  const FeatureHubScreen({super.key, this.roomTypeFilter});
 
   @override
   State<FeatureHubScreen> createState() => _FeatureHubScreenState();
@@ -71,12 +72,16 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .eq('user_id', userId)
           .maybeSingle();
       final owner = await Backend.isZoonlOwner();
-      final roomsRaw = await Backend.client
+      var roomQuery = Backend.client
           .from('live_rooms')
           .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
           .eq('is_live', true)
           .eq('is_private', false)
-          .eq('is_locked', false)
+          .eq('is_locked', false);
+      if (widget.roomTypeFilter != null) {
+        roomQuery = roomQuery.eq('room_type', widget.roomTypeFilter!);
+      }
+      final roomsRaw = await roomQuery
           .order('created_at', ascending: false)
           .limit(30);
 
@@ -358,26 +363,34 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                     style: const TextStyle(color: _muted, fontSize: 11),
                   ),
                   const SizedBox(height: 15),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
-                          icon: const Icon(Icons.videocam_rounded),
-                          label: const Text('VIDEO LIVE'),
-                          style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
-                        ),
-                      ),
+                  if (widget.roomTypeFilter == 'video')
+                    SizedBox(width: double.infinity, child: FilledButton.icon(
+                      onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
+                      icon: const Icon(Icons.videocam_rounded),
+                      label: const Text('START VIDEO LIVE'),
+                      style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
+                    ))
+                  else if (widget.roomTypeFilter == 'audio')
+                    SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                      onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
+                      icon: const Icon(Icons.mic_rounded),
+                      label: const Text('START AUDIO LIVE'),
+                    ))
+                  else
+                    Row(children: [
+                      Expanded(child: FilledButton.icon(
+                        onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
+                        icon: const Icon(Icons.videocam_rounded),
+                        label: const Text('VIDEO LIVE'),
+                        style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
+                      )),
                       const SizedBox(width: 9),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
-                          icon: const Icon(Icons.mic_rounded),
-                          label: const Text('AUDIO LIVE'),
-                        ),
-                      ),
-                    ],
-                  ),
+                      Expanded(child: OutlinedButton.icon(
+                        onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
+                        icon: const Icon(Icons.mic_rounded),
+                        label: const Text('AUDIO LIVE'),
+                      )),
+                    ]),
                   if (!_canHost)
                     const Padding(
                       padding: EdgeInsets.only(top: 8),
