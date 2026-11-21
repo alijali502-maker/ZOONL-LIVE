@@ -270,6 +270,7 @@ class ZoonlAuthGate extends StatelessWidget {
           .select('id, prime_tier_id, started_at, expires_at, is_active')
           .eq('user_id', authUserId)
           .eq('is_active', true)
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
           .order('started_at', ascending: false);
       memberships = (rows as List)
           .map((row) => Map<String, dynamic>.from(row as Map))
