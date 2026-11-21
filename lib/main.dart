@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_entry.dart' as entry;
 import 'core/app_config.dart';
@@ -1273,6 +1276,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   bool kycFrontUploaded = false;
   bool kycBackUploaded = false;
   bool kycCardSelfieUploaded = false;
+  bool kycUploading = false;
+  bool kycSubmitting = false;
+  String? kycFrontPath;
+  String? kycBackPath;
+  String? kycSelfiePath;
+  String? kycMessage;
+  final ImagePicker _kycPicker = ImagePicker();
 
   final TextEditingController payoutAccountCtrl =
       TextEditingController();
@@ -2404,6 +2414,77 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  Future<void> _pickKycDocument(String kind) async {
+    if (registrationSubmitted || kycUploading) return;
+    try {
+      final picked = await _kycPicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      final userId = Backend.currentUserId;
+      if (userId == null) throw StateError('Login required.');
+      setState(() { kycUploading = true; kycMessage = null; });
+      final localFile = File(picked.path);
+      if (await localFile.length() > 20 * 1024 * 1024) {
+        throw StateError('Each KYC image must be smaller than 20 MB.');
+      }
+      final path = '$userId/host-kyc/$kind-${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await Backend.client.storage.from('host-kyc-private').upload(
+        path,
+        localFile,
+        fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (kind == 'id-front') {
+          kycFrontPath = path;
+          kycFrontUploaded = true;
+        } else if (kind == 'id-back') {
+          kycBackPath = path;
+          kycBackUploaded = true;
+        } else {
+          kycSelfiePath = path;
+          kycCardSelfieUploaded = true;
+        }
+        kycMessage = '$kind uploaded securely.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => kycMessage = 'KYC upload failed: $error');
+    } finally {
+      if (mounted) setState(() => kycUploading = false);
+    }
+  }
+
+  Future<void> _submitKyc() async {
+    if (registrationSubmitted || kycSubmitting) return;
+    if (kycFrontPath == null || kycBackPath == null || kycSelfiePath == null) {
+      _showMessage('Upload ID front, ID back and selfie with ID first.');
+      return;
+    }
+    setState(() { kycSubmitting = true; kycMessage = null; });
+    try {
+      await Backend.client.rpc(
+        'submit_host_verification',
+        params: <String, dynamic>{
+          'p_country': kycCountry,
+          'p_id_front_path': kycFrontPath,
+          'p_id_back_path': kycBackPath,
+          'p_selfie_with_id_path': kycSelfiePath,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        registrationSubmitted = true;
+        kycMessage = 'Host verification submitted. Waiting for Owner review.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => kycMessage = 'Submission failed: $error');
+    } finally {
+      if (mounted) setState(() => kycSubmitting = false);
+    }
+  }
+
   Widget _walletBalanceTile(String label, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -2553,36 +2634,35 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 spacing: 8,
                 children: <Widget>[
                   OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycFrontUploaded
-                          ? 'Front ID ✓'
-                          : 'Upload ID Front',
-                    ),
+                    onPressed: kycUploading || registrationSubmitted
+                        ? null
+                        : () => _pickKycDocument('id-front'),
+                    child: Text(kycFrontUploaded ? 'Front ID ✓' : 'Upload ID Front'),
                   ),
                   OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycBackUploaded
-                          ? 'Back ID ✓'
-                          : 'Upload ID Back',
-                    ),
+                    onPressed: kycUploading || registrationSubmitted
+                        ? null
+                        : () => _pickKycDocument('id-back'),
+                    child: Text(kycBackUploaded ? 'Back ID ✓' : 'Upload ID Back'),
                   ),
                   OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycCardSelfieUploaded
-                          ? 'Photo ✓'
-                          : 'Upload Required Photo',
-                    ),
+                    onPressed: kycUploading || registrationSubmitted
+                        ? null
+                        : () => _pickKycDocument('selfie-with-id'),
+                    child: Text(kycCardSelfieUploaded ? 'Selfie ✓' : 'Upload Selfie with ID'),
                   ),
                 ],
+              ),
+              if (kycMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(kycMessage!, style: const TextStyle(color: Color(0xFFD6B46A), fontSize: 11)),
+                ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: kycUploading || kycSubmitting ? null : _submitKyc,
+                icon: const Icon(Icons.verified_user),
+                label: Text(kycSubmitting ? 'Submitting...' : registrationSubmitted ? 'Verification Submitted' : 'SUBMIT HOST VERIFICATION'),
               ),
               const SizedBox(height: 8),
               TextField(
