@@ -2329,11 +2329,22 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         ? 'Expired • moved to Backup'
                         : expiry == null ? 'Permanent item' : 'Expires: $expiry',
                   ),
-                  trailing: Text(
-                    expired ? 'BACKUP' : item['is_equipped'] == true ? 'EQUIPPED' : 'OWNED',
-                    style: const TextStyle(
-                        color: Color(0xFFD6B46A), fontSize: 10),
-                  ),
+                  trailing: expired
+                      ? const Text(
+                          'BACKUP',
+                          style: TextStyle(color: Colors.white54, fontSize: 10),
+                        )
+                      : item['is_equipped'] == true
+                          ? const Text(
+                              'EQUIPPED',
+                              style: TextStyle(color: Color(0xFFD6B46A), fontSize: 10),
+                            )
+                          : OutlinedButton(
+                              onPressed: code.isEmpty
+                                  ? null
+                                  : () => _equipCosmetic(code, name),
+                              child: const Text('Equip'),
+                            ),
                 );
               }),
             ],
