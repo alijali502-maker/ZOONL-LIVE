@@ -19,6 +19,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   final SupabaseClient _db = Supabase.instance.client;
   final TextEditingController _caption = TextEditingController();
   CameraController? _camera;
+  List<CameraDescription> _cameras = <CameraDescription>[];
   VideoPlayerController? _preview;
   XFile? _recordedFile;
   Timer? _recordingTimer;
@@ -140,7 +141,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
     }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _initializeCamera({CameraLensDirection? preferredDirection}) async {
     setState(() {
       _cameraLoading = true;
       _error = null;
@@ -154,8 +155,10 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
       }
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw StateError('No camera is available.');
-      final front = cameras.where((c) => c.lensDirection == CameraLensDirection.front);
-      final selected = front.isNotEmpty ? front.first : cameras.first;
+      _cameras = cameras;
+      final direction = preferredDirection ?? CameraLensDirection.front;
+      final matching = cameras.where((c) => c.lensDirection == direction);
+      final selected = matching.isNotEmpty ? matching.first : cameras.first;
       next = CameraController(
         selected,
         ResolutionPreset.high,
@@ -174,6 +177,17 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
     } finally {
       if (mounted) setState(() => _cameraLoading = false);
     }
+  }
+
+  Future<void> _flipCamera() async {
+    if (_recording || _uploading || _cameraLoading || _cameras.length < 2) return;
+    final current = _camera?.description.lensDirection ?? CameraLensDirection.front;
+    final next = current == CameraLensDirection.front ? CameraLensDirection.back : CameraLensDirection.front;
+    final old = _camera;
+    _camera = null;
+    await old?.dispose();
+    if (mounted) setState(() { _cameraLoading = true; });
+    await _initializeCamera(preferredDirection: next);
   }
 
   Future<void> _startRecording() async {
@@ -332,128 +346,87 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   Widget build(BuildContext context) {
     final camera = _camera;
     final preview = _preview;
+    final mediaReady = (preview != null && preview.value.isInitialized) || (camera != null && camera.value.isInitialized);
+    final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: const Color(0xFF070B17),
+      backgroundColor: const Color(0xFF05070D),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D1426),
-        title: const Text('SHORT VIDEO STUDIO',
-            style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent, elevation: 0,
+        title: const Text('SHORT VIDEO STUDIO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: .8)),
+        actions: [
+          IconButton.filledTonal(tooltip: 'Switch camera',
+            onPressed: _recording || _uploading || _cameraLoading || _cameras.length < 2 ? null : _flipCamera,
+            icon: const Icon(Icons.flip_camera_android)),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(14),
-          children: [
-            Container(
-              height: 430,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: const Color(0xFF141E35),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF56638F)),
-              ),
-              child: _cameraLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : preview != null && preview.value.isInitialized
-                      ? AspectRatio(
-                          aspectRatio: preview.value.aspectRatio,
-                          child: _activeLut == null
-                              ? VideoPlayer(preview)
-                              : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: VideoPlayer(preview)),
-                        )
-                      : camera != null && camera.value.isInitialized
-                          ? (_activeLut == null
-                              ? CameraPreview(camera)
-                              : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: CameraPreview(camera)))
-                          : Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.no_photography, color: Color(0xFFB9AEFF), size: 48),
-                                  Text(_error ?? 'Camera unavailable',
-                                      style: const TextStyle(color: Colors.white70)),
-                                  TextButton(onPressed: _initializeCamera, child: const Text('Retry')),
-                                ],
-                              ),
-                            ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: _filters.map((filter) => ChoiceChip(
-                label: Text(filter),
-                selected: _filter == filter,
-                onSelected: _recording || _uploading ? null : (_) { setState(() => _filter = filter); _loadFilterLut(); },
-              )).toList(),
-            ),
-            Row(
-              children: [
-                const Text('Filter intensity', style: TextStyle(color: Colors.white70)),
-                Expanded(
-                  child: Slider(
-                    value: _filterStrength,
-                    min: 0,
-                    max: 1,
-                    onChanged: _recording || _uploading
-                        ? null
-                        : (value) => setState(() => _filterStrength = value),
-                  ),
-                ),
-                Text('${(_filterStrength * 100).round()}%',
-                    style: const TextStyle(color: Colors.white)),
-              ],
-            ),
-            const Padding(
-              padding: EdgeInsets.only(top: 2),
-              child: Text(
-                'The selected colour effect and intensity are previewed and encoded into the published MP4. Audio is preserved.',
-                style: TextStyle(color: Colors.white54, fontSize: 11),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _caption,
-              maxLength: 180,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'Caption',
-                labelStyle: TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            Text(
-              'Duration: $_recordingSeconds / 60 sec',
-              style: const TextStyle(color: Color(0xFFB9AEFF)),
-            ),
-            const SizedBox(height: 10),
-            if (_recording)
-              FilledButton.icon(
-                onPressed: _stopRecording,
-                icon: const Icon(Icons.stop_circle),
-                label: const Text('Stop Recording'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-              )
-            else if (preview == null)
-              FilledButton.icon(
-                onPressed: _cameraLoading || _uploading || _filterLoading ? null : _startRecording,
-                icon: const Icon(Icons.fiber_manual_record),
-                label: const Text('Record Short'),
-              )
-            else ...[
-              FilledButton.icon(
-                onPressed: _uploading || _filterLoading ? null : _uploadVideo,
-                icon: const Icon(Icons.cloud_upload),
-                label: Text(_filterLoading ? 'Loading filter...' : _uploading ? 'Uploading...' : 'Publish Short'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _uploading ? null : _retake,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retake'),
-              ),
-            ],
-          ],
-        ),
-      ),
+      body: Stack(fit: StackFit.expand, children: [
+        if (_cameraLoading)
+          const Center(child: CircularProgressIndicator())
+        else if (preview != null && preview.value.isInitialized)
+          Center(child: AspectRatio(aspectRatio: preview.value.aspectRatio,
+            child: _activeLut == null ? VideoPlayer(preview) : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: VideoPlayer(preview))))
+        else if (camera != null && camera.value.isInitialized)
+          Center(child: AspectRatio(aspectRatio: camera.value.aspectRatio,
+            child: _activeLut == null ? CameraPreview(camera) : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: CameraPreview(camera))))
+        else
+          Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.no_photography, color: Color(0xFFB9AEFF), size: 48),
+            Text(_error ?? 'Camera unavailable', style: const TextStyle(color: Colors.white70)),
+            TextButton(onPressed: _initializeCamera, child: const Text('Retry camera')),
+          ])),
+        const Positioned.fill(child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
+          gradient: LinearGradient(begin: Alignment.topCenter,end: Alignment.bottomCenter,
+            colors:[Color(0x88000000),Colors.transparent,Color(0xF0000000)],stops:[0,.42,1]))))),
+        if (_recording) Positioned(top: MediaQuery.of(context).padding.top + 62,left: 16,
+          child: Container(padding: const EdgeInsets.symmetric(horizontal: 12,vertical: 7),
+            decoration: BoxDecoration(color: Colors.redAccent,borderRadius: BorderRadius.circular(20)),
+            child: Text('● REC  $_recordingSeconds s',style: const TextStyle(color: Colors.white,fontWeight: FontWeight.w900,fontSize: 11)))),
+        Positioned(left: 12,right: 12,bottom: 10,
+          child: ConstrainedBox(constraints: BoxConstraints(maxHeight: size.height * .48),
+            child: ClipRRect(borderRadius: BorderRadius.circular(22),
+              child: Container(color: const Color(0xE6101420),padding: const EdgeInsets.fromLTRB(13,12,13,12),
+                child: SingleChildScrollView(child: Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Row(children:[
+                    const Text('LOOKS & CAMERA',style:TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:11,letterSpacing:.8)),
+                    const Spacer(),
+                    Text(_filterLoading?'Preparing LUT…':_filter,style:const TextStyle(color:Color(0xFFE6C47A),fontSize:10,fontWeight:FontWeight.w800)),
+                  ]),
+                  const SizedBox(height:8),
+                  Wrap(spacing:7,runSpacing:7,children:_filters.map((filter)=>ChoiceChip(
+                    label:Text(filter),selected:_filter==filter,
+                    onSelected:_recording||_uploading?null:(_){setState(()=>_filter=filter);_loadFilterLut();},
+                    selectedColor:const Color(0xFFE6C47A),backgroundColor:const Color(0xFF252B3A),
+                    labelStyle:TextStyle(color:_filter==filter?Colors.black:Colors.white,fontSize:10,fontWeight:FontWeight.w800),
+                  )).toList()),
+                  Row(children:[
+                    const Text('Intensity',style:TextStyle(color:Colors.white70,fontSize:10)),
+                    Expanded(child:Slider(value:_filterStrength,min:0,max:1,onChanged:_recording||_uploading?null:(v)=>setState(()=>_filterStrength=v))),
+                    Text('\${(_filterStrength*100).round()}%',style:const TextStyle(color:Colors.white,fontSize:10)),
+                  ]),
+                  TextField(controller:_caption,maxLength:180,style:const TextStyle(color:Colors.white,fontSize:12),
+                    decoration:InputDecoration(labelText:'Caption',labelStyle:const TextStyle(color:Colors.white70,fontSize:11),
+                      counterText:'',isDense:true,filled:true,fillColor:const Color(0xFF202638),
+                      border:OutlineInputBorder(borderRadius:BorderRadius.circular(12),borderSide:BorderSide.none))),
+                  Text('Duration: $_recordingSeconds / 60 sec',style:const TextStyle(color:Color(0xFFB9AEFF),fontSize:10)),
+                  const SizedBox(height:7),
+                  if (_recording)
+                    SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_stopRecording,
+                      icon:const Icon(Icons.stop_circle),label:const Text('STOP RECORDING'),
+                      style:FilledButton.styleFrom(backgroundColor:Colors.redAccent)))
+                  else if (preview == null)
+                    SizedBox(width:double.infinity,child:FilledButton.icon(
+                      onPressed:_cameraLoading||_uploading||_filterLoading||!mediaReady?null:_startRecording,
+                      icon:const Icon(Icons.fiber_manual_record),label:const Text('RECORD SHORT')))
+                  else ...[
+                    SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_uploading||_filterLoading?null:_uploadVideo,
+                      icon:const Icon(Icons.cloud_upload),label:Text(_uploading?'PUBLISHING…':'PUBLISH SHORT'))),
+                    SizedBox(width:double.infinity,child:OutlinedButton.icon(onPressed:_uploading?null:_retake,
+                      icon:const Icon(Icons.refresh),label:const Text('RETAKE'))),
+                  ],
+                ])),
+              )))),
+      ]),
     );
   }
-}
