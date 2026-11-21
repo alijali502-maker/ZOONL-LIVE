@@ -760,6 +760,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         topTabIndex = 1;
                       });
                     },
+                    onOpenShortVideos: () => setState(() { bottomIndex = 0; topTabIndex = 0; }),
+                    onOpenWallet: () => setState(() => bottomIndex = 2),
+                    onOpenPrime: () => setState(() { bottomIndex = 0; topTabIndex = 4; }),
                   ),
                 ),
               ],
@@ -1232,16 +1235,202 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   }
 }
 
+
+class _ProfileSocialPanel extends StatefulWidget {
+  const _ProfileSocialPanel({
+    required this.userId,
+    required this.onOpenShortVideos,
+    required this.onOpenWallet,
+    required this.onOpenPrime,
+  });
+
+  final String userId;
+  final VoidCallback onOpenShortVideos;
+  final VoidCallback onOpenWallet;
+  final VoidCallback onOpenPrime;
+
+  @override
+  State<_ProfileSocialPanel> createState() => _ProfileSocialPanelState();
+}
+
+class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
+  late Future<Map<String, dynamic>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileSocialPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) _future = _load();
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final client = Supabase.instance.client;
+    final followers = await client.from('user_follows')
+        .select('id').eq('following_id', widget.userId);
+    final following = await client.from('user_follows')
+        .select('id').eq('follower_id', widget.userId);
+    final videos = await client.from('short_videos')
+        .select('id,caption,video_url,duration_seconds,likes_count,created_at')
+        .eq('user_id', widget.userId)
+        .order('created_at', ascending: false)
+        .limit(4);
+    return {
+      'followers': (followers as List).length,
+      'following': (following as List).length,
+      'videos': (videos as List)
+          .map((row) => Map<String, dynamic>.from(row as Map)).toList(),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17232E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF354653)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('SOCIAL PROFILE',
+            style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          FutureBuilder<Map<String, dynamic>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                );
+              }
+              if (snapshot.hasError) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Profile statistics could not be loaded.',
+                      style: TextStyle(color: Colors.white70)),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _future = _load()),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                );
+              }
+              final data = snapshot.data!;
+              final videos = data['videos'] as List<Map<String, dynamic>>;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: _socialStat('FOLLOWERS', data['followers'].toString(), Icons.people_alt_outlined)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _socialStat('FOLLOWING', data['following'].toString(), Icons.person_add_alt_1)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Expanded(child: Text('MY SHORT VIDEOS',
+                        style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold))),
+                      TextButton(onPressed: widget.onOpenShortVideos, child: const Text('OPEN ALL')),
+                    ],
+                  ),
+                  if (videos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Text('No uploaded Shorts yet. Your published videos will appear here.',
+                        style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    )
+                  else
+                    ...videos.map((video) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFF211735),
+                        child: Icon(Icons.play_arrow, color: Color(0xFFD6B46A)),
+                      ),
+                      title: Text((video['caption'] ?? 'ZOONL Short').toString(),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text('${video['duration_seconds'] ?? 0}s • ${video['likes_count'] ?? 0} likes'),
+                    )),
+                ],
+              );
+            },
+          ),
+          const Divider(color: Color(0xFF354653), height: 22),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.workspace_premium, color: Color(0xFFD6B46A)),
+            title: const Text('Prime Membership'),
+            subtitle: const Text('View active membership, tiers and benefits'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: widget.onOpenPrime,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFD6B46A)),
+            title: const Text('Top-up & Payment History'),
+            subtitle: const Text('View wallet balance, receipts and transactions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: widget.onOpenWallet,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _socialStat(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFFD6B46A), size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60)),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+
 class ZoonlCompleteBody extends StatefulWidget {
   final int topTabIndex;
   final int bottomIndex;
   final VoidCallback onSwitchToLive;
+  final VoidCallback onOpenShortVideos;
+  final VoidCallback onOpenWallet;
+  final VoidCallback onOpenPrime;
 
   const ZoonlCompleteBody({
     super.key,
     required this.topTabIndex,
     required this.bottomIndex,
     required this.onSwitchToLive,
+    required this.onOpenShortVideos,
+    required this.onOpenWallet,
+    required this.onOpenPrime,
   });
 
   @override
@@ -2845,6 +3034,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     final String bio = (store.currentUser['bio'] ?? '').toString();
     final String avatarUrl =
         (store.currentUser['avatarUrl'] ?? '').toString();
+    final String profileBackgroundUrl =
+        (store.currentUser['profileBackgroundUrl'] ?? '').toString();
 
     Future<void> openProfileEditor() async {
       final bool? saved = await Navigator.of(context).push<bool>(
@@ -2860,6 +3051,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
+        if (profileBackgroundUrl.startsWith('http'))
+          Container(
+            height: 136,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              image: DecorationImage(
+                image: NetworkImage(profileBackgroundUrl),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(Colors.black.withOpacity(.38), BlendMode.darken),
+              ),
+              border: Border.all(color: const Color(0xFFD6B46A).withOpacity(.7)),
+            ),
+            alignment: Alignment.bottomLeft,
+            padding: const EdgeInsets.all(16),
+            child: const Text('PROFILE BACKGROUND',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          ),
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
           child: Column(
@@ -2927,6 +3136,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
             ],
           ),
+        ),
+        _ProfileSocialPanel(
+          userId: userId,
+          onOpenShortVideos: widget.onOpenShortVideos,
+          onOpenWallet: widget.onOpenWallet,
+          onOpenPrime: widget.onOpenPrime,
         ),
         _luxuryCard(
           title: 'ACCOUNT & PRIVACY SETTINGS',
