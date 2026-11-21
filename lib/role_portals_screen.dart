@@ -273,6 +273,15 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     ],
   );
 
+  Future<void> _openAgencyReview(Map<String, dynamic> row) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AgencyApplicationReviewScreen(application: row),
+      ),
+    );
+    if (changed == true) _loadRecords();
+  }
+
   Widget _records() {
     final filtered = records.where((row) => row.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
     return Column(children: [
@@ -332,8 +341,16 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
                       leading: const Icon(Icons.storage_outlined, color: _gold),
                       title: Text(title.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                       subtitle: Text(row.entries.take(5).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
-                      trailing: const Icon(Icons.chevron_right, color: _gold),
-                      onTap: () => showDialog<void>(
+                      trailing: selected == 2
+                          ? IconButton(
+                              tooltip: 'Review application',
+                              onPressed: () => _openAgencyReview(row),
+                              icon: const Icon(Icons.fact_check, color: _gold),
+                            )
+                          : const Icon(Icons.chevron_right, color: _gold),
+                      onTap: selected == 2
+                          ? () => _openAgencyReview(row)
+                          : () => showDialog<void>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           backgroundColor: _panel,
@@ -629,6 +646,167 @@ class _CoinAdjustmentScreenState extends State<CoinAdjustmentScreen> {
         ),
     ]),
   );
+}
+
+class AgencyApplicationReviewScreen extends StatefulWidget {
+  final Map<String, dynamic> application;
+  const AgencyApplicationReviewScreen({super.key, required this.application});
+
+  @override
+  State<AgencyApplicationReviewScreen> createState() => _AgencyApplicationReviewScreenState();
+}
+
+class _AgencyApplicationReviewScreenState extends State<AgencyApplicationReviewScreen> {
+  final TextEditingController _note = TextEditingController();
+  bool _busy = false;
+  String? _receiptUrl;
+  String? _message;
+  String? _agencyCode;
+
+  Map<String, dynamic> get app => widget.application;
+  String get applicationId => app['id'].toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReceipt();
+  }
+
+  Future<void> _loadReceipt() async {
+    final path = app['deposit_receipt_path']?.toString();
+    if (path == null || path.isEmpty) return;
+    try {
+      final url = await Backend.client.storage
+          .from('agency-documents-private')
+          .createSignedUrl(path, 3600);
+      if (mounted) setState(() => _receiptUrl = url);
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Receipt preview unavailable: $error');
+    }
+  }
+
+  Future<void> _setDeposit(String status) async {
+    setState(() { _busy = true; _message = null; });
+    try {
+      await Backend.client.rpc(
+        'owner_set_agency_deposit_status',
+        params: <String, dynamic>{
+          'p_application_id': applicationId,
+          'p_deposit_status': status,
+          'p_review_note': _note.text.trim(),
+        },
+      );
+      if (mounted) setState(() => _message = 'Deposit status set to $status.');
+    } catch (error) {
+      if (mounted) setState(() => _message = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _review(String decision) async {
+    setState(() { _busy = true; _message = null; });
+    try {
+      final result = await Backend.client.rpc(
+        'owner_review_agency_application',
+        params: <String, dynamic>{
+          'p_application_id': applicationId,
+          'p_decision': decision,
+          'p_review_note': _note.text.trim(),
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _agencyCode = result is Map ? result['agency_code']?.toString() : null;
+          _message = decision == 'approved'
+              ? 'Agency approved. Official code: ${_agencyCode ?? 'pending'}'
+              : 'Application rejected.';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final depositStatus = (app['deposit_status'] ?? 'pending').toString();
+    final applicationStatus = (app['application_status'] ?? 'pending').toString();
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(title: const Text('Review Agency Application')),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        _portalCard(
+          (app['proposed_name'] ?? 'Agency').toString(),
+          'Type: ${app['agency_type']} • Deposit: USD ${app['deposit_amount']} • Application: $applicationStatus • Deposit status: $depositStatus',
+          Icons.business,
+        ),
+        const SizedBox(height: 10),
+        Text('Contact: ${app['contact_details']}', style: const TextStyle(color: _muted)),
+        Text('Deposit reference: ${app['deposit_reference'] ?? 'Not supplied'}',
+            style: const TextStyle(color: _muted)),
+        if (_receiptUrl != null) ...[
+          const SizedBox(height: 12),
+          const Text('Private deposit receipt', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(_receiptUrl!, height: 220, fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Text('Receipt preview could not be rendered.', style: TextStyle(color: _muted))),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _note,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Owner review note'),
+        ),
+        const SizedBox(height: 12),
+        if (applicationStatus == 'pending') ...[
+          if (depositStatus == 'pending')
+            FilledButton(
+              onPressed: _busy ? null : () => _setDeposit('verified'),
+              child: const Text('VERIFY USD 300 DEPOSIT'),
+            ),
+          if (depositStatus != 'rejected')
+            OutlinedButton(
+              onPressed: _busy ? null : () => _setDeposit('rejected'),
+              child: const Text('REJECT DEPOSIT RECEIPT'),
+            ),
+          if (depositStatus == 'verified')
+            FilledButton(
+              onPressed: _busy ? null : () => _review('approved'),
+              child: const Text('APPROVE & ISSUE AGENCY CODE'),
+            ),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _review('rejected'),
+            child: const Text('REJECT APPLICATION'),
+          ),
+        ],
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(_message!, style: const TextStyle(color: _teal)),
+          ),
+        if (_busy) const Padding(
+          padding: EdgeInsets.all(12),
+          child: Center(child: CircularProgressIndicator(color: _gold)),
+        ),
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('BACK TO AGENCY RECORDS'),
+        ),
+      ]),
+    );
+  }
 }
 
 class AgencyApplicationFormScreen extends StatefulWidget {
