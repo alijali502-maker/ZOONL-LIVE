@@ -11,6 +11,7 @@ import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
+import 'user_level_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_feed_screen.dart';
@@ -847,7 +848,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             const Text(
               'LIVE EVENT',
               style: TextStyle(
-                color: Color(0xFFD6B46A),
+                color: Color(0xFFB9AEFF),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
@@ -3181,8 +3182,58 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ],
               ),
               const Divider(height: 24),
-              _profileInfoRow(Icons.workspace_premium, 'Level',
-                  '${store.currentUser['level'] ?? 1}  •  VIP ${store.currentUser['vipTier'] ?? 'NONE'}'),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const UserLevelScreen(),
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF29365E), Color(0xFF141E35)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF9B8CFF).withOpacity(.65)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [Color(0xFFB9AEFF), Color(0xFF58D6CE)]),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${store.currentUser['level'] ?? 1}',
+                            style: const TextStyle(color: Color(0xFF10182E), fontSize: 19, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('ACCOUNT LEVEL', style: TextStyle(color: Color(0xFFC7D3F4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                            Text('LEVEL ${store.currentUser['level'] ?? 1}',
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                            Text('VIP ${store.currentUser['vipTier'] ?? 'NONE'} • View level ladder',
+                              style: const TextStyle(color: Color(0xFFB9C7E8), fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Color(0xFFB9AEFF)),
+                    ],
+                  ),
+                ),
+              ),
               _profileInfoRow(Icons.flag_outlined, 'Country', country),
               _profileInfoRow(Icons.info_outline, 'Bio',
                   bio.isEmpty ? 'Add a short introduction' : bio),
