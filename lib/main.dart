@@ -1540,6 +1540,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       TextEditingController();
 
   bool registrationSubmitted = false;
+  late Future<Map<String, dynamic>?> _starSummaryFuture;
   bool aiExpanded = false;
   bool femaleVoiceEnabled = true;
 
@@ -1581,6 +1582,23 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       'a': 'Owner actions require a trusted server-side Owner role. A public account ID is not authorization.',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _starSummaryFuture = _loadStarSummary();
+  }
+
+  Future<Map<String, dynamic>?> _loadStarSummary() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return null;
+    final row = await Backend.client
+        .from('streamer_gifting_summary')
+        .select('daily_coins,weekly_coins,monthly_coins,star_rank')
+        .eq('streamer_id', userId)
+        .maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
+  }
 
   @override
   void dispose() {
@@ -2851,6 +2869,76 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
             ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'STREAMER STAR RANK',
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: _starSummaryFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+              }
+              if (snapshot.hasError) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Gift-based star summary is unavailable.',
+                      style: TextStyle(color: Colors.white60, fontSize: 11)),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _starSummaryFuture = _loadStarSummary()),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('RETRY'),
+                    ),
+                  ],
+                );
+              }
+              final data = snapshot.data ?? <String, dynamic>{};
+              final rank = (data['star_rank'] ?? 'NO STAR').toString();
+              final stars = rank.startsWith('5') ? 5
+                  : rank.startsWith('4') ? 4
+                  : rank.startsWith('3') ? 3
+                  : rank.startsWith('2') ? 2
+                  : rank.startsWith('1') ? 1 : 0;
+              final daily = (data['daily_coins'] as num?)?.toInt() ?? 0;
+              final weekly = (data['weekly_coins'] as num?)?.toInt() ?? 0;
+              final monthly = (data['monthly_coins'] as num?)?.toInt() ?? 0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: List<Widget>.generate(5, (index) => Icon(
+                      index < stars ? Icons.star : Icons.star_border,
+                      color: const Color(0xFFD6B46A),
+                      size: 25,
+                    )),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(rank, style: const TextStyle(
+                    color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text('Daily $daily')),
+                      Chip(label: Text('Weekly $weekly')),
+                      Chip(label: Text('Monthly $monthly')),
+                    ],
+                  ),
+                  const Text('Ranks are calculated from verified gifts received. They do not change wallet balances.',
+                    style: TextStyle(color: Colors.white60, fontSize: 10)),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _starSummaryFuture = _loadStarSummary()),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('REFRESH'),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         _luxuryCard(
