@@ -1448,6 +1448,7 @@ class ZoonlCompleteBody extends StatefulWidget {
   final int bottomIndex;
   final VoidCallback onSwitchToLive;
   final VoidCallback onOpenShortVideos;
+  final Future<void> Function() onCreateShortVideo;
   final VoidCallback onOpenWallet;
   final VoidCallback onOpenPrime;
 
@@ -1457,6 +1458,7 @@ class ZoonlCompleteBody extends StatefulWidget {
     required this.bottomIndex,
     required this.onSwitchToLive,
     required this.onOpenShortVideos,
+    required this.onCreateShortVideo,
     required this.onOpenWallet,
     required this.onOpenPrime,
   });
