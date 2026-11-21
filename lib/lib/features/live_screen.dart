@@ -162,6 +162,10 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Map<String, dynamic>> _giftCatalog = <Map<String, dynamic>>[];
   Map<String, dynamic>? _giftBanner;
   Timer? _giftBannerTimer;
+  Timer? _entryBannerTimer;
+  String? _entryBannerName;
+  String? _entryBannerEffect;
+  String? _entryBannerMedia;
   AudioPlayer? _giftAudioPlayer;
   int _hostLevel = 1;
   bool _isTrustedOwner = false;
@@ -926,6 +930,28 @@ class _LiveScreenState extends State<LiveScreen> {
           callback: (payload) => unawaited(_showRemoteGift(payload.newRecord)),
         )
         .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'live_room_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => unawaited(_showRoomEntry(payload.newRecord)),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'live_room_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => unawaited(_showRoomEntry(payload.newRecord)),
+        )
+        .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'live_rooms',
@@ -942,6 +968,44 @@ class _LiveScreenState extends State<LiveScreen> {
           },
         )
         .subscribe();
+  }
+
+  Future<void> _showRoomEntry(Map<String, dynamic> member) async {
+    final userId = member['user_id']?.toString() ?? '';
+    if (userId.isEmpty) return;
+    try {
+      final profile = await _supabase.from('profiles')
+          .select('display_name').eq('id', userId).maybeSingle();
+      final styles = await _supabase.from('zoonl_live_active_styles')
+          .select('active_entry_code').eq('user_id', userId).maybeSingle();
+      final code = styles?['active_entry_code']?.toString() ?? '';
+      Map<String, dynamic>? effect;
+      if (code.isNotEmpty) {
+        effect = await _supabase.from('zoonl_live_cosmetics')
+            .select('zoonl_item_name,media_url,color_theme_hex')
+            .eq('project_name', 'ZOONL LIVE')
+            .eq('zoonl_item_code', code)
+            .eq('is_active', true)
+            .maybeSingle();
+      }
+      if (!mounted) return;
+      _entryBannerTimer?.cancel();
+      setState(() {
+        _entryBannerName = profile?['display_name']?.toString() ?? 'ZOONL Member';
+        _entryBannerEffect = effect?['zoonl_item_name']?.toString() ?? 'Standard Entry';
+        _entryBannerMedia = effect?['media_url']?.toString();
+      });
+      _entryBannerTimer = Timer(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        setState(() {
+          _entryBannerName = null;
+          _entryBannerEffect = null;
+          _entryBannerMedia = null;
+        });
+      });
+    } catch (_) {
+      // A failed cosmetic lookup must never interrupt room entry or gifting.
+    }
   }
 
   String _nameFor(String? senderId) {
@@ -1377,6 +1441,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   void _setGiftBanner(Map<String, dynamic> data) {
     _giftBannerTimer?.cancel();
+    _entryBannerTimer?.cancel();
     if (!mounted) return;
     setState(() => _giftBanner = data);
     _giftBannerTimer = Timer(const Duration(seconds: 6), () {
@@ -1550,7 +1615,54 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
         ),
       ),
-      body: SafeArea(child: body),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(child: body),
+            if (_entryBannerName != null)
+              Positioned(
+                top: 10,
+                left: 12,
+                right: 12,
+                child: IgnorePointer(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    child: Container(
+                      key: ValueKey('$_entryBannerName-$_entryBannerEffect'),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF273B70), Color(0xFF39235D), Color(0xFF173F4A)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF8CEBFF), width: 1.2),
+                        boxShadow: [BoxShadow(color: const Color(0xFF8CEBFF).withOpacity(.16), blurRadius: 18)],
+                      ),
+                      child: Row(children: [
+                        if ((_entryBannerMedia ?? '').startsWith('https://'))
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(_entryBannerMedia!, width: 42, height: 42, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF), size: 30)),
+                          )
+                        else
+                          const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF), size: 30),
+                        const SizedBox(width: 11),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('$_entryBannerName ENTERED THE ROOM',
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: .6)),
+                          const SizedBox(height: 3),
+                          Text(_entryBannerEffect ?? 'Standard Entry',
+                            style: const TextStyle(color: Color(0xFF8CEBFF), fontSize: 12, fontWeight: FontWeight.w800)),
+                        ])),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
