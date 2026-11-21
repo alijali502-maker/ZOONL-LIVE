@@ -62,16 +62,16 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
           var blue = b / (size - 1);
           switch (filter) {
             case 'Warm':
-              red = (red * 1.07 + 0.015).clamp(0.0, 1.0);
-              blue = (blue * 0.91).clamp(0.0, 1.0);
+              red = (red * 1.07 + 0.015).clamp(0.0, 1.0).toDouble();
+              blue = (blue * 0.91).clamp(0.0, 1.0).toDouble();
               break;
             case 'Cool':
-              red = (red * 0.92).clamp(0.0, 1.0);
-              blue = (blue * 1.08 + 0.015).clamp(0.0, 1.0);
+              red = (red * 0.92).clamp(0.0, 1.0).toDouble();
+              blue = (blue * 1.08 + 0.015).clamp(0.0, 1.0).toDouble();
               break;
             case 'Rose':
-              red = (red * 1.06 + 0.012).clamp(0.0, 1.0);
-              blue = (blue * 1.025 + 0.006).clamp(0.0, 1.0);
+              red = (red * 1.06 + 0.012).clamp(0.0, 1.0).toDouble();
+              blue = (blue * 1.025 + 0.006).clamp(0.0, 1.0).toDouble();
               break;
             case 'Mono':
               final luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
@@ -279,7 +279,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
       await _db.storage.from('zoonl-shorts').upload(
         uploadedPath,
         localFile,
-        fileOptions: const FileOptions(contentType: 'video/mp4', upsert: false),
+        fileOptions: FileOptions(contentType: 'video/mp4', upsert: false),
       );
       final publicUrl = _db.storage.from('zoonl-shorts').getPublicUrl(uploadedPath);
       await _db.from('short_videos').insert({
