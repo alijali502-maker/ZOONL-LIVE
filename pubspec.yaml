@@ -5,13 +5,14 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.0
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
+  camera: ^0.11.0+2
   supabase_flutter: ^2.9.0
   livekit_client: ^2.4.9
   flutter_dotenv: ^5.2.1
@@ -19,6 +20,7 @@ dependencies:
   video_player: ^2.9.2
   just_audio: ^0.9.42
   image_picker: ^1.1.2
+  filmkit: ^0.7.1
 
 dev_dependencies:
   flutter_test:

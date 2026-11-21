@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: zoonl-live-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build Android APK
@@ -40,6 +44,59 @@ jobs:
         run: |
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
+
+      - name: Ensure Gradle plugin repositories
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/settings.gradle.kts")
+          s = p.read_text()
+          match = re.search(r"pluginManagement\s*\{", s)
+          if not match:
+              raise SystemExit("pluginManagement block was not generated.")
+          start = match.end()
+          repo_match = re.search(r"repositories\s*\{", s[start:])
+          if not repo_match:
+              raise SystemExit("pluginManagement repositories block was not generated.")
+          repo_start = start + repo_match.end()
+          close = s.find("}", repo_start)
+          if close < 0:
+              raise SystemExit("Could not locate plugin repository block end.")
+          block = s[repo_start:close]
+          additions = []
+          if "google()" not in block:
+              additions.append("google()")
+          if "mavenCentral()" not in block:
+              additions.append("mavenCentral()")
+          if "gradlePluginPortal()" not in block:
+              additions.append("gradlePluginPortal()")
+          if additions:
+              s = s[:repo_start] + "\n" + "\n".join("        " + item for item in additions) + "\n" + s[repo_start:]
+              p.write_text(s)
+          print("Gradle plugin resolution repositories verified.")
+          PY
+
+      - name: Set Android minimum SDK for native video filters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          target = next((p for p in candidates if p.exists()), None)
+          if target is None:
+              raise SystemExit("Android app Gradle file was not generated.")
+          source = target.read_text()
+          if target.suffix == ".kts":
+              source = source.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+          else:
+              source = source.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
+          target.write_text(source)
+          if "minSdk = 24" not in source and "minSdkVersion 24" not in source:
+              raise SystemExit("Could not set Android minSdkVersion to 24.")
+          print(f"Android minSdkVersion set to 24 in {target}")
+          PY
 
       - name: Add Android Internet Permission
         run: |

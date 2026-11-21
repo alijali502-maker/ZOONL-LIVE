@@ -1,15 +1,24 @@
-Import 'dart:async';
+import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_entry.dart' as entry;
 import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
+import 'user_level_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
+import 'short_video_feed_screen.dart';
+import 'short_video_studio_screen.dart';
+import 'role_portals_screen.dart';
+import 'features/pk_battle_screen.dart';
+import 'features/pk_broadcast_screen.dart';
 import 'lib/features/live_screen.dart';
 
 Future<void> main() async {
@@ -96,8 +105,14 @@ class ZoonlStore extends ChangeNotifier {
       <String, Map<String, dynamic>>{};
 
   List<Map<String, dynamic>> memberships = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> agencyApplications =
       <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> giftCatalog = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> cosmeticsCatalog = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> userBaggage = <Map<String, dynamic>>[];
+  Map<String, dynamic> userTrial = <String, dynamic>{};
 
   String officialHostingEmail = 'hosting@zoonllive.com';
   String officialHostingContact = '';
@@ -230,7 +245,13 @@ class ZoonlStore extends ChangeNotifier {
     // No sample users, fake Coins, fake gifts, or fabricated wallet records.
     // TEST mode uses only explicitly entered test data.
     memberships = <Map<String, dynamic>>[];
+    walletTransactions = <Map<String, dynamic>>[];
     agencyApplications = <Map<String, dynamic>>[];
+    giftCatalog = <Map<String, dynamic>>[];
+    cosmeticsCatalog = <Map<String, dynamic>>[];
+    primeTiers = <Map<String, dynamic>>[];
+    userBaggage = <Map<String, dynamic>>[];
+    userTrial = <String, dynamic>{};
     streamers.clear();
     shortVideos.clear();
     privateRooms.clear();
@@ -744,6 +765,23 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         topTabIndex = 1;
                       });
                     },
+                    onOpenShortVideos: () {
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ShortVideoFeedScreen(onlyMine: true),
+                        ),
+                      );
+                    },
+                    onCreateShortVideo: () async {
+                      final uploaded = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => const ShortVideoStudioScreen(),
+                        ),
+                      );
+                      if (uploaded == true && mounted) setState(() {});
+                    },
+                    onOpenWallet: () => setState(() => bottomIndex = 2),
+                    onOpenPrime: () => setState(() { bottomIndex = 0; topTabIndex = 4; }),
                   ),
                 ),
               ],
@@ -810,7 +848,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             const Text(
               'LIVE EVENT',
               style: TextStyle(
-                color: Color(0xFFD6B46A),
+                color: Color(0xFFB9AEFF),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
@@ -1164,13 +1202,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 ),
                 title: const Text('Audio Room'),
                 subtitle: const Text(
-                  'Audio room seats and call requests',
+                  'LiveKit audio broadcast with in-room guest seats',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   if (!store.canStartLive()) {
                     _showMessage(
-                      'Live ke liye Level 5 ya verified streamer status chahiye.',
+                      'Live के लिए Owner या approved Host status जरूरी है।',
                     );
                     return;
                   }
@@ -1196,8 +1234,10 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _showMessage(
-                    'Private Room needs secure server integration.',
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const FeatureHubScreen(),
+                    ),
                   );
                 },
               ),
@@ -1216,16 +1256,227 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
   }
 }
 
+
+class _ProfileSocialPanel extends StatefulWidget {
+  const _ProfileSocialPanel({
+    required this.userId,
+    required this.onOpenShortVideos,
+    required this.onCreateShortVideo,
+    required this.onOpenWallet,
+    required this.onOpenPrime,
+  });
+
+  final String userId;
+  final VoidCallback onOpenShortVideos;
+  final Future<void> Function() onCreateShortVideo;
+  final VoidCallback onOpenWallet;
+  final VoidCallback onOpenPrime;
+
+  @override
+  State<_ProfileSocialPanel> createState() => _ProfileSocialPanelState();
+}
+
+class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
+  late Future<Map<String, dynamic>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileSocialPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) _future = _load();
+  }
+
+  Future<Map<String, dynamic>> _load() async {
+    final client = Supabase.instance.client;
+    final followers = await client.from('user_follows')
+        .select('id').eq('following_id', widget.userId);
+    final following = await client.from('user_follows')
+        .select('id').eq('follower_id', widget.userId);
+    final publicProfile = await client.from('user_public_profiles')
+        .select('zoonl_id')
+        .eq('user_id', widget.userId)
+        .maybeSingle();
+    final videos = await client.from('short_videos')
+        .select('id,user_id,caption,video_url,filter_name,is_filter_baked,duration_seconds,likes_count,created_at')
+        .eq('user_id', widget.userId)
+        .order('created_at', ascending: false)
+        .limit(4);
+    final publicId = publicProfile?['zoonl_id']?.toString() ?? '';
+    return {
+      'followers': (followers as List).length,
+      'following': (following as List).length,
+      'videos': (videos as List).map((row) {
+        return <String, dynamic>{
+          ...Map<String, dynamic>.from(row as Map),
+          'zoonl_id': publicId,
+        };
+      }).toList(),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17232E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF354653)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('SOCIAL PROFILE',
+            style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          FutureBuilder<Map<String, dynamic>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                );
+              }
+              if (snapshot.hasError) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Profile statistics could not be loaded.',
+                      style: TextStyle(color: Colors.white70)),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _future = _load()),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                );
+              }
+              final data = snapshot.data!;
+              final videos = data['videos'] as List<Map<String, dynamic>>;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: _socialStat('FOLLOWERS', data['followers'].toString(), Icons.people_alt_outlined)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _socialStat('FOLLOWING', data['following'].toString(), Icons.person_add_alt_1)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Expanded(child: Text('MY SHORT VIDEOS',
+                        style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold))),
+                      TextButton(
+                        onPressed: () async {
+                          await widget.onCreateShortVideo();
+                          if (mounted) setState(() => _future = _load());
+                        },
+                        child: const Text('CREATE'),
+                      ),
+                      TextButton(onPressed: widget.onOpenShortVideos, child: const Text('OPEN ALL')),
+                    ],
+                  ),
+                  if (videos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Text('No uploaded Shorts yet. Your published videos will appear here.',
+                        style: TextStyle(color: Colors.white60, fontSize: 12)),
+                    )
+                  else
+                    ...videos.map((video) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFF211735),
+                        child: Icon(Icons.play_arrow, color: Color(0xFFD6B46A)),
+                      ),
+                      title: Text((video['caption'] ?? 'ZOONL Short').toString(),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text('${video['duration_seconds'] ?? 0}s • ${video['likes_count'] ?? 0} likes'),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ShortVideoPlayerScreen(video: video),
+                        ),
+                      ),
+                    )),
+                ],
+              );
+            },
+          ),
+          const Divider(color: Color(0xFF354653), height: 22),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.workspace_premium, color: Color(0xFFD6B46A)),
+            title: const Text('Prime Membership'),
+            subtitle: const Text('View active membership, tiers and benefits'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: widget.onOpenPrime,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFD6B46A)),
+            title: const Text('Top-up & Payment History'),
+            subtitle: const Text('View wallet balance, receipts and transactions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: widget.onOpenWallet,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _socialStat(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFFD6B46A), size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60)),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
+}
+
+
 class ZoonlCompleteBody extends StatefulWidget {
   final int topTabIndex;
   final int bottomIndex;
   final VoidCallback onSwitchToLive;
+  final VoidCallback onOpenShortVideos;
+  final Future<void> Function() onCreateShortVideo;
+  final VoidCallback onOpenWallet;
+  final VoidCallback onOpenPrime;
 
   const ZoonlCompleteBody({
     super.key,
     required this.topTabIndex,
     required this.bottomIndex,
     required this.onSwitchToLive,
+    required this.onOpenShortVideos,
+    required this.onCreateShortVideo,
+    required this.onOpenWallet,
+    required this.onOpenPrime,
   });
 
   @override
@@ -1236,19 +1487,14 @@ class ZoonlCompleteBody extends StatefulWidget {
 class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   final ZoonlStore store = ZoonlStore.instance;
 
+  bool _isStoreOwner = false;
+  String _storeFilter = 'ALL';
+
   String selectedVideoFilter = 'VIP Velvet Glow';
   bool recordingShort = false;
 
   final TextEditingController shortCaptionCtrl =
       TextEditingController();
-
-  double skinSmooth = 0.75;
-  double faceSize = 0.50;
-  double eyeSize = 0.65;
-
-  String eyeLens = 'Crystal Hazel';
-  String eyeColor = 'Amber Gold';
-  String makeupPreset = 'Royal Glamour';
 
   bool micMuted = false;
   bool camMuted = false;
@@ -1258,10 +1504,30 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
   String kycCountry = 'Pakistan';
   String kycDob = '';
+  final TextEditingController kycLegalNameCtrl = TextEditingController();
 
   bool kycFrontUploaded = false;
   bool kycBackUploaded = false;
   bool kycCardSelfieUploaded = false;
+  bool kycUploading = false;
+  bool kycSubmitting = false;
+  String? kycFrontPath;
+  String? kycBackPath;
+  String? kycSelfiePath;
+  String? kycMessage;
+  final ImagePicker _kycPicker = ImagePicker();
+
+  bool get _isAdultForKyc {
+    final dob = DateTime.tryParse(kycDob);
+    if (dob == null) return false;
+    final today = DateTime.now();
+    var age = today.year - dob.year;
+    if (today.month < dob.month ||
+        (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age >= 18;
+  }
 
   final TextEditingController payoutAccountCtrl =
       TextEditingController();
@@ -1270,6 +1536,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       TextEditingController();
 
   bool registrationSubmitted = false;
+  late Future<Map<String, dynamic>?> _starSummaryFuture;
   bool aiExpanded = false;
   bool femaleVoiceEnabled = true;
 
@@ -1313,10 +1580,194 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _starSummaryFuture = _loadStarSummary();
+    unawaited(_loadVipStoreData());
+  }
+
+  Future<void> _loadVipStoreData() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return;
+    try {
+      final client = Backend.client;
+      final owner = await Backend.isZoonlOwner();
+      final catalog = await client
+          .from('zoonl_live_cosmetics')
+          .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('is_active', true)
+          .order('sort_order');
+      final tiers = await client
+          .from('prime_tiers')
+          .select('id,tier_name,benefits,is_active,coin_price,duration_days')
+          .eq('is_active', true)
+          .order('id');
+      final inventory = await client
+          .from('zoonl_live_user_baggage')
+          .select('id,zoonl_item_code,item_type,is_equipped,acquired_via,expires_at,created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      final prime = await client
+          .from('user_prime_memberships')
+          .select('id,prime_tier_id,started_at,expires_at,is_active')
+          .eq('user_id', userId)
+          .eq('is_active', true);
+      final wallet = await client
+          .from('wallets')
+          .select('coins,diamonds')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final trial = await client
+          .from('zoonl_user_trials')
+          .select('started_at,expires_at,trial_status,svip_active')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final activeStyle = await client
+          .from('zoonl_live_active_styles')
+          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (!mounted) return;
+      setState(() {
+        _isStoreOwner = owner;
+        store.cosmeticsCatalog = (catalog as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.primeTiers = (tiers as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.userBaggage = (inventory as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.memberships = (prime as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.userTrial = trial == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(trial);
+        if (activeStyle != null) {
+          store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
+          store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
+          store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
+          store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
+          store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
+        }
+        if (wallet != null) {
+          store.currentUser['coins'] = (wallet['coins'] as num?)?.toInt() ?? 0;
+          store.currentUser['diamonds'] = (wallet['diamonds'] as num?)?.toInt() ?? 0;
+        }
+      });
+      store.refresh();
+    } catch (error) {
+      _showMessage('VIP Store data could not load: $error');
+    }
+  }
+
+  Future<void> _editCosmeticPrice(String itemCode, String itemName, int currentPrice) async {
+    if (!_isStoreOwner) return;
+    final controller = TextEditingController(text: currentPrice.toString());
+    try {
+      final price = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Set price • $itemName'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Coin price', helperText: 'Set 0 to make this item free'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null || value < 0 || value > 1000000000) return;
+              Navigator.pop(dialogContext, value);
+            }, child: const Text('Save price')),
+          ],
+        ),
+      );
+      if (price == null) return;
+      await Backend.client.rpc('owner_set_zoonl_cosmetic_price', params: {
+        'p_item_code': itemCode,
+        'p_coin_price': price,
+      });
+      await _loadVipStoreData();
+      _showMessage('$itemName price updated to $price coins.');
+    } catch (error) {
+      _showMessage('Price update failed: $error');
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _editPrimeTierPrice(int tierId, String tierName, int currentPrice, int currentDays) async {
+    if (!_isStoreOwner) return;
+    final priceController = TextEditingController(text: currentPrice.toString());
+    final daysController = TextEditingController(text: currentDays.toString());
+    try {
+      final values = await showDialog<List<int>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Configure $tierName'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: priceController, keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Coin price')),
+            TextField(controller: daysController, keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Duration in days')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () {
+              final price = int.tryParse(priceController.text.trim());
+              final days = int.tryParse(daysController.text.trim());
+              if (price == null || days == null || price < 0 || price > 1000000000 || days < 1 || days > 3650) return;
+              Navigator.pop(dialogContext, [price, days]);
+            }, child: const Text('Save')),
+          ],
+        ),
+      );
+      if (values == null) return;
+      await Backend.client.rpc('owner_set_prime_tier_price', params: {
+        'p_tier_id': tierId,
+        'p_coin_price': values[0],
+        'p_duration_days': values[1],
+      });
+      await _loadVipStoreData();
+      _showMessage('$tierName pricing saved.');
+    } catch (error) {
+      _showMessage('Prime price update failed: $error');
+    } finally {
+      priceController.dispose();
+      daysController.dispose();
+    }
+  }
+
+  Future<void> _buyPrimeTier(int tierId, String tierName) async {
+    try {
+      await Backend.client.rpc('buy_zoonl_prime_tier', params: {'p_tier_id': tierId});
+      await _loadVipStoreData();
+      _showMessage('$tierName activated on this account.');
+    } catch (error) {
+      _showMessage('Prime purchase failed: $error');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _loadStarSummary() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return null;
+    final row = await Backend.client
+        .from('streamer_gifting_summary')
+        .select('daily_coins,weekly_coins,monthly_coins,star_rank')
+        .eq('streamer_id', userId)
+        .maybeSingle();
+    return row == null ? null : Map<String, dynamic>.from(row);
+  }
+
+  @override
   void dispose() {
     shortCaptionCtrl.dispose();
     payoutAccountCtrl.dispose();
     agencyTrackCtrl.dispose();
+    kycLegalNameCtrl.dispose();
     super.dispose();
   }
 
@@ -1349,11 +1800,11 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       case 0:
         return const FeatureHubScreen();
       case 1:
-        return _buildLiveSection();
+        return const FeatureHubScreen(roomTypeFilter: 'video');
       case 2:
         return _buildPkSection();
       case 3:
-        return _buildAudioSection();
+        return const FeatureHubScreen(roomTypeFilter: 'audio');
       default:
         return _buildVipHubSection();
     }
@@ -1716,38 +2167,17 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ],
               ),
               const SizedBox(height: 10),
-              const Text(
-                'VIP Beauty Filter Controls',
-                style: TextStyle(
-                  color: Color(0xFFD6B46A),
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF171D36),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF9360F5).withOpacity(.5)),
                 ),
-              ),
-              Slider(
-                value: skinSmooth,
-                onChanged: (double value) {
-                  setState(() => skinSmooth = value);
-                },
-              ),
-              Slider(
-                value: faceSize,
-                onChanged: (double value) {
-                  setState(() => faceSize = value);
-                },
-              ),
-              Slider(
-                value: eyeSize,
-                onChanged: (double value) {
-                  setState(() => eyeSize = value);
-                },
-              ),
-              Wrap(
-                spacing: 8,
-                children: <Widget>[
-                  Chip(label: Text('Lens: $eyeLens')),
-                  Chip(label: Text('Eye Color: $eyeColor')),
-                  Chip(label: Text('Makeup: $makeupPreset')),
-                ],
+                child: const Text(
+                  'Camera colour filters are selected on the Pre-Live screen before Start. Face retouch controls stay hidden until they can process the outgoing LiveKit video, not just change a local slider.',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
               const SizedBox(height: 8),
               _buildGiftControls(activeStreamer),
@@ -1759,11 +2189,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildGiftControls(Map<String, dynamic> streamer) {
+    final gifts = store.giftCatalog;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const Text(
-          'Original Gift System',
+          'Original Supabase Gift Catalog',
           style: TextStyle(
             color: Color(0xFFD6B46A),
             fontWeight: FontWeight.bold,
@@ -1772,21 +2203,52 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         const SizedBox(height: 8),
         Text('Available Coins: ${store.currentUser['coins'] ?? 0}'),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            _giftButton(streamer, 'Golden Rose', 100),
-            _giftButton(streamer, 'Golden Heart', 300),
-            _giftButton(streamer, 'Diamond Heart', 1500),
-            _giftButton(streamer, 'Royal Castle', 85000),
-          ],
-        ),
+        if (gifts.isEmpty)
+          const Text(
+            'Active gift catalog is unavailable. Gift sending remains enabled when the server catalog is reachable.',
+            style: TextStyle(color: Colors.orangeAccent, fontSize: 12),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: gifts.map((gift) {
+              final name = (gift['gift_name'] ?? '').toString();
+              final price = (gift['coin_price'] as num?)?.toInt() ?? 0;
+              final image = (gift['image_url'] ?? gift['preview_url'] ?? '')
+                  .toString();
+              return OutlinedButton(
+                onPressed: name.isEmpty || price <= 0
+                    ? null
+                    : () => _giftButton(streamer, name, price),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (image.startsWith('https://'))
+                      Image.network(
+                        image,
+                        width: 34,
+                        height: 34,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.card_giftcard, size: 22),
+                      )
+                    else
+                      const Icon(Icons.card_giftcard, size: 22),
+                    const SizedBox(height: 3),
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('$price coins',
+                        style: const TextStyle(fontSize: 10)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         if (store.isLiveMode)
           const Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
-              'LIVE MODE: Gifts require a verified server transaction. No local balance will be changed.',
+              'Gift transactions are processed by the Supabase wallet RPC. Client balances are never edited locally.',
               style: TextStyle(
                 color: Colors.orangeAccent,
                 fontSize: 11,
@@ -1879,255 +2341,248 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  Widget _buildPkSection() {
-    final int slots = pkModeSelected == '6P'
-        ? 6
-        : pkModeSelected == '4GRID'
-            ? 4
-            : pkModeSelected == '3P'
-                ? 3
-                : 2;
-
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: <Widget>[
-        _luxuryCard(
-          title: 'PK Battle Arena',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Wrap(
-                spacing: 8,
-                children: <String>[
-                  '6P',
-                  '3P',
-                  '2P',
-                  'TRAIN',
-                  '4GRID',
-                ].map((String mode) {
-                  return ChoiceChip(
-                    label: Text(mode),
-                    selected: pkModeSelected == mode,
-                    onSelected: (_) {
-                      setState(() => pkModeSelected = mode);
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 10),
-              Text('Selected PK Mode: $pkModeSelected'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: List<Widget>.generate(slots, (int index) {
-                  return Container(
-                    width: 140,
-                    height: 80,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D2B37),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFD6B46A),
-                      ),
-                    ),
-                    child: Text(
-                      'Slot ${index + 1} ($pkModeSelected)',
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'PK invitations, live score sync and participant connections require the live-room service.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildPkSection() => const PkBroadcastScreen();
 
   Widget _buildAudioSection() {
-    final Map<String, dynamic>? audioRoom =
-        _findStreamer('AUDIO');
+    // Audio is a broadcast room, not a separate phone-call flow.
+    // Reuse the same Supabase + LiveKit room lifecycle, guest invitations,
+    // seats, moderation and gifting as the video-live experience.
+    return const FeatureHubScreen(roomTypeFilter: 'audio');
+  }
 
-    if (audioRoom == null) {
-      return _emptyState(
-        'No audio room available',
-        'Audio rooms will appear here when supplied by the server or added to a TEST session.',
-      );
+  Future<void> _refreshCosmeticsData() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return;
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_user_baggage')
+          .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      store.userBaggage = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+      final wallet = await Backend.client
+          .from('wallets')
+          .select('coins, diamonds')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (wallet != null) {
+        store.currentUser['coins'] =
+            (wallet['coins'] as num?)?.toInt() ?? 0;
+        store.currentUser['diamonds'] =
+            (wallet['diamonds'] as num?)?.toInt() ?? 0;
+      }
+      final activeStyle = await Backend.client
+          .from('zoonl_live_active_styles')
+          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (activeStyle != null) {
+        store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
+        store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
+        store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
+        store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
+        store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
+      }
+      store.refresh();
+    } catch (error) {
+      _showMessage('Supabase inventory refresh failed: $error');
     }
+  }
 
-    final List<Map<String, dynamic>> seats =
-        (audioRoom['seats'] as List<dynamic>? ?? <dynamic>[])
-            .whereType<Map>()
-            .map(
-              (Map seat) => Map<String, dynamic>.from(seat),
-            )
-            .toList();
+  Future<void> _buyCosmetic(String itemCode, String itemName) async {
+    try {
+      await Backend.client.rpc(
+        'buy_zoonl_cosmetic',
+        params: <String, dynamic>{'p_item_code': itemCode},
+      );
+      await _refreshCosmeticsData();
+      _showMessage('$itemName added to your ZOONL LIVE inventory.');
+    } catch (error) {
+      _showMessage('Purchase not completed: $error');
+    }
+  }
 
-    final List<dynamic> requests =
-        audioRoom['pendingCallRequests'] as List<dynamic>? ??
-            <dynamic>[];
-
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: <Widget>[
-        _luxuryCard(
-          title:
-              '${audioRoom['name']} • Audio Room (${seats.length} Seats)',
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              IconButton(
-                icon: const Icon(
-                  Icons.add_circle,
-                  color: Color(0xFFD6B46A),
-                ),
-                onPressed: () {
-                  if (store.isLiveMode) {
-                    _showMessage(
-                      'Audio seat changes require server authorization.',
-                    );
-                    return;
-                  }
-                  audioRoom['plusOpen'] =
-                      audioRoom['plusOpen'] != true;
-                  store.refresh();
-                },
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.phone_in_talk,
-                  color: Color(0xFF00E676),
-                ),
-                onPressed: () {
-                  if (store.isLiveMode) {
-                    _showMessage(
-                      'Call requests require the live-room service.',
-                    );
-                    return;
-                  }
-                  audioRoom['callRequestOpen'] =
-                      audioRoom['callRequestOpen'] != true;
-                  store.refresh();
-                },
-              ),
-            ],
-          ),
-          child: Column(
-            children: <Widget>[
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemCount: seats.length,
-                itemBuilder: (_, int index) {
-                  final Map<String, dynamic> seat = seats[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D2B37),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        const Icon(
-                          Icons.headset_mic,
-                          color: Color(0xFFD6B46A),
-                        ),
-                        Text(
-                          'Seat ${seat['seat']}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        Text(
-                          '${seat['name']}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              ...requests.map((dynamic request) {
-                if (request is! Map) {
-                  return const SizedBox.shrink();
-                }
-
-                return ListTile(
-                  title: Text(
-                    'Call Join Request: ${request['name']}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      IconButton(
-                        icon: const Icon(
-                          Icons.check_circle,
-                          color: Colors.greenAccent,
-                        ),
-                        onPressed: () {
-                          if (store.isLiveMode) {
-                            _showMessage(
-                              'Accepting a call requires server verification.',
-                            );
-                            return;
-                          }
-                          final List<dynamic> current =
-                              audioRoom['pendingCallRequests']
-                                  as List<dynamic>;
-                          current.remove(request);
-                          _showMessage(
-                            'TEST request accepted locally.',
-                          );
-                          store.refresh();
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.cancel,
-                          color: Colors.redAccent,
-                        ),
-                        onPressed: () {
-                          if (store.isLiveMode) return;
-                          (audioRoom['pendingCallRequests']
-                                  as List<dynamic>)
-                              .remove(request);
-                          store.refresh();
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ],
-    );
+  Future<void> _equipCosmetic(String itemCode, String itemName) async {
+    try {
+      await Backend.equipZoonlCosmetic(itemCode: itemCode);
+      await _refreshCosmeticsData();
+      _showMessage('$itemName equipped.');
+    } catch (error) {
+      _showMessage('Could not equip item: $error');
+    }
   }
 
   Widget _buildVipHubSection() {
+    final ownedCodes = store.userBaggage
+        .where((item) {
+          final expiry = item['expires_at'];
+          final validExpiry = expiry == null ||
+              (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ??
+                  false);
+          return validExpiry;
+        })
+        .map((item) => item['zoonl_item_code']?.toString() ?? '')
+        .toSet();
+
+    final equippedCodes = store.userBaggage.where((item) {
+      if (item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null ||
+          (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    }).map((item) => item['zoonl_item_code']?.toString() ?? '').toSet();
+
+    final activePrime = store.memberships.where((item) {
+      if (item['is_active'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null ||
+          (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    }).toList();
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title: 'VIP Top-Up & Backup Store',
+          title: 'Prime Membership',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(activePrime.isEmpty
+                  ? 'No active Prime membership on this account.'
+                  : 'Active Prime memberships: ${activePrime.length}'),
+              if (store.userTrial.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    store.userTrial['trial_status'] == 'active' &&
+                            store.userTrial['svip_active'] == true
+                        ? 'SVIP Trial ACTIVE • expires ${store.userTrial['expires_at']}'
+                        : 'SVIP Trial EXPIRED • trial cosmetics are in Backup',
+                    style: const TextStyle(
+                        color: Color(0xFFD6B46A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              ...store.primeTiers.map((tier) {
+                final tierId = (tier['id'] as num?)?.toInt() ?? 0;
+                final tierName = (tier['tier_name'] ?? 'Prime').toString();
+                final price = (tier['coin_price'] as num?)?.toInt() ?? 0;
+                final days = (tier['duration_days'] as num?)?.toInt() ?? 30;
+                final benefits = tier['benefits'];
+                final active = activePrime.any((m) =>
+                    (m['prime_tier_id'] as num?)?.toInt() == tierId &&
+                    (m['expires_at'] == null ||
+                     (DateTime.tryParse(m['expires_at'].toString())?.isAfter(DateTime.now()) ?? false)));
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.workspace_premium, color: Color(0xFFB9AEFF)),
+                  title: Text(tierName),
+                  subtitle: Text('${price} coins • $days days • ' + (benefits is Map
+                      ? benefits.entries.map((e) => '${e.key}: ${e.value}').join(' • ')
+                      : 'Tier $tierId')),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (_isStoreOwner) IconButton(
+                      tooltip: 'Owner: edit Prime price and duration',
+                      icon: const Icon(Icons.edit, color: Color(0xFF8CEBFF), size: 18),
+                      onPressed: () => _editPrimeTierPrice(tierId, tierName, price, days),
+                    ),
+                    if (active)
+                      const Chip(label: Text('ACTIVE'), visualDensity: VisualDensity.compact)
+                    else
+                      TextButton(
+                        onPressed: () => _buyPrimeTier(tierId, tierName),
+                        child: const Text('BUY'),
+                      ),
+                  ]),
+                );
+              }),
+              const SizedBox(height: 4),
+              const Text(
+                "Prime purchases debit wallet Coins on the server and activate a time-limited membership. The Owner controls each tier's price and duration.",
+                style: TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'ZOONL LIVE Frames • Entries • Backgrounds',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Coins: ${store.currentUser['coins'] ?? 0} • Owned items: ${ownedCodes.length}',
+              ),
+              const SizedBox(height: 8),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                for (final category in ['ALL', 'AVATAR_FRAME', 'ENTRY_EFFECT', 'PROFILE_BG', 'ID_BADGE', 'CHAT_BUBBLE'])
+                  ChoiceChip(
+                    label: Text(category == 'ALL' ? 'All' : category.replaceAll('_', ' ')),
+                    selected: _storeFilter == category,
+                    onSelected: (_) => setState(() => _storeFilter = category),
+                  ),
+              ]),
+              if (_isStoreOwner)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6, bottom: 4),
+                  child: Text('OWNER CONTROL: change each item price below. Updates are verified by Supabase.',
+                    style: TextStyle(color: Color(0xFF8CEBFF), fontSize: 10, fontWeight: FontWeight.w700)),
+                ),
+              const SizedBox(height: 8),
+              if (store.cosmeticsCatalog.isEmpty)
+                const Text('No active cosmetics are available from Supabase.')
+              else
+                ...store.cosmeticsCatalog.where((item) =>
+                  _storeFilter == 'ALL' || item['item_type']?.toString() == _storeFilter
+                ).map((item) {
+                  final code = (item['zoonl_item_code'] ?? '').toString();
+                  final name = (item['zoonl_item_name'] ?? 'Cosmetic').toString();
+                  final type = (item['item_type'] ?? '').toString();
+                  final price = (item['coin_price'] as num?)?.toInt() ?? 0;
+                  final owned = ownedCodes.contains(code);
+                  final equipped = equippedCodes.contains(code);
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.auto_awesome,
+                        color: Color(0xFFD6B46A)),
+                    title: Text(name),
+                    subtitle: Text(
+                      '$type • ${price == 0 ? 'Reward / Owner item' : '$price coins'}',
+                    ),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (_isStoreOwner)
+                        IconButton(
+                          tooltip: 'Owner: change item price',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.edit, color: Color(0xFF8CEBFF), size: 18),
+                          onPressed: code.isEmpty ? null : () => _editCosmeticPrice(code, name, price),
+                        ),
+                      if (equipped)
+                        const Text('EQUIPPED', style: TextStyle(color: Color(0xFF8CEBFF), fontSize: 10))
+                      else
+                        OutlinedButton(
+                          onPressed: code.isEmpty ? null : () => owned
+                              ? _equipCosmetic(code, name)
+                              : _buyCosmetic(code, name),
+                          child: Text(owned ? 'Equip' : 'Buy'),
+                        ),
+                    ]),
+                  );
+                }),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                onPressed: _loadVipStoreData,
+                icon: const Icon(Icons.sync),
+                label: const Text('Refresh Store & Inventory'),
+              ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'VIP INVENTORY & BACKUP STORE',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -2135,42 +2590,57 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 'Current VIP: ${store.currentUser['vipTier']} • Coins: ${store.currentUser['coins']}',
               ),
               const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  _showMessage(
-                    'VIP/SVIP activation requires verified payment and server approval.',
-                  );
-                },
-                child: const Text('VIP / SVIP Top-Up'),
+              const Text(
+                'VIP/SVIP real-money checkout is not enabled. No payment is taken here. Prime tiers above can be purchased only with existing wallet Coins.',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
-              const SizedBox(height: 8),
-              if (store.backupStore.isEmpty)
+              if (store.userBaggage.isEmpty)
                 const Text(
-                  'No saved rewards.',
+                  'No owned cosmetics in Supabase inventory.',
                   style: TextStyle(color: Colors.white60),
                 ),
-              ...store.backupStore.map(
-                (Map<String, dynamic> item) {
-                  return ListTile(
-                    title: Text(
-                      '${item['name']} (${item['type']})',
-                    ),
-                    trailing: Switch(
-                      value: item['equipped'] == true,
-                      onChanged: (bool value) {
-                        if (store.isLiveMode) {
-                          _showMessage(
-                            'Reward changes require server verification.',
-                          );
-                          return;
-                        }
-                        item['equipped'] = value;
-                        store.refresh();
-                      },
-                    ),
-                  );
-                },
-              ),
+              ...store.userBaggage.map((item) {
+                final code = (item['zoonl_item_code'] ?? '').toString();
+                final catalogItem = store.cosmeticsCatalog.firstWhere(
+                  (catalog) =>
+                      catalog['zoonl_item_code']?.toString() == code,
+                  orElse: () => <String, dynamic>{},
+                );
+                final trialName = <String, String>{
+                  'ZOONL_TRIAL_FRAME_5D': 'New ID Trial Frame (5 Days)',
+                  'ZOONL_TRIAL_ENTRY_5D': 'New ID Trial Entry (5 Days)',
+                  'ZOONL_TRIAL_BACKGROUND_5D': 'New ID Trial Background (5 Days)',
+                }[code];
+                final name =
+                    (catalogItem['zoonl_item_name'] ?? trialName ?? code).toString();
+                final expiry = item['expires_at']?.toString();
+                final expiryDate = expiry == null ? null : DateTime.tryParse(expiry);
+                final expired = expiryDate != null && expiryDate.isBefore(DateTime.now());
+                return ListTile(
+                  title: Text(name),
+                  subtitle: Text(
+                    expired
+                        ? 'Expired • moved to Backup'
+                        : expiry == null ? 'Permanent item' : 'Expires: $expiry',
+                  ),
+                  trailing: expired
+                      ? const Text(
+                          'BACKUP',
+                          style: TextStyle(color: Colors.white54, fontSize: 10),
+                        )
+                      : item['is_equipped'] == true
+                          ? const Text(
+                              'EQUIPPED',
+                              style: TextStyle(color: Color(0xFFD6B46A), fontSize: 10),
+                            )
+                          : OutlinedButton(
+                              onPressed: code.isEmpty
+                                  ? null
+                                  : () => _equipCosmetic(code, name),
+                              child: const Text('Equip'),
+                            ),
+                );
+              }),
             ],
           ),
         ),
@@ -2184,9 +2654,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     Icons.lock,
                     color: Color(0xFFD6B46A),
                   ),
-                  title: Text(
-                    'Private Room ${room['roomId']}',
-                  ),
+                  title: Text('Private Room ${room['roomId']}'),
                   subtitle: const Text(
                     'Room key and access must be verified by the server.',
                   ),
@@ -2230,159 +2698,414 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  Widget _buildWalletAndEarningScreen() {
-    final int nowDay = DateTime.now().day;
-    final bool inPayoutWindow = nowDay >= 1 && nowDay <= 5;
+  Future<void> _pickKycDocument(String kind) async {
+    if (registrationSubmitted || kycUploading) return;
+    if (!_isAdultForKyc) {
+      _showMessage('Host verification documents are available only after adult eligibility is confirmed.');
+      return;
+    }
+    try {
+      final picked = await _kycPicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
+      if (picked == null) return;
+      final userId = Backend.currentUserId;
+      if (userId == null) throw StateError('Login required.');
+      setState(() { kycUploading = true; kycMessage = null; });
+      final localFile = File(picked.path);
+      if (await localFile.length() > 20 * 1024 * 1024) {
+        throw StateError('Each KYC image must be smaller than 20 MB.');
+      }
+      final path = '$userId/host-kyc/$kind-${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await Backend.client.storage.from('host-kyc-private').upload(
+        path,
+        localFile,
+        fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+      );
+      if (!mounted) return;
+      setState(() {
+        if (kind == 'id-front') {
+          kycFrontPath = path;
+          kycFrontUploaded = true;
+        } else if (kind == 'id-back') {
+          kycBackPath = path;
+          kycBackUploaded = true;
+        } else {
+          kycSelfiePath = path;
+          kycCardSelfieUploaded = true;
+        }
+        kycMessage = '$kind uploaded securely.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => kycMessage = 'KYC upload failed: $error');
+    } finally {
+      if (mounted) setState(() => kycUploading = false);
+    }
+  }
 
+
+  Future<void> _pickKycDateOfBirth() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Select your real date of birth',
+    );
+    if (picked != null && mounted) {
+      setState(() => kycDob =
+          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}');
+    }
+  }
+
+  Widget _kycDocumentCard({
+    required String title,
+    required String guidance,
+    required IconData icon,
+    required bool uploaded,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: uploaded ? const Color(0xFF4BC2B0) : const Color(0xFF6C4A82)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: const Color(0xFF34234A),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: const Color(0xFFD6B46A), size: 31),
+        ),
+        const SizedBox(width: 11),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(guidance, style: const TextStyle(color: Colors.white60, fontSize: 10)),
+        ])),
+        const SizedBox(width: 6),
+        Icon(uploaded ? Icons.check_circle : Icons.upload_file,
+          color: uploaded ? const Color(0xFF4BC2B0) : const Color(0xFFD6B46A)),
+        IconButton(
+          tooltip: 'Choose from gallery',
+          onPressed: kycUploading || registrationSubmitted ? null : onTap,
+          icon: const Icon(Icons.photo_library_outlined, color: Color(0xFFD6B46A)),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _submitKyc() async {
+    if (registrationSubmitted || kycSubmitting) return;
+    final dob = DateTime.tryParse(kycDob);
+    if (!_isAdultForKyc || dob == null) {
+      _showMessage('Host verification is only available to adults aged 18 or above.');
+      return;
+    }
+    if (kycLegalNameCtrl.text.trim().length < 3) {
+      _showMessage('Enter your legal name and real date of birth first.');
+      return;
+    }
+    if (kycFrontPath == null || kycBackPath == null || kycSelfiePath == null) {
+      _showMessage('Upload ID front, ID back and selfie with ID first.');
+      return;
+    }
+    setState(() { kycSubmitting = true; kycMessage = null; });
+    try {
+      await Backend.client.rpc(
+        'submit_host_verification',
+        params: <String, dynamic>{
+          'p_legal_name': kycLegalNameCtrl.text.trim(),
+          'p_date_of_birth': kycDob,
+          'p_country': kycCountry,
+          'p_id_front_path': kycFrontPath,
+          'p_id_back_path': kycBackPath,
+          'p_selfie_with_id_path': kycSelfiePath,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        registrationSubmitted = true;
+        kycMessage = 'Host verification submitted. Waiting for Owner review.';
+      });
+    } catch (error) {
+      if (mounted) setState(() => kycMessage = 'Submission failed: $error');
+    } finally {
+      if (mounted) setState(() => kycSubmitting = false);
+    }
+  }
+
+  Widget _walletBalanceTile(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF211735),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF6C4A82)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFD6B46A), size: 20),
+          const SizedBox(height: 5),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletAndEarningScreen() {
     final int coins =
         (store.currentUser['coins'] as num?)?.toInt() ?? 0;
-    final double walletBalance =
-        (store.currentUser['walletBalance'] as num?)?.toDouble() ??
-            0.0;
+    final int diamonds =
+        (store.currentUser['diamonds'] as num?)?.toInt() ?? 0;
 
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
         _luxuryCard(
-          title: 'Wallet & 65% Streamer Earning',
+          title: 'Wallet • Live Supabase Balance',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('Coins: $coins'),
-              Text(
-                'Streamer Wallet Balance: \$'
-                '${walletBalance.toStringAsFixed(2)}',
+              Row(
+                children: <Widget>[
+                  Expanded(child: _walletBalanceTile('COINS', coins.toString(), Icons.monetization_on)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _walletBalanceTile('DIAMONDS', diamonds.toString(), Icons.diamond)),
+                ],
               ),
-              Text(
-                inPayoutWindow
-                    ? 'Payout Window Open (1–5)'
-                    : 'Payout window: monthly, from day 1 to day 5.',
-                style: const TextStyle(
-                  color: Color(0xFFD6B46A),
-                ),
+              const SizedBox(height: 8),
+              const Text(
+                'Balances are loaded from the authenticated wallet record. Coin additions and gift deductions are written by secured Supabase functions.',
+                style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
-              const SizedBox(height: 6),
-              Text(
-                store.isTestMode
-                    ? 'TEST MODE: This balance is test-session data only.'
-                    : 'LIVE MODE: Balance and payout must come from the verified server ledger.',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white60,
-                ),
-              ),
-              if (store.isTestMode) ...<Widget>[
-                const Divider(height: 20),
-                const Text(
-                  'Add test Coins for Gift System checks',
-                  style: TextStyle(
-                    color: Color(0xFFD6B46A),
-                  ),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: <Widget>[
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(1000);
-                        _showMessage('1,000 test Coins added.');
-                      },
-                      child: const Text('+1,000 TEST'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(10000);
-                        _showMessage('10,000 test Coins added.');
-                      },
-                      child: const Text('+10,000 TEST'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () {
-                        store.addTestCoins(200000);
-                        _showMessage('200,000 test Coins added.');
-                      },
-                      child: const Text('+200,000 TEST'),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
+        ),
+        _luxuryCard(
+          title: 'STREAMER STAR RANK',
+          child: FutureBuilder<Map<String, dynamic>?>(
+            future: _starSummaryFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+              }
+              if (snapshot.hasError) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Gift-based star summary is unavailable.',
+                      style: TextStyle(color: Colors.white60, fontSize: 11)),
+                    TextButton.icon(
+                      onPressed: () => setState(() => _starSummaryFuture = _loadStarSummary()),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('RETRY'),
+                    ),
+                  ],
+                );
+              }
+              final data = snapshot.data ?? <String, dynamic>{};
+              final rank = (data['star_rank'] ?? 'NO STAR').toString();
+              final stars = rank.startsWith('5') ? 5
+                  : rank.startsWith('4') ? 4
+                  : rank.startsWith('3') ? 3
+                  : rank.startsWith('2') ? 2
+                  : rank.startsWith('1') ? 1 : 0;
+              final daily = (data['daily_coins'] as num?)?.toInt() ?? 0;
+              final weekly = (data['weekly_coins'] as num?)?.toInt() ?? 0;
+              final monthly = (data['monthly_coins'] as num?)?.toInt() ?? 0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: List<Widget>.generate(5, (index) => Icon(
+                      index < stars ? Icons.star : Icons.star_border,
+                      color: const Color(0xFFD6B46A),
+                      size: 25,
+                    )),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(rank, style: const TextStyle(
+                    color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(label: Text('Daily $daily')),
+                      Chip(label: Text('Weekly $weekly')),
+                      Chip(label: Text('Monthly $monthly')),
+                    ],
+                  ),
+                  const Text('Ranks are calculated from verified gifts received. They do not change wallet balances.',
+                    style: TextStyle(color: Colors.white60, fontSize: 10)),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _starSummaryFuture = _loadStarSummary()),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('REFRESH'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        _luxuryCard(
+          title: 'Top-up Status',
+          child: const Text(
+            'New coin purchases are currently disabled while the app\'s paid-entry game economy is reviewed. Existing wallet balances and transaction history remain visible.',
+            style: TextStyle(color: Colors.white60, fontSize: 11),
+          ),
+        ),
+        _luxuryCard(
+          title: 'Wallet Transaction History',
+          child: store.walletTransactions.isEmpty
+              ? const Text('No wallet transactions found for this account.',
+                  style: TextStyle(color: Colors.white60))
+              : Column(
+                  children: store.walletTransactions.take(20).map((tx) {
+                    final rawAmount = (tx['amount'] as num?)?.toInt() ?? 0;
+                    final type = (tx['transaction_type'] ?? 'transaction').toString();
+                    final outgoing = type.contains('sent') ||
+                        type.contains('purchase') ||
+                        type.contains('withdrawal') ||
+                        type.contains('spend');
+                    final amount = outgoing ? -rawAmount.abs() : rawAmount.abs();
+                    final currency = (tx['currency'] ?? '').toString().toUpperCase();
+                    final description = (tx['description'] ?? '').toString();
+                    final created = (tx['created_at'] ?? '').toString();
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        amount >= 0 ? Icons.arrow_downward : Icons.arrow_upward,
+                        color: amount >= 0 ? Colors.greenAccent : Colors.orangeAccent,
+                      ),
+                      title: Text(
+                        '${amount >= 0 ? '+' : ''}$amount $currency',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        '$type • $description\n$created',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                    );
+                  }).toList(),
+                ),
         ),
         _luxuryCard(
           title: 'Earning Folder — Direct / Agency Registration',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              DropdownButtonFormField<String>(
-                initialValue: kycCountry,
-                items: const <String>[
-                  'Pakistan',
-                  'UAE',
-                  'Saudi Arabia',
-                  'India',
-                  'Other',
-                ].map((String country) {
-                  return DropdownMenuItem<String>(
-                    value: country,
-                    child: Text(country),
-                  );
-                }).toList(),
-                onChanged: (String? value) {
-                  setState(() {
-                    kycCountry = value ?? 'Pakistan';
-                  });
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Country',
+              OutlinedButton.icon(
+                onPressed: registrationSubmitted ? null : _pickKycDateOfBirth,
+                icon: const Icon(Icons.calendar_month),
+                label: Text(kycDob.isEmpty ? 'SELECT DATE OF BIRTH' : 'DATE OF BIRTH: $kycDob'),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Host verification and creator payouts are strictly for adults aged 18+. Document upload stays locked until adult eligibility is confirmed.',
+                style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
+              ),
+              if (_isAdultForKyc) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: kycLegalNameCtrl,
+                  enabled: !registrationSubmitted,
+                  decoration: const InputDecoration(labelText: 'Legal name as shown on ID'),
                 ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: kycCountry,
+                  items: const <String>[
+                    'United Arab Emirates',
+                    'Saudi Arabia',
+                    'Qatar',
+                    'Kuwait',
+                    'Bahrain',
+                    'Oman',
+                    'Pakistan',
+                    'India',
+                    'Bangladesh',
+                    'United Kingdom',
+                    'United States',
+                    'Other',
+                  ].map((String country) => DropdownMenuItem<String>(
+                    value: country, child: Text(country),
+                  )).toList(),
+                  onChanged: (String? value) => setState(() => kycCountry = value ?? 'United Arab Emirates'),
+                  decoration: const InputDecoration(labelText: 'Country'),
+                ),
+                const SizedBox(height: 12),
+                const Text('DOCUMENT PHOTO GUIDE', style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+                const SizedBox(height: 7),
+                _kycDocumentCard(
+                  title: '1. ID Front Side',
+                  guidance: 'Keep the full front side visible, sharp and without glare.',
+                  icon: Icons.credit_card,
+                  uploaded: kycFrontUploaded,
+                  onTap: () => _pickKycDocument('id-front'),
+                ),
+                _kycDocumentCard(
+                  title: '2. ID Back Side',
+                  guidance: 'Show the complete reverse side and all readable details.',
+                  icon: Icons.badge_outlined,
+                  uploaded: kycBackUploaded,
+                  onTap: () => _pickKycDocument('id-back'),
+                ),
+                _kycDocumentCard(
+                  title: '3. Selfie With ID',
+                  guidance: 'Face and ID should both be clearly visible in one photo.',
+                  icon: Icons.face_retouching_natural,
+                  uploaded: kycCardSelfieUploaded,
+                  onTap: () => _pickKycDocument('selfie-with-id'),
+                ),
+              ] else
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF211735),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: const Color(0xFF6C4A82)),
+                  ),
+                  child: Text(
+                    kycDob.isEmpty
+                        ? 'Select your date of birth to check eligibility. No identity documents are requested at this stage.'
+                        : 'This feature is available only to adults aged 18 or above. Identity document uploads are unavailable for under-18 accounts.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
+              if (kycMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(kycMessage!, style: const TextStyle(color: Color(0xFFD6B46A), fontSize: 11)),
+                ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: kycUploading || kycSubmitting ? null : _submitKyc,
+                icon: const Icon(Icons.verified_user),
+                label: Text(kycSubmitting ? 'Submitting...' : registrationSubmitted ? 'Verification Submitted' : 'SUBMIT HOST VERIFICATION'),
               ),
               const SizedBox(height: 8),
               const Text(
-                'KYC document submission is handled through the secure verification service.',
-              ),
-              Wrap(
-                spacing: 8,
-                children: <Widget>[
-                  OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycFrontUploaded
-                          ? 'Front ID ✓'
-                          : 'Upload ID Front',
-                    ),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycBackUploaded
-                          ? 'Back ID ✓'
-                          : 'Upload ID Back',
-                    ),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _showMessage(
-                      'Secure document upload service is required.',
-                    ),
-                    child: Text(
-                      kycCardSelfieUploaded
-                          ? 'Photo ✓'
-                          : 'Upload Required Photo',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: payoutAccountCtrl,
-                enabled: !registrationSubmitted,
-                decoration: const InputDecoration(
-                  labelText: 'Payout Account',
-                ),
+                'Payout account linking will be connected through an approved payment provider. Do not enter bank passwords, card security codes or full card details in this form.',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -2393,31 +3116,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
               ),
               const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: registrationSubmitted
-                    ? null
-                    : () {
-                        if (store.isLiveMode) {
-                          _showMessage(
-                            'KYC submission requires the secure server service.',
-                          );
-                          return;
-                        }
-                        if (payoutAccountCtrl.text.trim().isEmpty) {
-                          _showMessage(
-                            'Enter a payout account for this TEST form.',
-                          );
-                          return;
-                        }
-                        _showMessage(
-                          'TEST form is not submitted to a real KYC service.',
-                        );
-                      },
-                child: Text(
-                  registrationSubmitted
-                      ? 'Registration Submitted'
-                      : 'Submit Registration',
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const AgencyPortalScreen()),
                 ),
+                icon: const Icon(Icons.business_center),
+                label: const Text('OPEN AGENCY REGISTRATION PORTAL'),
               ),
             ],
           ),
@@ -2545,6 +3249,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  List<Color> _cosmeticGradientColors(String? raw) {
+    final colors = <Color>[];
+    for (final part in (raw ?? '').split(',')) {
+      final hex = part.trim().replaceFirst('#', '');
+      if (hex.length != 6) continue;
+      try {
+        colors.add(Color(int.parse('FF$hex', radix: 16)));
+      } catch (_) {}
+    }
+    if (colors.length < 2) {
+      return const [Color(0xFF29365E), Color(0xFF34245B), Color(0xFF153E4C)];
+    }
+    return colors.take(3).toList();
+  }
+
   Widget _buildProfileAndSettingsScreen() {
     final bool isLive = store.currentUser['isLive'] == true;
     final String displayName =
@@ -2555,6 +3274,31 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     final String bio = (store.currentUser['bio'] ?? '').toString();
     final String avatarUrl =
         (store.currentUser['avatarUrl'] ?? '').toString();
+    final String profileBackgroundUrl =
+        (store.currentUser['profileBackgroundUrl'] ?? '').toString();
+    final activeBgCode = store.currentUser['activeProfileBgCode']?.toString() ?? '';
+    final activeFrameCode = store.currentUser['activeFrameCode']?.toString() ?? '';
+    Map<String, dynamic>? activeBgItem;
+    Map<String, dynamic>? activeFrameItem;
+    for (final item in store.cosmeticsCatalog) {
+      if (item['zoonl_item_code']?.toString() == activeBgCode) activeBgItem = item;
+      if (item['zoonl_item_code']?.toString() == activeFrameCode) activeFrameItem = item;
+    }
+    final hasEquippedBg = activeBgItem != null && store.userBaggage.any((item) {
+      if (item['zoonl_item_code']?.toString() != activeBgCode || item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    });
+    final activeBgUrl = hasEquippedBg ? (activeBgItem?['media_url']?.toString() ?? '') : '';
+    final effectiveBgUrl = activeBgUrl.startsWith('http') ? activeBgUrl : profileBackgroundUrl;
+    final hasPremiumBg = hasEquippedBg;
+    final hasEquippedFrame = activeFrameItem != null && store.userBaggage.any((item) {
+      if (item['zoonl_item_code']?.toString() != activeFrameCode || item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    });
+    final profileBgColors = _cosmeticGradientColors(activeBgItem?['color_theme_hex']?.toString());
+    final frameColors = _cosmeticGradientColors(activeFrameItem?['color_theme_hex']?.toString());
 
     Future<void> openProfileEditor() async {
       final bool? saved = await Navigator.of(context).push<bool>(
@@ -2563,13 +3307,59 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         ),
       );
       if (saved == true && mounted) {
-        _showMessage('Profile saved. Reopen this page to refresh account details.');
+        try {
+          final authId = Backend.currentUserId;
+          if (authId != null) {
+            final profile = await Backend.client.from('profiles')
+                .select('display_name,country,bio,avatar_url,profile_background_url,user_level')
+                .eq('id', authId).maybeSingle();
+            if (profile != null) {
+              store.currentUser['name'] = profile['display_name'] ?? store.currentUser['name'];
+              store.currentUser['country'] = profile['country'] ?? '';
+              store.currentUser['bio'] = profile['bio'] ?? '';
+              store.currentUser['avatarUrl'] = profile['avatar_url'] ?? '';
+              store.currentUser['profileBackgroundUrl'] = profile['profile_background_url'] ?? '';
+              store.currentUser['level'] = profile['user_level'] ?? store.currentUser['level'] ?? 1;
+              store.refresh();
+            }
+          }
+          _showMessage('Profile saved and refreshed.');
+        } catch (error) {
+          _showMessage('Profile saved. Refresh could not load: $error');
+        }
       }
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
+        if (effectiveBgUrl.startsWith('http') || hasPremiumBg)
+          Container(
+            height: 136,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: profileBgColors),
+              borderRadius: BorderRadius.circular(18),
+              image: effectiveBgUrl.startsWith('http')
+                  ? DecorationImage(
+                      image: NetworkImage(effectiveBgUrl),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(Colors.black.withOpacity(.32), BlendMode.darken),
+                    )
+                  : null,
+              border: Border.all(color: const Color(0xFF8CEBFF).withOpacity(.7)),
+            ),
+            alignment: Alignment.bottomLeft,
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              hasPremiumBg
+                  ? 'PROFILE BACKGROUND • ${activeBgItem?['zoonl_item_name'] ?? 'PREMIUM'}'
+                  : 'PROFILE BACKGROUND',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
           child: Column(
@@ -2578,15 +3368,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  CircleAvatar(
-                    radius: 38,
-                    backgroundColor: const Color(0xFF293B49),
-                    backgroundImage: avatarUrl.startsWith('http')
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: avatarUrl.startsWith('http')
-                        ? null
-                        : const Icon(Icons.person, size: 38, color: Color(0xFFD6B46A)),
+                  Container(
+                    width: 82,
+                    height: 82,
+                    padding: EdgeInsets.all(hasEquippedFrame ? 3 : 0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: hasEquippedFrame ? LinearGradient(colors: frameColors) : null,
+                      border: hasEquippedFrame
+                          ? Border.all(color: const Color(0xFF8CEBFF), width: 1)
+                          : null,
+                    ),
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: const Color(0xFF293B49),
+                      backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl.startsWith('http')
+                          ? null
+                          : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -2621,8 +3421,84 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ],
               ),
               const Divider(height: 24),
-              _profileInfoRow(Icons.workspace_premium, 'Level',
-                  '${store.currentUser['level'] ?? 1}  •  VIP ${store.currentUser['vipTier'] ?? 'NONE'}'),
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const UserLevelScreen(),
+                  ),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF29365E), Color(0xFF141E35)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF9B8CFF).withOpacity(.65)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [Color(0xFFB9AEFF), Color(0xFF58D6CE)]),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${store.currentUser['level'] ?? 1}',
+                            style: const TextStyle(color: Color(0xFF10182E), fontSize: 19, fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('ACCOUNT LEVEL', style: TextStyle(color: Color(0xFFC7D3F4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                            Text('LEVEL ${store.currentUser['level'] ?? 1}',
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                            Text('VIP ${store.currentUser['vipTier'] ?? 'NONE'} • View level ladder',
+                              style: const TextStyle(color: Color(0xFFB9C7E8), fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right, color: Color(0xFFB9AEFF)),
+                    ],
+                  ),
+                ),
+              ),
+              if (store.currentUser['activeBadgeCode']?.toString() == 'ZOONL_LUCKY_ID_01')
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF29365E), Color(0xFF34245B), Color(0xFF153E4C)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF8CEBFF), width: 1.2),
+                    boxShadow: [BoxShadow(color: const Color(0xFF8CEBFF).withOpacity(.12), blurRadius: 12)],
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF)),
+                    const SizedBox(width: 9),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('ZOONL LUCKY ID', style: TextStyle(color: Color(0xFF8CEBFF), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
+                      Text(userId.isEmpty ? 'ID pending' : userId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.2)),
+                    ])),
+                    const Icon(Icons.verified, color: Color(0xFF8CEBFF)),
+                  ]),
+                ),
+              if ((store.currentUser['activeEntryCode'] ?? '').toString().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 4),
+                  child: Text('Room entry equipped: ${store.currentUser['activeEntryCode']}',
+                    style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
               _profileInfoRow(Icons.flag_outlined, 'Country', country),
               _profileInfoRow(Icons.info_outline, 'Bio',
                   bio.isEmpty ? 'Add a short introduction' : bio),
@@ -2637,6 +3513,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
             ],
           ),
+        ),
+        _ProfileSocialPanel(
+          userId: Backend.currentUserId ?? '',
+          onOpenShortVideos: widget.onOpenShortVideos,
+          onCreateShortVideo: widget.onCreateShortVideo,
+          onOpenWallet: widget.onOpenWallet,
+          onOpenPrime: widget.onOpenPrime,
         ),
         _luxuryCard(
           title: 'ACCOUNT & PRIVACY SETTINGS',

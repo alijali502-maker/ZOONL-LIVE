@@ -4,7 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
-import '../core/call_service.dart';
+import '../core/services/call_service.dart';
 
 class AudioCallScreen extends StatefulWidget {
   final String serverUrl;
