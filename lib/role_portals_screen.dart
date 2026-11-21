@@ -280,6 +280,23 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
           decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search records'),
         ),
       ),
+      if (selected == 5)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                final changed = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(builder: (_) => const CoinAdjustmentScreen()),
+                );
+                if (changed == true) _loadRecords();
+              },
+              icon: const Icon(Icons.add_card),
+              label: const Text('ADD COINS BY ZOONL ID'),
+            ),
+          ),
+        ),
       if (loading) const LinearProgressIndicator(color: _gold),
       if (error != null) Padding(padding: const EdgeInsets.all(16), child: Text('Could not load $_table: $error', style: const TextStyle(color: Color(0xFFE47777)))),
       Expanded(
@@ -334,6 +351,14 @@ class AdminOperationsPortalScreen extends StatelessWidget {
         children: [
           _portalCard('YOUR ACCESS SCOPE', 'Only permissions confirmed by is_zoonl_admin_allowed() are shown. Missing permissions remain unavailable.', Icons.verified_user),
           const SizedBox(height: 12),
+          if (permissions['manage_topups'] == true)
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const CoinAdjustmentScreen()),
+              ),
+              icon: const Icon(Icons.add_card),
+              label: const Text('ADD COINS BY ZOONL ID'),
+            ),
           for (final item in granted)
             Card(
               color: _panel,
@@ -350,6 +375,148 @@ class AdminOperationsPortalScreen extends StatelessWidget {
       )),
     ]);
   }
+}
+
+class CoinAdjustmentScreen extends StatefulWidget {
+  const CoinAdjustmentScreen({super.key});
+
+  @override
+  State<CoinAdjustmentScreen> createState() => _CoinAdjustmentScreenState();
+}
+
+class _CoinAdjustmentScreenState extends State<CoinAdjustmentScreen> {
+  final TextEditingController _zoonlId = TextEditingController();
+  final TextEditingController _amount = TextEditingController();
+  final TextEditingController _description = TextEditingController();
+  bool _checking = false;
+  bool _submitting = false;
+  String? _recipientName;
+  String? _error;
+  Map<String, dynamic>? _receipt;
+
+  Future<void> _lookupRecipient() async {
+    final id = _zoonlId.text.trim();
+    if (!RegExp(r'^[0-9]+$').hasMatch(id)) {
+      setState(() => _error = 'Enter a numeric ZOONL ID.');
+      return;
+    }
+    setState(() { _checking = true; _error = null; _recipientName = null; });
+    try {
+      final publicProfile = await Backend.client
+          .from('user_public_profiles')
+          .select('user_id,zoonl_id')
+          .eq('zoonl_id', id)
+          .maybeSingle();
+      if (publicProfile == null) throw StateError('ZOONL ID not found.');
+      final profile = await Backend.client
+          .from('profiles')
+          .select('display_name')
+          .eq('id', publicProfile['user_id'])
+          .maybeSingle();
+      if (!mounted) return;
+      setState(() => _recipientName =
+          (profile?['display_name'] ?? 'ZOONL User').toString());
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    final id = _zoonlId.text.trim();
+    final amount = int.tryParse(_amount.text.trim());
+    if (_recipientName == null) {
+      await _lookupRecipient();
+      if (_recipientName == null) return;
+    }
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Enter a valid coin amount.');
+      return;
+    }
+    setState(() { _submitting = true; _error = null; _receipt = null; });
+    try {
+      final result = await Backend.client.rpc(
+        'add_zoonl_coins',
+        params: <String, dynamic>{
+          'p_zoonl_id': id,
+          'p_amount': amount,
+          'p_description': _description.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      setState(() => _receipt = Map<String, dynamic>.from(result as Map));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _zoonlId.dispose();
+    _amount.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Secure Coin Adjustment')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      _portalCard('SERVER-VERIFIED TOP-UP', 'The server checks Owner status or the Owner-granted manage_topups permission. The client cannot choose a wallet UUID or write a balance directly.', Icons.lock),
+      const SizedBox(height: 14),
+      TextField(
+        controller: _zoonlId,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: 'Recipient ZOONL ID', suffixIcon: IconButton(onPressed: _checking ? null : _lookupRecipient, icon: const Icon(Icons.search))),
+      ),
+      if (_recipientName != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text('Recipient: $_recipientName • ID ${_zoonlId.text.trim()}',
+              style: const TextStyle(color: _teal, fontWeight: FontWeight.w700)),
+        ),
+      TextField(
+        controller: _amount,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(labelText: 'Coins to add'),
+      ),
+      TextField(
+        controller: _description,
+        maxLength: 160,
+        decoration: const InputDecoration(labelText: 'Receipt description / reference'),
+      ),
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(_error!, style: const TextStyle(color: Color(0xFFE47777))),
+        ),
+      FilledButton.icon(
+        onPressed: _submitting ? null : _submit,
+        icon: const Icon(Icons.check_circle),
+        label: Text(_submitting ? 'Processing...' : 'CONFIRM COIN ADJUSTMENT'),
+      ),
+      if (_receipt != null)
+        Card(
+          color: _panel,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('TOP-UP RECEIPT', style: TextStyle(color: _gold, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Text('Recipient: $_recipientName', style: const TextStyle(color: Colors.white)),
+              Text('ZOONL ID: ${_receipt!['zoonl_id']}', style: const TextStyle(color: Colors.white70)),
+              Text('Coins added: ${_receipt!['coins_added']}', style: const TextStyle(color: Colors.white70)),
+              Text('New balance: ${_receipt!['new_balance']}', style: const TextStyle(color: Colors.white70)),
+              Text('Type: ${_receipt!['transaction_type']}', style: const TextStyle(color: Colors.white70)),
+            ]),
+          ),
+        ),
+    ]),
+  );
 }
 
 class AgencyPortalScreen extends StatefulWidget {
