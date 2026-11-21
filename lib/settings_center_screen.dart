@@ -208,24 +208,6 @@ class SettingsCenterScreen extends StatelessWidget {
                 builder: (_) => const BlockedUsersScreen(),
               )),
             ),
-            _SettingItem(
-              Icons.notifications_active_outlined,
-              'In-app notifications',
-              'Read and mark account alerts as seen',
-              () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => const InAppNotificationsScreen(),
-              )),
-            ),
-            _SettingItem(
-              Icons.report_gmailerrorred_outlined,
-              'Report a problem',
-              'Support contact and safety guidance',
-              () => _showDetails(
-                context,
-                'Report a problem',
-                'For urgent account or safety concerns, use the official ZOONL support contact published by the app owner. This client does not claim to submit a report until a verified support endpoint is connected.',
-              ),
-            ),
           ]),
           _section(context, 'Application preferences', [
             _SettingItem(
