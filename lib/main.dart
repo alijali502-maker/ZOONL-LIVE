@@ -12,6 +12,7 @@ import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'user_level_screen.dart';
+import 'level_badge_widget.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_feed_screen.dart';
@@ -1592,6 +1593,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     try {
       final client = Backend.client;
       final owner = await Backend.isZoonlOwner();
+      final remoteLevel = await client.rpc('zoonl_my_level');
       final catalog = await client
           .from('zoonl_live_cosmetics')
           .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
@@ -1633,6 +1635,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       if (!mounted) return;
       setState(() {
         _isStoreOwner = owner;
+        store.currentUser['level'] = (remoteLevel as num?)?.toInt() ?? 1;
         store.cosmeticsCatalog = (catalog as List)
             .map((row) => Map<String, dynamic>.from(row as Map)).toList();
         store.primeTiers = (tiers as List)
@@ -3368,25 +3371,36 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  Container(
-                    width: 82,
-                    height: 82,
-                    padding: EdgeInsets.all(hasEquippedFrame ? 3 : 0),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: hasEquippedFrame ? LinearGradient(colors: frameColors) : null,
-                      border: hasEquippedFrame
-                          ? Border.all(color: const Color(0xFF8CEBFF), width: 1)
-                          : null,
-                    ),
-                    child: CircleAvatar(
-                      radius: 36,
-                      backgroundColor: const Color(0xFF293B49),
-                      backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
-                      child: avatarUrl.startsWith('http')
-                          ? null
-                          : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
-                    ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 82,
+                        height: 82,
+                        padding: EdgeInsets.all(hasEquippedFrame ? 3 : 0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: hasEquippedFrame ? LinearGradient(colors: frameColors) : null,
+                          border: hasEquippedFrame
+                              ? Border.all(color: const Color(0xFF8CEBFF), width: 1)
+                              : null,
+                        ),
+                        child: CircleAvatar(
+                          radius: 36,
+                          backgroundColor: const Color(0xFF293B49),
+                          backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
+                          child: avatarUrl.startsWith('http')
+                              ? null
+                              : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      ZoonlMiniLevelBadge(
+                        onTap: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(builder: (_) => const UserLevelScreen()),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 14),
                   Expanded(
