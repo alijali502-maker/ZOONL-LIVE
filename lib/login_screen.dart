@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -700,19 +701,38 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Widget _authGlass({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xAA090909),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0x66FFFFFF)),
+            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 28, offset: Offset(0, 10))],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070B17),
+      backgroundColor: const Color(0xFF050505),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF17232E),
-              Color(0xFF070B17),
-              Color(0xFF070B17),
+              Color(0xFF202020),
+              Color(0xFF090909),
+              Color(0xFF050505),
             ],
           ),
         ),
@@ -757,7 +777,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  if (_phoneMode) _phoneForm() else _emailForm(),
+                  _authGlass(child: _phoneMode ? _phoneForm() : _emailForm()),
                   const SizedBox(height: 14),
                   TextButton(
                     onPressed: _loading
@@ -784,7 +804,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Row(
                     children: [
                       Expanded(
-                        child: Divider(color: Color(0xFF2C3B59)),
+                        child: Divider(color: Color(0x66FFFFFF)),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
