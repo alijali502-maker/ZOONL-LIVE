@@ -1302,7 +1302,7 @@ class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
         .eq('user_id', widget.userId)
         .maybeSingle();
     final videos = await client.from('short_videos')
-        .select('id,user_id,caption,video_url,duration_seconds,likes_count,created_at')
+        .select('id,user_id,caption,video_url,filter_name,is_filter_baked,duration_seconds,likes_count,created_at')
         .eq('user_id', widget.userId)
         .order('created_at', ascending: false)
         .limit(4);
