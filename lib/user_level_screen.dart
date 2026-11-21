@@ -161,7 +161,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
       backgroundColor:const Color(0xFF080B13),actions:[IconButton(onPressed:_loading?null:_load,icon:const Icon(Icons.refresh))]),
       body:_loading?const Center(child:CircularProgressIndicator()):_error!=null
         ?Center(child:Padding(padding:const EdgeInsets.all(22),child:Column(mainAxisSize:MainAxisSize.min,children:[
-          Text(_error!,textAlign:TextAlign.center),const SizedBox(height:12),OutlinedButton(onPressed:_load,child:const Text('RETRY'))]))
+          Text(_error!,textAlign:TextAlign.center),const SizedBox(height:12),OutlinedButton(onPressed:_load,child:const Text('RETRY'))])))
         :RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.all(14),children:[
           _glass(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Row(children:[const Expanded(child:Text('YOUR CURRENT RANK',style:TextStyle(color:Colors.white60,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:1.6))),
