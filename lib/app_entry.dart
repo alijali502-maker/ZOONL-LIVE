@@ -224,6 +224,7 @@ class ZoonlAuthGate extends StatelessWidget {
     List<Map<String, dynamic>> cosmetics = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> baggage = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
     Map<String, dynamic> userTrial = <String, dynamic>{};
 
     try {
@@ -355,6 +356,7 @@ class ZoonlAuthGate extends StatelessWidget {
       cosmetics: cosmetics,
       primeTiers: primeTiers,
       baggage: baggage,
+      walletTransactions: walletTransactions,
       userTrial: userTrial,
     );
   }
@@ -443,6 +445,7 @@ class _HomeData {
   final List<Map<String, dynamic>> cosmetics;
   final List<Map<String, dynamic>> primeTiers;
   final List<Map<String, dynamic>> baggage;
+  final List<Map<String, dynamic>> walletTransactions;
   final Map<String, dynamic> userTrial;
 
   const _HomeData({
@@ -454,6 +457,7 @@ class _HomeData {
     required this.cosmetics,
     required this.primeTiers,
     required this.baggage,
+    required this.walletTransactions,
     required this.userTrial,
   });
 
@@ -466,6 +470,7 @@ class _HomeData {
     cosmetics: <Map<String, dynamic>>[],
     primeTiers: <Map<String, dynamic>>[],
     baggage: <Map<String, dynamic>>[],
+    walletTransactions: <Map<String, dynamic>>[],
     userTrial: <String, dynamic>{},
   );
 }
