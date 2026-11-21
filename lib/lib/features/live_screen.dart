@@ -1051,6 +1051,12 @@ class _LiveScreenState extends State<LiveScreen> {
                 const Expanded(child: Text('ALL LIVE GIFTS', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.w900, fontSize: 17))),
                 IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close, color: Colors.white)),
               ])),
+              if (_isHost)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  child: Text('Host view: catalogue preview only. Viewers send gifts to the host.',
+                    style: TextStyle(color: Colors.white60, fontSize: 11)),
+                ),
               SizedBox(height: 42, child: ListView(scrollDirection: Axis.horizontal, children: categories.map((c) =>
                 Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(
                   label: Text(c), selected: category == c, onSelected: (_) => setSheetState(() => category = c),
@@ -1065,7 +1071,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     final gift = visible[index];
                     final imageUrl = (gift['image_url'] ?? gift['preview_url'] ?? '').toString();
                     return InkWell(
-                      onTap: sending ? null : () async {
+                      onTap: sending || _isHost ? null : () async {
                         setSheetState(() => sending = true);
                         try {
                           final response = await _supabase.rpc('send_live_gift', params: {
