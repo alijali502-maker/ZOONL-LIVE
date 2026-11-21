@@ -13,6 +13,7 @@ import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
+import 'short_video_feed_screen.dart';
 import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
@@ -761,7 +762,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         topTabIndex = 1;
                       });
                     },
-                    onOpenShortVideos: () => setState(() { bottomIndex = 0; topTabIndex = 0; }),
+                    onOpenShortVideos: () {
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ShortVideoFeedScreen(onlyMine: true),
+                        ),
+                      );
+                    },
                     onOpenWallet: () => setState(() => bottomIndex = 2),
                     onOpenPrime: () => setState(() { bottomIndex = 0; topTabIndex = 4; }),
                   ),
