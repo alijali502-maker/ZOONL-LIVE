@@ -35,7 +35,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
     final start = DateTime.tryParse('${battle?['started_at'] ?? ''}');
     final mins = (battle?['duration_minutes'] as num?)?.toInt() ?? 5;
     if (start == null) return mins * 60;
-    return (mins * 60 - DateTime.now().difference(start).inSeconds).clamp(0, mins * 60);
+    return (mins * 60 - DateTime.now().difference(start).inSeconds).clamp(0, mins * 60).toInt();
   }
   String get clock => '${(remaining ~/ 60).toString().padLeft(2, '0')}:${(remaining % 60).toString().padLeft(2, '0')}';
 
@@ -188,10 +188,14 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
     refreshInvitations();
   }
 
+  Future<void> leaveQueueSilently() async {
+    try { await db.rpc('pk_leave_random_queue'); } catch (_) {}
+  }
+
   @override
   void dispose() {
     poller?.cancel();
-    if (queued) unawaited(db.rpc('pk_leave_random_queue').catchError((_) => false));
+    if (queued) unawaited(leaveQueueSilently());
     target.dispose();
     super.dispose();
   }
