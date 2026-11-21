@@ -26,7 +26,7 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final select = _db.from('short_videos').select(
-        'id,user_id,video_url,caption,filter_name,duration_seconds,likes_count,created_at',
+        'id,user_id,video_url,caption,filter_name,is_filter_baked,duration_seconds,likes_count,created_at',
       );
       final rows = widget.onlyMine
           ? await select
@@ -200,9 +200,30 @@ class _ShortVideoPlayerScreenState extends State<ShortVideoPlayerScreen> {
     super.dispose();
   }
 
+  ColorFilter get _legacyFilter {
+    switch (widget.video['filter_name']?.toString()) {
+      case 'Warm':
+        return const ColorFilter.mode(Color(0x55FF9A50), BlendMode.softLight);
+      case 'Cool':
+        return const ColorFilter.mode(Color(0x5573B9FF), BlendMode.softLight);
+      case 'Rose':
+        return const ColorFilter.mode(Color(0x55FF78B7), BlendMode.softLight);
+      case 'Mono':
+        return const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0, 0, 0, 1, 0,
+        ]);
+      default:
+        return const ColorFilter.mode(Colors.transparent, BlendMode.dst);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
+    final filterAlreadyBaked = widget.video['is_filter_baked'] == true;
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -219,7 +240,12 @@ class _ShortVideoPlayerScreenState extends State<ShortVideoPlayerScreen> {
                       ? const CircularProgressIndicator()
                       : AspectRatio(
                           aspectRatio: controller.value.aspectRatio,
-                          child: VideoPlayer(controller),
+                          child: filterAlreadyBaked
+                              ? VideoPlayer(controller)
+                              : ColorFiltered(
+                                  colorFilter: _legacyFilter,
+                                  child: VideoPlayer(controller),
+                                ),
                         ),
             ),
           ),
