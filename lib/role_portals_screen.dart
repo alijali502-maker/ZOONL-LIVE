@@ -577,7 +577,7 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
     try {
       final now = DateTime.now();
       final cutoff = DateTime(now.year - 18, now.month, now.day);
-      final cutoffText = '\${cutoff.year.toString().padLeft(4, '0')}-\${cutoff.month.toString().padLeft(2, '0')}-\${cutoff.day.toString().padLeft(2, '0')}';
+      final cutoffText = cutoff.year.toString().padLeft(4, '0') + '-' + cutoff.month.toString().padLeft(2, '0') + '-' + cutoff.day.toString().padLeft(2, '0');
       final rows = await _db.from('host_verification_submissions')
           .select('id')
           .eq('user_id', userId)
