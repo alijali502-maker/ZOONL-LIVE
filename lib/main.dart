@@ -13,7 +13,6 @@ import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
-import 'manual_topup_panel.dart';
 import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
@@ -2802,36 +2801,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         _luxuryCard(
-          title: 'Top-up Packages',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              ...const <(String, String)>[
-                (r'\$10', '45,000 Coins'),
-                (r'\$20', '90,000 Coins'),
-                (r'\$30', '135,000 Coins'),
-                (r'\$40', '180,000 Coins'),
-                (r'\$50', '225,000 Coins'),
-                (r'\$60', '270,000 Coins'),
-                (r'\$70', '315,000 Coins'),
-                (r'\$80', '360,000 Coins'),
-                (r'\$90', '405,000 Coins'),
-                (r'\$100', '450,000 Coins'),
-              ].map((package) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.payments_outlined, color: Color(0xFFD6B46A)),
-                title: Text(package.$1, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                trailing: Text(package.$2, style: const TextStyle(color: Color(0xFFD6B46A))),
-              )),
-              const Text(
-                'Manual top-ups are credited only after an authorized reviewer verifies the receipt.',
-                style: TextStyle(color: Colors.white54, fontSize: 11),
-              ),
-            ],
+          title: 'Top-up Status',
+          child: const Text(
+            'New coin purchases are currently disabled while the app\'s paid-entry game economy is reviewed. Existing wallet balances and transaction history remain visible.',
+            style: TextStyle(color: Colors.white60, fontSize: 11),
           ),
         ),
-        ManualTopupPanel(userId: Backend.currentUserId ?? ''),
         _luxuryCard(
           title: 'Wallet Transaction History',
           child: store.walletTransactions.isEmpty
