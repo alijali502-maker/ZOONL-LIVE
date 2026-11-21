@@ -3314,15 +3314,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           final authId = Backend.currentUserId;
           if (authId != null) {
             final profile = await Backend.client.from('profiles')
-                .select('display_name,country,bio,avatar_url,profile_background_url,user_level')
+                .select('display_name,country,bio,avatar_url,profile_background_url')
                 .eq('id', authId).maybeSingle();
+            final authoritativeLevel = await Backend.client.rpc('zoonl_my_level');
             if (profile != null) {
               store.currentUser['name'] = profile['display_name'] ?? store.currentUser['name'];
               store.currentUser['country'] = profile['country'] ?? '';
               store.currentUser['bio'] = profile['bio'] ?? '';
               store.currentUser['avatarUrl'] = profile['avatar_url'] ?? '';
               store.currentUser['profileBackgroundUrl'] = profile['profile_background_url'] ?? '';
-              store.currentUser['level'] = profile['user_level'] ?? store.currentUser['level'] ?? 1;
+              store.currentUser['level'] = (authoritativeLevel as num?)?.toInt() ?? 1;
               store.refresh();
             }
           }
