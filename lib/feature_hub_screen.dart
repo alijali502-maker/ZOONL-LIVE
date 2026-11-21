@@ -217,7 +217,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL User').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: (_profile['zoonl_id'] ?? '').toString(),
           joinRoomId: room['id'].toString(),
           roomType: (room['room_type'] ?? 'video').toString(),
         ),
