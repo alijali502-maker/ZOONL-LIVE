@@ -169,6 +169,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   final List<Map<String, String>> _messages = [];
   final Set<String> _seenMessageIds = {};
+  final Map<String, String> _chatBadges = {};
 
   String? get _myId => _supabase.auth.currentUser?.id;
 
@@ -940,13 +941,66 @@ class _LiveScreenState extends State<LiveScreen> {
 
     final id = (row['id'] ?? '').toString();
     if (id.isNotEmpty && !_seenMessageIds.add(id)) return;
+    final senderId = row['sender_id']?.toString() ?? '';
+    if (senderId.isNotEmpty) unawaited(_loadChatBadge(senderId));
 
     setState(() {
       _messages.add({
-        'name': _nameFor(row['sender_id']?.toString()),
+        'sender_id': senderId,
+        'name': _nameFor(senderId),
         'message': (row['message'] ?? '').toString(),
+        'badge': _chatBadges[senderId] ?? 'NONE',
       });
     });
+  }
+
+  Future<void> _loadChatBadge(String senderId) async {
+    if (senderId.isEmpty || _chatBadges.containsKey(senderId)) return;
+    _chatBadges[senderId] = 'LOADING';
+    try {
+      final result = await _supabase.rpc(
+        'get_public_chat_badges',
+        params: <String, dynamic>{'p_user_ids': <String>[senderId]},
+      );
+      final rows = result is List ? result : const [];
+      var badge = 'NONE';
+      if (rows.isNotEmpty && rows.first is Map) {
+        badge = (rows.first['badge_code'] ?? 'NONE').toString();
+      }
+      if (!mounted) return;
+      setState(() {
+        _chatBadges[senderId] = badge;
+        for (final item in _messages) {
+          if (item['sender_id'] == senderId) item['badge'] = badge;
+        }
+      });
+    } catch (_) {
+      _chatBadges[senderId] = 'NONE';
+    }
+  }
+
+  Widget _buildChatLine(Map<String, String> item) {
+    final badge = item['badge'] ?? 'NONE';
+    final badgeColor = badge == 'SVIP'
+        ? const Color(0xFFE04455)
+        : const Color(0xFFD6B46A);
+    return RichText(
+      text: TextSpan(
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+        children: [
+          TextSpan(
+            text: item['name'] ?? 'User',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          if (badge == 'VIP' || badge == 'SVIP')
+            TextSpan(
+              text: ' [$badge]',
+              style: TextStyle(color: badgeColor, fontWeight: FontWeight.w900),
+            ),
+          TextSpan(text: ': ${item['message'] ?? ''}'),
+        ],
+      ),
+    );
   }
 
   Future<void> _sendMessage() async {
@@ -1834,10 +1888,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Text(
-                          '${item['name']}: ${item['message']}',
-                          style: const TextStyle(color: Colors.white),
-                        ),
+                        child: _buildChatLine(item),
                       );
                     },
                   ),
