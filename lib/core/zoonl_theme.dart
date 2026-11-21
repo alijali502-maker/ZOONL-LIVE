@@ -4,17 +4,17 @@ import 'package:flutter/material.dart';
 class ZoonlTheme {
   ZoonlTheme._();
 
-  static const Color background = Color(0xFF080D14);
-  static const Color backgroundRaised = Color(0xFF101923);
-  static const Color surface = Color(0xFF17232E);
-  static const Color surfaceRaised = Color(0xFF1D2B37);
-  static const Color border = Color(0xFF354653);
-  static const Color champagne = Color(0xFFD6B46A);
-  static const Color champagneLight = Color(0xFFE8D29A);
-  static const Color teal = Color(0xFF4BC2B0);
-  static const Color textPrimary = Color(0xFFF4F1E9);
-  static const Color textSecondary = Color(0xFFAAB5BE);
-  static const Color danger = Color(0xFFE47777);
+  static const Color background = Color(0xFF070B17);
+  static const Color backgroundRaised = Color(0xFF0D1426);
+  static const Color surface = Color(0xFF141E35);
+  static const Color surfaceRaised = Color(0xFF1B2844);
+  static const Color border = Color(0xFF2C3B59);
+  static const Color champagne = Color(0xFF9B8CFF);
+  static const Color champagneLight = Color(0xFFD2CEFF);
+  static const Color teal = Color(0xFF58D6CE);
+  static const Color textPrimary = Color(0xFFF4F6FF);
+  static const Color textSecondary = Color(0xFFA9B4CA);
+  static const Color danger = Color(0xFFFF788E);
 
   static ThemeData get dark {
     final ColorScheme scheme = const ColorScheme.dark(
