@@ -6,9 +6,97 @@ import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_player/video_player.dart';
+import 'package:just_audio/just_audio.dart';
 
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).
+
+class _LiveGiftMedia extends StatefulWidget {
+  const _LiveGiftMedia({required this.url, required this.size});
+  final String url;
+  final double size;
+
+  @override
+  State<_LiveGiftMedia> createState() => _LiveGiftMediaState();
+}
+
+class _LiveGiftMediaState extends State<_LiveGiftMedia> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+
+  bool get _isVideo {
+    final path = widget.url.toLowerCase().split('?').first;
+    return path.endsWith('.mp4') || path.endsWith('.webm') ||
+        path.endsWith('.mov') || path.endsWith('.m4v');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isVideo) _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    _controller = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(false);
+      await controller.play();
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveGiftMedia oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _controller?.dispose();
+      _controller = null;
+      _failed = false;
+      if (_isVideo) _initializeVideo();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (_isVideo && controller != null && controller.value.isInitialized && !_failed) {
+      return SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
+          ),
+        ),
+      );
+    }
+    if (!_isVideo || _failed) {
+      return SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: Image.network(widget.url, fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70), size: 38)),
+      );
+    }
+    return SizedBox(width: widget.size, height: widget.size,
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)));
+  }
+}
+
 class LiveScreen extends StatefulWidget {
   final String userName;
   final String userId;
@@ -69,6 +157,7 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Map<String, dynamic>> _giftCatalog = <Map<String, dynamic>>[];
   Map<String, dynamic>? _giftBanner;
   Timer? _giftBannerTimer;
+  AudioPlayer? _giftAudioPlayer;
   int _hostLevel = 1;
 
   final TextEditingController _titleController =
@@ -1070,6 +1159,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   itemBuilder: (context, index) {
                     final gift = visible[index];
                     final imageUrl = (gift['image_url'] ?? gift['preview_url'] ?? '').toString();
+                    final mediaUrl = (gift['animation_3d_url'] ?? gift['animation_url'] ?? imageUrl).toString();
                     return InkWell(
                       onTap: sending || _isHost ? null : () async {
                         setSheetState(() => sending = true);
@@ -1080,6 +1170,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           final result = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
                           _setGiftBanner({
                             'gift_name': gift['gift_name'], 'image_url': imageUrl,
+                            'media_url': mediaUrl, 'sound_url': gift['sound_url'],
                             'sender_name': widget.userName, 'quantity': quantity,
                             'total_coins': result['total_coins'] ?? ((gift['coin_price'] as num? ?? 0) * quantity),
                           });
@@ -1095,9 +1186,9 @@ class _LiveScreenState extends State<LiveScreen> {
                         decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(13),
                           border: Border.all(color: const Color(0xFFE5BD70).withOpacity(.28))),
                         child: Column(children: [
-                          Expanded(child: imageUrl.isEmpty
+                          Expanded(child: mediaUrl.isEmpty
                             ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70))
-                            : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70)))),
+                            : _LiveGiftMedia(url: mediaUrl, size: 90)),
                           Text((gift['gift_name'] ?? 'Gift').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white, fontSize: 11)),
                           const SizedBox(height: 3),
@@ -1132,27 +1223,43 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Future<void> _showRemoteGift(Map<String, dynamic> row) async {
     try {
-      final gift = await _supabase.from('gifts').select('gift_name,image_url,coin_price').eq('id', row['gift_id']).maybeSingle();
+      final gift = await _supabase.from('gifts').select('gift_name,image_url,animation_url,animation_3d_url,sound_url,coin_price').eq('id', row['gift_id']).maybeSingle();
       final sender = await _supabase.from('profiles').select('display_name').eq('id', row['sender_id']).maybeSingle();
       if (!mounted || gift == null) return;
+      _playGiftSound((gift['sound_url'] ?? '').toString());
       _setGiftBanner({
         'gift_name': gift['gift_name'], 'image_url': gift['image_url'],
+        'media_url': gift['animation_3d_url'] ?? gift['animation_url'] ?? gift['image_url'],
+        'sound_url': gift['sound_url'],
         'sender_name': sender?['display_name'] ?? 'Viewer', 'quantity': row['quantity'] ?? 1,
         'total_coins': row['total_coins'] ?? gift['coin_price'] ?? 0,
       });
     } catch (_) {}
   }
 
+
+  Future<void> _playGiftSound(String url) async {
+    if (url.trim().isEmpty) return;
+    final previous = _giftAudioPlayer;
+    _giftAudioPlayer = null;
+    if (previous != null) await previous.dispose();
+    final player = AudioPlayer();
+    _giftAudioPlayer = player;
+    try {
+      await player.setUrl(url);
+      await player.play();
+    } catch (_) {}
+  }
+
   Widget _liveGiftBanner() {
     final gift = _giftBanner ?? <String, dynamic>{};
-    final image = (gift['image_url'] ?? '').toString();
+    final image = (gift['media_url'] ?? gift['image_url'] ?? '').toString();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6D3BA5), Color(0xFF2A1740)]),
         borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE5BD70), width: 1.2)),
       child: Row(children: [
-        if (image.isNotEmpty) SizedBox(width: 38, height: 38, child: Image.network(image, fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70))))
+        if (image.isNotEmpty) _LiveGiftMedia(url: image, size: 42)
         else const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70), size: 30),
         const SizedBox(width: 10),
         Expanded(child: Text('${gift['sender_name'] ?? 'Viewer'} sent ${gift['gift_name'] ?? 'a gift'} ×${gift['quantity'] ?? 1}',
@@ -1235,6 +1342,9 @@ class _LiveScreenState extends State<LiveScreen> {
 
     _guestPoller?.cancel();
     _giftBannerTimer?.cancel();
+    final giftAudio = _giftAudioPlayer;
+    _giftAudioPlayer = null;
+    if (giftAudio != null) unawaited(giftAudio.dispose());
     if (_isGuest && _guestSeatId != null) {
       unawaited(_supabase.rpc(
         'room_leave_guest_seat',
