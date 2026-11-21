@@ -769,7 +769,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
     setState(() {
       coins = newCoins;
       progressCoins = xp;
-      myLevel = lv.clamp(1, 100);
+      myLevel = lv.clamp(1, 100).toInt();
     });
   }
 
@@ -875,7 +875,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
       Color(0xFFFF8B83), Color(0xFFFFD76A), Color(0xFFFF9EEB),
       Color(0xFFFFE5A0),
     ];
-    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9);
+    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
     return palette[tier];
   }
 
