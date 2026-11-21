@@ -973,7 +973,8 @@ class AgencyPortalScreen extends StatefulWidget {
 class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
   bool loading = true;
   String? error;
-  List<Map<String, dynamic>> rows = [];
+  Map<String, dynamic> dashboard = {};
+  List<Map<String, dynamic>> applications = [];
 
   @override
   void initState() { super.initState(); _load(); }
@@ -981,43 +982,22 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
   Future<void> _load() async {
     setState(() { loading = true; error = null; });
     try {
-      final result = await Backend.fetchPortalRows('agency_applications');
+      final raw = await Backend.client.rpc('get_my_agency_dashboard');
+      final apps = await Backend.client.from('agency_applications')
+          .select('id,proposed_name,agency_type,application_status,deposit_status,deposit_amount,created_at,review_note')
+          .eq('applicant_id', Backend.currentUserId!)
+          .order('created_at', ascending: false);
       if (!mounted) return;
-      setState(() { rows = result; loading = false; });
+      setState(() {
+        dashboard = raw is Map ? Map<String, dynamic>.from(raw) : {};
+        applications = (apps as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        loading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() { error = e.toString(); loading = false; });
     }
   }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _bg,
-    appBar: AppBar(title: const Text('Agency & Creator Portal')),
-    body: ListView(padding: const EdgeInsets.all(16), children: [
-      _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
-      const SizedBox(height: 14),
-      _portalCard('AGENCY APPLICATIONS', 'Application records below are loaded from the connected agency_applications table. Approval and official agency ID issuance remain Owner-authorized server operations.', Icons.assignment),
-      const SizedBox(height: 10),
-      FilledButton.icon(
-        onPressed: _openAgencyApplication,
-        icon: const Icon(Icons.add_business),
-        label: const Text('START AGENCY APPLICATION'),
-      ),
-      const SizedBox(height: 14),
-      if (loading) const Center(child: CircularProgressIndicator(color: _gold)),
-      if (error != null) Text('Agency records could not be loaded: $error', style: const TextStyle(color: Color(0xFFE47777))),
-      if (!loading && error == null && rows.isEmpty)
-        const Padding(padding: EdgeInsets.all(20), child: Text('No agency application records returned.', textAlign: TextAlign.center, style: TextStyle(color: _muted))),
-      for (final row in rows)
-        Card(color: _panel, child: ListTile(
-          leading: const Icon(Icons.business, color: _gold),
-          title: Text((row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
-          subtitle: Text(row.entries.take(4).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
-        )),
-      OutlinedButton.icon(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh), label: const Text('REFRESH')),
-    ]),
-  );
 
   Future<void> _openAgencyApplication() async {
     final submitted = await Navigator.of(context).push<bool>(
@@ -1025,7 +1005,124 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
     );
     if (submitted == true) await _load();
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final agencies = (dashboard['agencies'] as List? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final members = (dashboard['members'] as List? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final gross = agencies.fold<double>(0, (sum, a) => sum + ((a['gross_earnings'] as num?)?.toDouble() ?? 0));
+    final commission = agencies.fold<double>(0, (sum, a) => sum + ((a['agency_commission'] as num?)?.toDouble() ?? 0));
+
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        title: const Text('Agency & Creator Portal'),
+        actions: [IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh))],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator(color: _gold))
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
+              const SizedBox(height: 12),
+              _portalCard('YOUR AGENCY WORKSPACE', 'This portal shows agencies approved for your account, linked streamers, verified earnings and the official contact details assigned by the Owner.', Icons.business),
+              if (error != null)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text('Dashboard load failed: $error', style: const TextStyle(color: Color(0xFFE47777)))),
+              if (agencies.isNotEmpty) ...[
+                Row(children: [
+                  Expanded(child: _agencyMetric('AGENCIES', agencies.length.toString(), Icons.business)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _agencyMetric('STREAMERS', members.length.toString(), Icons.people_alt)),
+                ]),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: _agencyMetric('GROSS EARNINGS', gross.toStringAsFixed(2) + ' USD', Icons.payments)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _agencyMetric('AGENCY COMMISSION', commission.toStringAsFixed(2) + ' USD', Icons.account_balance)),
+                ]),
+                const SizedBox(height: 12),
+                for (final agency in agencies) ...[
+                  _portalCard(
+                    (agency['agency_name'] ?? 'Agency').toString(),
+                    'Agency ID: ' + (agency['agency_zoonl_id'] ?? 'Not linked').toString() +
+                    ' • Code: ' + (agency['agency_code'] ?? 'Pending').toString() +
+                    '\nType: ' + (agency['agency_type'] ?? 'streamer').toString().toUpperCase() +
+                    ' • Status: ' + (agency['agency_status'] ?? 'pending').toString() +
+                    '\nApproved streamers: ' + (agency['member_count'] ?? 0).toString() +
+                    ' • Commission: ' + (agency['commission_percent'] ?? 0).toString() + '%',
+                    Icons.verified,
+                  ),
+                  if ((agency['official_topup_number'] ?? '').toString().isNotEmpty)
+                    _portalCard('OFFICIAL TOP-UP CONTACT',
+                      'Number: ' + agency['official_topup_number'].toString() +
+                      '\nWhatsApp: ' + (agency['official_whatsapp_number'] ?? 'Not configured').toString(),
+                      Icons.phone_android),
+                  _portalCard('EARNING SUMMARY',
+                    'Gross: ' + (agency['gross_earnings'] ?? 0).toString() +
+                    ' USD\nAgency commission: ' + (agency['agency_commission'] ?? 0).toString() +
+                    ' USD\nStreamer share: ' + (agency['streamer_earnings'] ?? 0).toString() + ' USD',
+                    Icons.analytics),
+                ],
+                const SizedBox(height: 8),
+                const Text('REGISTERED STREAMERS', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+                if (members.isEmpty)
+                  const Padding(padding: EdgeInsets.all(12), child: Text('No streamer registrations are linked to this agency yet.', style: TextStyle(color: _muted)))
+                else
+                  for (final member in members)
+                    Card(color: _panel, child: ListTile(
+                      leading: const Icon(Icons.person, color: _gold),
+                      title: Text((member['display_name'] ?? 'ZOONL Streamer').toString(), style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(
+                        'ZOONL ID: ' + (member['zoonl_id'] ?? 'Not assigned').toString() +
+                        ' • ' + (member['member_role'] ?? 'streamer').toString() +
+                        '\nStatus: ' + (member['member_status'] ?? 'pending').toString() +
+                        ' • Earnings: ' + (member['total_earned'] ?? 0).toString() + ' USD',
+                        style: const TextStyle(color: _muted, fontSize: 10),
+                      ),
+                    )),
+              ] else
+                _portalCard('NO APPROVED AGENCY LINKED', 'Your application status is shown below. The full Agency Portal activates after Owner approval and official agency code issuance.', Icons.info_outline),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _openAgencyApplication,
+                icon: const Icon(Icons.add_business),
+                label: const Text('START AGENCY APPLICATION'),
+              ),
+              const SizedBox(height: 12),
+              const Text('YOUR AGENCY APPLICATION HISTORY', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+              if (applications.isEmpty)
+                const Padding(padding: EdgeInsets.all(12), child: Text('No agency applications submitted.', style: TextStyle(color: _muted)))
+              else
+                for (final app in applications)
+                  Card(color: _panel, child: ListTile(
+                    leading: const Icon(Icons.assignment_outlined, color: _gold),
+                    title: Text((app['proposed_name'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
+                    subtitle: Text(
+                      'Type: ' + (app['agency_type'] ?? '').toString() +
+                      ' • Deposit: USD ' + (app['deposit_amount'] ?? 300).toString() +
+                      '\nApplication: ' + (app['application_status'] ?? 'pending').toString() +
+                      ' • Deposit: ' + (app['deposit_status'] ?? 'pending').toString(),
+                      style: const TextStyle(color: _muted, fontSize: 10),
+                    ),
+                  )),
+            ]),
+    );
+  }
+
+  Widget _agencyMetric(String label, String value, IconData icon) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFF354653))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: _gold, size: 20),
+      const SizedBox(height: 6),
+      Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+      Text(label, style: const TextStyle(color: _muted, fontSize: 9)),
+    ]),
+  );
 }
+
 
 class _PortalSection {
   final String title;
