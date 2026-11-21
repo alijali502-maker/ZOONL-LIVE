@@ -87,7 +87,7 @@ class _LiveScreenState extends State<LiveScreen> {
   ];
 
   String get _liveLevelSticker {
-    final index = ((_hostLevel - 1) ~/ 10).clamp(0, _levelStickers.length - 1);
+    final index = ((_hostLevel - 1) ~/ 10).clamp(0, _levelStickers.length - 1).toInt();
     return _levelStickers[index];
   }
 
@@ -1613,9 +1613,9 @@ class _LiveScreenState extends State<LiveScreen> {
                     color: Colors.red,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.circle, size: 8, color: Colors.white),
+                      const Icon(Icons.circle, size: 8, color: Colors.white),
                       SizedBox(width: 6),
                       Text(
                         _privateRoom || _lockedRoom ? 'PRIVATE LIVE • $_liveLevelSticker • LV $_hostLevel' : 'LIVE • $_liveLevelSticker • LV $_hostLevel',
