@@ -2312,8 +2312,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       catalog['zoonl_item_code']?.toString() == code,
                   orElse: () => <String, dynamic>{},
                 );
+                final trialName = <String, String>{
+                  'ZOONL_TRIAL_FRAME_5D': 'New ID Trial Frame (5 Days)',
+                  'ZOONL_TRIAL_ENTRY_5D': 'New ID Trial Entry (5 Days)',
+                  'ZOONL_TRIAL_BACKGROUND_5D': 'New ID Trial Background (5 Days)',
+                }[code];
                 final name =
-                    (catalogItem['zoonl_item_name'] ?? code).toString();
+                    (catalogItem['zoonl_item_name'] ?? trialName ?? code).toString();
                 final expiry = item['expires_at']?.toString();
                 final expiryDate = expiry == null ? null : DateTime.tryParse(expiry);
                 final expired = expiryDate != null && expiryDate.isBefore(DateTime.now());
