@@ -868,7 +868,7 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
         _phone.text.trim().isEmpty ||
         _depositReference.text.trim().isEmpty ||
         _receiptPath == null) {
-      setState(() => _error = 'Complete the contact details and upload the $300 deposit receipt.');
+      setState(() => _error = 'Complete the contact details and upload the \$300 deposit receipt.');
       return;
     }
     setState(() { _submitting = true; _error = null; });
