@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'video_live_tools_panel.dart';
 
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).
@@ -416,6 +417,21 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  void _openVideoTools() {
+    final roomId = _roomId;
+    if (roomId == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => VideoLiveToolsPanel(
+        roomId: roomId,
+        ownerId: _roomOwnerId ?? '',
+        isHost: _isHost,
+      ),
+    );
+  }
+
   // ---------- Controls ----------
   Future<void> _toggleMicrophone() async {
     final next = !_microphoneEnabled;
@@ -805,6 +821,11 @@ class _LiveScreenState extends State<LiveScreen> {
         onTap: _toggleCamera,
       ),
       _control(
+        icon: Icons.dashboard_customize,
+        label: 'Live Tools',
+        onTap: _openVideoTools,
+      ),
+      _control(
         icon: Icons.chat,
         label: 'Chat',
         onTap: () => setState(() => _chatEnabled = !_chatEnabled),
@@ -820,6 +841,11 @@ class _LiveScreenState extends State<LiveScreen> {
 
   List<Widget> _viewerControls() {
     return [
+      _control(
+        icon: Icons.dashboard_customize,
+        label: 'Live Info',
+        onTap: _openVideoTools,
+      ),
       _control(
         icon: Icons.chat,
         label: 'Chat',
