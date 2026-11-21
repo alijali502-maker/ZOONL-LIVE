@@ -58,6 +58,8 @@ class _LiveScreenState extends State<LiveScreen> {
   Room? _lk;
   Timer? _guestPoller;
   bool _isGuest = false;
+  bool _guestAudioAllowed = true;
+  bool _guestVideoAllowed = true;
   bool _guestInviteDialogShown = false;
   String? _guestSeatId;
   List<Map<String, dynamic>> _guestSeats = <Map<String, dynamic>>[];
@@ -302,22 +304,27 @@ class _LiveScreenState extends State<LiveScreen> {
 
     _isGuest = data['is_guest'] == true;
     _guestSeatId = data['seat_id']?.toString();
+    _guestAudioAllowed = _isHost || data['audio_enabled'] == true;
+    _guestVideoAllowed = _selectedRoomType == 'video' &&
+        (_isHost || data['video_enabled'] == true);
     if (_isHost || _isGuest) {
-      final audioAllowed = _isHost || data['audio_enabled'] == true;
-      final videoAllowed = _selectedRoomType == 'video' &&
-          (_isHost || data['video_enabled'] == true);
-      if (_isGuest) {
+      if (_isGuest && _guestAudioAllowed) {
         final micPermission = await Permission.microphone.request();
         if (!micPermission.isGranted) {
           throw StateError('Microphone permission is required for guest audio.');
         }
-        if (videoAllowed) await Permission.camera.request();
+      }
+      if (_isGuest && _guestVideoAllowed) {
+        final cameraPermission = await Permission.camera.request();
+        _guestVideoAllowed = cameraPermission.isGranted;
       }
       await room.localParticipant?.setMicrophoneEnabled(
-        audioAllowed && _microphoneEnabled,
+        _guestAudioAllowed && _microphoneEnabled,
       );
       if (_selectedRoomType == 'video') {
-        await room.localParticipant?.setCameraEnabled(videoAllowed);
+        await room.localParticipant?.setCameraEnabled(
+          _guestVideoAllowed && _cameraEnabled,
+        );
       }
     }
   }
@@ -500,6 +507,7 @@ class _LiveScreenState extends State<LiveScreen> {
         }
         _showMessage('You joined the live as a guest.');
       } else {
+        _guestInviteDialogShown = false;
         _showMessage('Guest invitation declined.');
       }
     } catch (error) {
@@ -1444,12 +1452,13 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Widget> _viewerControls() {
     if (_isGuest) {
       return [
-        _control(
+        if (_guestAudioAllowed)
+          _control(
           icon: _microphoneEnabled ? Icons.mic : Icons.mic_off,
           label: 'Mic',
           onTap: _toggleMicrophone,
         ),
-        if (_selectedRoomType == 'video')
+        if (_selectedRoomType == 'video' && _guestVideoAllowed)
           _control(
             icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
             label: 'Camera',
