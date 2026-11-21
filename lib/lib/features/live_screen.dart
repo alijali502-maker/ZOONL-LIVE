@@ -1188,9 +1188,10 @@ class _LiveScreenState extends State<LiveScreen> {
                         decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(13),
                           border: Border.all(color: const Color(0xFFE5BD70).withOpacity(.28))),
                         child: Column(children: [
-                          Expanded(child: mediaUrl.isEmpty
+                          Expanded(child: imageUrl.isEmpty
                             ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70))
-                            : _LiveGiftMedia(url: imageUrl.isEmpty ? mediaUrl : imageUrl, size: 90)),
+                            : Image.network(imageUrl, fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70)))),
                           Text((gift['gift_name'] ?? 'Gift').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white, fontSize: 11)),
                           const SizedBox(height: 3),
