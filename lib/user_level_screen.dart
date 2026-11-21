@@ -27,18 +27,18 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
     }
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([
-        _db.rpc('zoonl_my_level'),
-        _db.from('gift_sends').select('total_coins').eq('sender_id', user.id),
-        _db.from('level_definitions').select('level,required_exp,level_name').order('level'),
-      ]);
-      final sent = (results[1] as List).fold<int>(0, (sum, row) =>
+      final myLevel = await _db.rpc('zoonl_my_level');
+      final sentRows = await _db.from('gift_sends')
+          .select('total_coins').eq('sender_id', user.id);
+      final levelRows = await _db.from('level_definitions')
+          .select('level,required_exp,level_name').order('level');
+      final sent = (sentRows as List).fold<int>(0, (sum, row) =>
         sum + ((row['total_coins'] as num?)?.toInt() ?? 0));
       if (!mounted) return;
       setState(() {
-        _level = (results[0] as num?)?.toInt() ?? 1;
+        _level = (myLevel as num?)?.toInt() ?? 1;
         _sentCoins = sent;
-        _levels = (results[2] as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        _levels = (levelRows as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         _loading = false;
       });
     } catch (error) {
