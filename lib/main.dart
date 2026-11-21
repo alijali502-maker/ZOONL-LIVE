@@ -1201,13 +1201,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                 ),
                 title: const Text('Audio Room'),
                 subtitle: const Text(
-                  'Audio room seats and call requests',
+                  'LiveKit audio broadcast with in-room guest seats',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   if (!store.canStartLive()) {
                     _showMessage(
-                      'Live ke liye Level 5 ya verified streamer status chahiye.',
+                      'Live के लिए Owner या approved Host status जरूरी है।',
                     );
                     return;
                   }
@@ -2203,172 +2203,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   Widget _buildPkSection() => const PkBroadcastScreen();
 
   Widget _buildAudioSection() {
-    final Map<String, dynamic>? audioRoom =
-        _findStreamer('AUDIO');
-
-    if (audioRoom == null) {
-      return _emptyState(
-        'No audio room available',
-        'Audio rooms will appear here when supplied by the server or added to a TEST session.',
-      );
-    }
-
-    final List<Map<String, dynamic>> seats =
-        (audioRoom['seats'] as List<dynamic>? ?? <dynamic>[])
-            .whereType<Map>()
-            .map(
-              (Map seat) => Map<String, dynamic>.from(seat),
-            )
-            .toList();
-
-    final List<dynamic> requests =
-        audioRoom['pendingCallRequests'] as List<dynamic>? ??
-            <dynamic>[];
-
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: <Widget>[
-        _luxuryCard(
-          title:
-              '${audioRoom['name']} • Audio Room (${seats.length} Seats)',
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              IconButton(
-                icon: const Icon(
-                  Icons.add_circle,
-                  color: Color(0xFFD6B46A),
-                ),
-                onPressed: () {
-                  if (store.isLiveMode) {
-                    _showMessage(
-                      'Audio seat changes require server authorization.',
-                    );
-                    return;
-                  }
-                  audioRoom['plusOpen'] =
-                      audioRoom['plusOpen'] != true;
-                  store.refresh();
-                },
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.phone_in_talk,
-                  color: Color(0xFF00E676),
-                ),
-                onPressed: () {
-                  if (store.isLiveMode) {
-                    _showMessage(
-                      'Call requests require the live-room service.',
-                    );
-                    return;
-                  }
-                  audioRoom['callRequestOpen'] =
-                      audioRoom['callRequestOpen'] != true;
-                  store.refresh();
-                },
-              ),
-            ],
-          ),
-          child: Column(
-            children: <Widget>[
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemCount: seats.length,
-                itemBuilder: (_, int index) {
-                  final Map<String, dynamic> seat = seats[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D2B37),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        const Icon(
-                          Icons.headset_mic,
-                          color: Color(0xFFD6B46A),
-                        ),
-                        Text(
-                          'Seat ${seat['seat']}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        Text(
-                          '${seat['name']}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-              ...requests.map((dynamic request) {
-                if (request is! Map) {
-                  return const SizedBox.shrink();
-                }
-
-                return ListTile(
-                  title: Text(
-                    'Call Join Request: ${request['name']}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      IconButton(
-                        icon: const Icon(
-                          Icons.check_circle,
-                          color: Colors.greenAccent,
-                        ),
-                        onPressed: () {
-                          if (store.isLiveMode) {
-                            _showMessage(
-                              'Accepting a call requires server verification.',
-                            );
-                            return;
-                          }
-                          final List<dynamic> current =
-                              audioRoom['pendingCallRequests']
-                                  as List<dynamic>;
-                          current.remove(request);
-                          _showMessage(
-                            'TEST request accepted locally.',
-                          );
-                          store.refresh();
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.cancel,
-                          color: Colors.redAccent,
-                        ),
-                        onPressed: () {
-                          if (store.isLiveMode) return;
-                          (audioRoom['pendingCallRequests']
-                                  as List<dynamic>)
-                              .remove(request);
-                          store.refresh();
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ],
-    );
+    // Audio is a broadcast room, not a separate phone-call flow.
+    // Reuse the same Supabase + LiveKit room lifecycle, guest invitations,
+    // seats, moderation and gifting as the video-live experience.
+    return const FeatureHubScreen(roomTypeFilter: 'audio');
   }
 
   Future<void> _refreshCosmeticsData() async {
