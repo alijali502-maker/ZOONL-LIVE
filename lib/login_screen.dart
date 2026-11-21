@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phone = TextEditingController();
   final _otp = TextEditingController();
   final _countryCode = TextEditingController(text: '+971');
+  DateTime? _dateOfBirth;
 
   final _formKey = GlobalKey<FormState>();
   final _supabase = Supabase.instance.client;
@@ -55,6 +56,34 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String get _fullPhone =>
       '$_normalizedCountryCode$_normalizedPhone';
+
+  String get _dobValue => _dateOfBirth == null
+      ? ''
+      : '${_dateOfBirth!.year.toString().padLeft(4, '0')}-${_dateOfBirth!.month.toString().padLeft(2, '0')}-${_dateOfBirth!.day.toString().padLeft(2, '0')}';
+
+  Future<void> _pickDateOfBirth() async {
+    final today = DateTime.now();
+    final value = await showDatePicker(
+      context: context,
+      initialDate: _dateOfBirth ?? DateTime(today.year - 18, today.month, today.day),
+      firstDate: DateTime(1900),
+      lastDate: today,
+      helpText: 'CONFIRM DATE OF BIRTH',
+    );
+    if (value != null && mounted) setState(() => _dateOfBirth = value);
+  }
+
+  Widget _dateOfBirthField() => InkWell(
+    onTap: _loading ? null : _pickDateOfBirth,
+    borderRadius: BorderRadius.circular(15),
+    child: InputDecorator(
+      decoration: _input('Date of Birth', Icons.calendar_month),
+      child: Text(
+        _dateOfBirth == null ? 'Select your date of birth' : _dobValue,
+        style: TextStyle(color: _dateOfBirth == null ? Colors.white54 : Colors.white),
+      ),
+    ),
+  );
 
   bool get _validPhone =>
       RegExp(r'^\+[1-9][0-9]{0,2}$').hasMatch(_normalizedCountryCode) &&
@@ -88,13 +117,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final password = _password.text;
 
       if (_register) {
+        if (_name.text.trim().isEmpty || _dateOfBirth == null) {
+          _show('Full Name और Date of Birth भरें।');
+          return;
+        }
         final result = await _supabase.auth.signUp(
           email: email,
           password: password,
           emailRedirectTo: _redirectTo,
           data: {
-            if (_name.text.trim().isNotEmpty)
-              'display_name': _name.text.trim(),
+            'display_name': _name.text.trim(),
+            'date_of_birth': _dobValue,
           },
         );
 
@@ -148,6 +181,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendPhoneOtp() async {
     if (_loading) return;
 
+    if (_register && (_name.text.trim().isEmpty || _dateOfBirth == null)) {
+      _show('Full Name और Date of Birth भरें।');
+      return;
+    }
+
     if (!_validPhone) {
       _show('सही Country Code और Mobile Number भरें।');
       return;
@@ -161,8 +199,10 @@ class _LoginScreenState extends State<LoginScreen> {
         phone: _fullPhone,
         shouldCreateUser: _register,
         data: {
-          if (_register && _name.text.trim().isNotEmpty)
+          if (_register) ...{
             'display_name': _name.text.trim(),
+            'date_of_birth': _dobValue,
+          },
         },
       );
 
@@ -439,7 +479,10 @@ class _LoginScreenState extends State<LoginScreen> {
               autofillHints: const [AutofillHints.name],
               style: const TextStyle(color: Colors.white),
               decoration: _input('Full Name', Icons.person_outline),
+              validator: (value) => (value ?? '').trim().isNotEmpty ? null : 'Full Name जरूरी है',
             ),
+            const SizedBox(height: 12),
+            _dateOfBirthField(),
             const SizedBox(height: 16),
           ],
           TextFormField(
@@ -514,6 +557,8 @@ class _LoginScreenState extends State<LoginScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: _input('Full Name', Icons.person_outline),
             ),
+            const SizedBox(height: 12),
+            _dateOfBirthField(),
             const SizedBox(height: 16),
           ],
           Row(
