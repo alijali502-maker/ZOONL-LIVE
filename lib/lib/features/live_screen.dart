@@ -2634,7 +2634,7 @@ class _LiveScreenState extends State<LiveScreen> {
   Widget _buildLiveRoom() {
     final liveParticipants = _lk?.remoteParticipants.values.where((p) =>
       _isHost || p.identity != _roomOwnerId
-    ).toList() ?? <Participant>[];
+    ).toList() ?? [];
     final viewers = liveParticipants.length;
 
     return Column(
