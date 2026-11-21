@@ -65,17 +65,22 @@ Deno.serve(async (req: Request) => {
       if (!member && !isGuest) return json({ error: "not allowed" }, 403);
     }
 
-    // Persist the authenticated room entry so every participant can see the
-    // entrant's equipped entry effect through Supabase Realtime.
-    const { error: memberError } = await admin
-      .from("live_room_members")
-      .upsert({
+    // Record a separate room-entry event. Do not add public viewers to
+    // live_room_members: that table also grants access to locked rooms.
+    const { data: activeStyle } = await admin
+      .from("zoonl_live_active_styles")
+      .select("active_entry_code")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const entryCode = activeStyle?.active_entry_code ?? null;
+    const { error: entryError } = await admin
+      .from("live_room_entry_events")
+      .insert({
         room_id: room.id,
         user_id: userId,
-        member_role: isHost ? "host" : isGuest ? "guest" : "viewer",
-        joined_at: new Date().toISOString(),
-      }, { onConflict: "room_id,user_id" });
-    if (memberError) return json({ error: "room membership could not be recorded" }, 500);
+        entry_code: entryCode,
+      });
+    if (entryError) console.error("room entry event not recorded", entryError.message);
 
     const token = new AccessToken(apiKey, apiSecret, {
       identity: userId,
