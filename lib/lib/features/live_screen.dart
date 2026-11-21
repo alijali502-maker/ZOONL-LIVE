@@ -139,6 +139,7 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _frontCamera = true;
   String? _previewError;
   String _previewFilter = 'Natural';
+  bool _filterConfirmed = false;
   double _filterStrength = 0.35;
   static const List<String> _previewFilters = <String>['Natural', 'Warm', 'Cool', 'Mono', 'Rose'];
 
@@ -296,6 +297,16 @@ class _LiveScreenState extends State<LiveScreen> {
     if (title.isEmpty) {
       _showMessage('Please enter a live room title.');
       return;
+    }
+    if (_selectedRoomType == 'video') {
+      if (_previewCamera?.value.isInitialized != true) {
+        _showMessage('पहले Camera Preview तैयार होने दें।');
+        return;
+      }
+      if (!_filterConfirmed) {
+        _showMessage('पहले Preview Filter चुनें, फिर Live शुरू करें।');
+        return;
+      }
     }
     if ((_privateRoom || _lockedRoom) && !_canUsePrivateRooms) {
       _showMessage('Private and locked rooms unlock at Level 10.');
@@ -1642,7 +1653,10 @@ class _LiveScreenState extends State<LiveScreen> {
                 selected: _previewFilter == filter,
                 onSelected: _busy
                     ? null
-                    : (_) => setState(() => _previewFilter = filter),
+                    : (_) => setState(() {
+                        _previewFilter = filter;
+                        _filterConfirmed = true;
+                      }),
               );
             }).toList(),
           ),
@@ -1664,11 +1678,25 @@ class _LiveScreenState extends State<LiveScreen> {
                   style: const TextStyle(color: Colors.white)),
             ],
           ),
-          const Text(
-            'Note: these colour effects change the pre-live preview only. '
-            'Face retouch effects (Whitening, Teeth, Big Eyes and Peeling) '
-            'need a face-effects SDK before they can be applied to the outgoing stream.',
-            style: TextStyle(color: Colors.white54, fontSize: 11),
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF171D36),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _filterConfirmed ? const Color(0xFF58D6CE) : const Color(0xFF9360F5)),
+            ),
+            child: Row(children: [
+              Icon(_filterConfirmed ? Icons.check_circle : Icons.tune,
+                color: _filterConfirmed ? const Color(0xFF58D6CE) : const Color(0xFFB9AEFF), size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                _filterConfirmed
+                  ? 'Preview filter selected: $_previewFilter. This colour effect is currently local preview only; it is not yet encoded into the outgoing LiveKit video for viewers.'
+                  : 'Choose one preview filter above before starting the video room.',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              )),
+            ]),
           ),
         ] else
           Container(
@@ -1809,7 +1837,9 @@ class _LiveScreenState extends State<LiveScreen> {
         SizedBox(
           height: 54,
           child: ElevatedButton.icon(
-            onPressed: _busy ? null : _startLive,
+            onPressed: _busy || (_selectedRoomType == 'video' &&
+                (!_filterConfirmed || _previewCamera?.value.isInitialized != true))
+                ? null : _startLive,
             icon: _busy
                 ? const SizedBox(
                     height: 18,
