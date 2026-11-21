@@ -788,15 +788,12 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
                       'Number: ' + agency['official_topup_number'].toString() +
                       '\nWhatsApp: ' + (agency['official_whatsapp_number'] ?? 'Not configured').toString(),
                       Icons.phone_android),
-                  final contact = agency['contact_details'] is Map
-                      ? Map<String, dynamic>.from(agency['contact_details'] as Map)
-                      : <String, dynamic>{};
-                  if (contact.isNotEmpty)
+                  if (agency['contact_details'] is Map)
                     _portalCard('REGISTERED AGENCY CONTACT',
-                      'Country: ' + (contact['country'] ?? agency['country'] ?? 'Not supplied').toString() +
-                      '\nEmail: ' + (contact['email'] ?? 'Not supplied').toString() +
-                      '\nPhone: ' + (contact['phone'] ?? 'Not supplied').toString() +
-                      '\nWhatsApp: ' + (contact['whatsapp'] ?? 'Not supplied').toString(),
+                      'Country: ' + (((agency['contact_details'] as Map?)?['country'] ?? agency['country'] ?? 'Not supplied').toString()) +
+                      '\nEmail: ' + (((agency['contact_details'] as Map?)?['email'] ?? 'Not supplied').toString()) +
+                      '\nPhone: ' + (((agency['contact_details'] as Map?)?['phone'] ?? 'Not supplied').toString()) +
+                      '\nWhatsApp: ' + (((agency['contact_details'] as Map?)?['whatsapp'] ?? 'Not supplied').toString()),
                       Icons.contact_phone),
                 ],
                 const SizedBox(height: 8),
