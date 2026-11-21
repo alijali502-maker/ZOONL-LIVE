@@ -45,7 +45,6 @@ Deno.serve(async (req: Request) => {
 
     const userId = authData.user.id;
     const isHost = room.owner_id === userId;
-
     const { data: guestSeat, error: seatError } = await admin
       .from("room_guest_seats")
       .select("id, seat_number, is_video_enabled, is_audio_enabled")
@@ -83,6 +82,7 @@ Deno.serve(async (req: Request) => {
       url: livekitUrl,
       is_host: isHost,
       is_guest: isGuest,
+      seat_id: guestSeat?.id ?? null,
       seat_number: guestSeat?.seat_number ?? null,
       audio_enabled: isHost || guestSeat?.is_audio_enabled === true,
       video_enabled: isHost || guestSeat?.is_video_enabled === true,
