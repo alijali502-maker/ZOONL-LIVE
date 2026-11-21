@@ -876,7 +876,8 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
       Color(0xFFFFE5A0),
     ];
     final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
-    return palette[tier];
+    final base = HSVColor.fromColor(palette[tier]);
+    return base.withHue((base.hue + (level % 10) * 3.2) % 360).toColor();
   }
 
   Future<_Person> _person(String uid) async {
