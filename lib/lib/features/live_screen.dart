@@ -377,13 +377,14 @@ class _LiveScreenState extends State<LiveScreen> {
       _showMessage('This audio theme is not available yet.');
       return;
     }
-    final price = (theme['coin_price'] as num?)?.toInt() ?? 0;
+    final selectedTheme = theme;
+    final price = (selectedTheme['coin_price'] as num?)?.toInt() ?? 0;
     if (!_audioThemeUnlocked.contains(code) && price > 0) {
       final approved = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           backgroundColor: const Color(0xFF171126),
-          title: Text('Unlock ${theme['theme_name']}',
+          title: Text('Unlock ${selectedTheme['theme_name']}',
               style: const TextStyle(color: Color(0xFFE6C47A))),
           content: Text('Unlock this animated audio background for $price coins?',
               style: const TextStyle(color: Colors.white70)),
