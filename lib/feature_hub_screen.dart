@@ -4,6 +4,8 @@ import 'core/backend.dart';
 import 'lib/features/live_screen.dart';
 import 'role_portals_screen.dart';
 import 'settings_center_screen.dart';
+import 'short_video_studio_screen.dart';
+import 'short_video_feed_screen.dart';
 
 class FeatureHubScreen extends StatefulWidget {
   const FeatureHubScreen({super.key});
@@ -27,6 +29,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   List<Map<String, dynamic>> _rooms = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _guestInvites = [];
+  List<Map<String, dynamic>> _shortVideos = [];
 
   @override
   void initState() {
@@ -84,6 +87,13 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .gt('expires_at', DateTime.now().toUtc().toIso8601String())
           .order('created_at', ascending: false);
 
+      final shortsRaw = await Backend.client
+          .from('short_videos')
+          .select('id,user_id,video_url,caption,duration_seconds,likes_count,created_at')
+          .eq('is_public', true)
+          .order('created_at', ascending: false)
+          .limit(5);
+
       final giftsRaw = await Backend.client
           .from('gifts')
           .select('id, gift_name, coin_price')
@@ -105,6 +115,9 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
             .map((row) => _map(row))
             .toList();
         _guestInvites = (guestInvitesRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _shortVideos = (shortsRaw as List)
             .map((row) => _map(row))
             .toList();
         _loading = false;
@@ -141,6 +154,22 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       ),
     );
     _loadDashboard();
+  }
+
+  Future<void> _openShortStudio() async {
+    final uploaded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const ShortVideoStudioScreen()),
+    );
+    if (uploaded == true) await _loadDashboard();
+  }
+
+  Future<void> _openShortFeed({bool onlyMine = false}) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ShortVideoFeedScreen(onlyMine: onlyMine),
+      ),
+    );
+    await _loadDashboard();
   }
 
   Future<void> _respondGuestInvite(
@@ -312,6 +341,68 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                         style: TextStyle(color: _muted, fontSize: 10),
                       ),
                     ),
+                ],
+              ),
+            ),
+            _sectionTitle('Short Videos', trailing: 'VIEW ALL', onTap: () => _openShortFeed()),
+            _panelCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Record, publish and watch public Shorts',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _openShortStudio,
+                          icon: const Icon(Icons.videocam),
+                          label: const Text('UPLOAD SHORT'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _teal,
+                            foregroundColor: const Color(0xFF071713),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openShortFeed(onlyMine: true),
+                          icon: const Icon(Icons.person),
+                          label: const Text('MY SHORTS'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_shortVideos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 10),
+                      child: Text('No public Shorts yet. Be the first to publish.',
+                          style: TextStyle(color: _muted, fontSize: 11)),
+                    )
+                  else
+                    ..._shortVideos.map((video) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.play_circle_fill, color: _gold, size: 30),
+                      title: Text(
+                        (video['caption'] ?? 'ZOONL Short').toString().isEmpty
+                            ? 'ZOONL Short'
+                            : (video['caption'] ?? '').toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        '${video['duration_seconds']} sec • ${video['likes_count']} likes',
+                        style: const TextStyle(color: _muted, fontSize: 10),
+                      ),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => ShortVideoPlayerScreen(video: video),
+                      )),
+                    )),
                 ],
               ),
             ),
