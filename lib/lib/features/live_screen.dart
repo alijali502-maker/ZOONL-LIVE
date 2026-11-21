@@ -277,7 +277,12 @@ class _LiveScreenState extends State<LiveScreen> {
 
   ColorFilter get _selectedPreviewColorFilter {
     if (_previewFilter == 'Mono') {
-      return const ColorFilter.mode(Colors.white, BlendMode.saturation);
+      return ColorFilter.matrix(<double>[
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0.2126, 0.7152, 0.0722, 0, 0,
+        0, 0, 0, 1, 0,
+      ]);
     }
     Color tint = Colors.transparent;
     if (_previewFilter == 'Warm') tint = const Color(0xFFFFA45B);
@@ -958,9 +963,20 @@ class _LiveScreenState extends State<LiveScreen> {
             value: roomId,
           ),
           callback: (payload) {
-            if (!_isHost && payload.newRecord['is_live'] == false) {
-              _showMessage('Live खत्म हो गया।');
-              _leaveViewer();
+            final row = payload.newRecord;
+            if (!_isHost) {
+              final code = row['video_filter_code']?.toString() ?? 'Natural';
+              final strength = (row['video_filter_strength'] as num?)?.toDouble() ?? 0.35;
+              if (mounted && _previewFilters.contains(code)) {
+                setState(() {
+                  _previewFilter = code;
+                  _filterStrength = strength.clamp(0.0, 1.0).toDouble();
+                });
+              }
+              if (row['is_live'] == false) {
+                _showMessage('Live खत्म हो गया।');
+                _leaveViewer();
+              }
             }
           },
         )
@@ -1512,6 +1528,102 @@ class _LiveScreenState extends State<LiveScreen> {
     } catch (error) {
       _showMessage('Camera बदल नहीं सका: ${_readable(error)}');
     }
+  }
+
+  Future<void> _openLiveFilterSettings() async {
+    final roomId = _roomId;
+    final userId = _myId;
+    if (!_isHost || !_isLive || roomId == null || userId == null ||
+        _selectedRoomType != 'video') return;
+
+    var selected = _previewFilter;
+    var strength = _filterStrength;
+    var saving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF171126),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('LIVE VIDEO FILTER',
+                  style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold, fontSize: 17)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _previewFilters.map((filter) => ChoiceChip(
+                    label: Text(filter),
+                    selected: selected == filter,
+                    onSelected: saving ? null : (_) => setSheetState(() => selected = filter),
+                  )).toList(),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  const Text('Intensity', style: TextStyle(color: Colors.white70)),
+                  Expanded(child: Slider(
+                    value: strength,
+                    min: 0,
+                    max: 1,
+                    onChanged: saving ? null : (value) => setSheetState(() => strength = value),
+                  )),
+                  Text('${(strength * 100).round()}%', style: const TextStyle(color: Colors.white)),
+                ]),
+                const Text(
+                  'This colour effect is synchronized to ZOONL LIVE viewers. It changes the in-app video display, not the original camera source.',
+                  style: TextStyle(color: Colors.white60, fontSize: 11),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: saving ? null : () async {
+                      setSheetState(() => saving = true);
+                      try {
+                        final updated = await _supabase.from('live_rooms')
+                          .update({
+                            'video_filter_code': selected,
+                            'video_filter_strength': strength,
+                          })
+                          .eq('id', roomId)
+                          .eq('owner_id', userId)
+                          .select('id')
+                          .maybeSingle();
+                        if (updated == null) {
+                          throw StateError('Room filter could not be saved. Check live-room update permission.');
+                        }
+                        if (mounted) {
+                          setState(() {
+                            _previewFilter = selected;
+                            _filterStrength = strength;
+                            _filterConfirmed = true;
+                          });
+                        }
+                        if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                        _showMessage('Filter updated for viewers.');
+                      } catch (error) {
+                        setSheetState(() => saving = false);
+                        _showMessage('Filter update failed: ${_readable(error)}');
+                      }
+                    },
+                    child: Text(saving ? 'SAVING...' : 'APPLY TO LIVE'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   String _readable(Object error) {
@@ -2153,6 +2265,8 @@ class _LiveScreenState extends State<LiveScreen> {
 
   List<Widget> _hostControls() {
     return [
+      if (_selectedRoomType == 'video')
+        _control(icon: Icons.auto_awesome, label: 'Filter', onTap: _openLiveFilterSettings),
       _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
       _control(
         icon: Icons.stars,
