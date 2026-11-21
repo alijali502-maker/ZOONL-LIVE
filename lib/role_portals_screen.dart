@@ -244,6 +244,14 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
         icon: const Icon(Icons.account_balance_wallet),
         label: const Text('OPEN WALLET & TOP-UP RECORDS'),
       ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const OwnerPaymentChannelsScreen()),
+        ),
+        icon: const Icon(Icons.payments_outlined),
+        label: const Text('MANAGE OFFICIAL PAYMENT CHANNELS'),
+      ),
     ],
   );
 
@@ -1124,7 +1132,234 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
 }
 
 
-class _PortalSection {
+class OwnerPaymentChannelsScreen extends StatefulWidget {
+  const OwnerPaymentChannelsScreen({super.key});
+  @override
+  State<OwnerPaymentChannelsScreen> createState() => _OwnerPaymentChannelsScreenState();
+}
+
+class _OwnerPaymentChannelsScreenState extends State<OwnerPaymentChannelsScreen> {
+  final _db = Backend.client;
+  final _label = TextEditingController();
+  final _country = TextEditingController(text: 'UAE');
+  final _method = TextEditingController();
+  final _accountName = TextEditingController();
+  final _accountNumber = TextEditingController();
+  final _whatsapp = TextEditingController();
+  final _instructions = TextEditingController();
+  List<Map<String, dynamic>> _channels = [];
+  List<Map<String, dynamic>> _agencies = [];
+  String? _editingId;
+  String _agencyId = '';
+  bool _active = true;
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  String? _message;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      if (!await Backend.isZoonlOwner()) throw StateError('Owner access required.');
+      final channels = await _db.from('manual_topup_payment_channels').select('*').order('created_at', ascending: false);
+      final agencies = await _db.from('agencies').select('id,agency_name,agency_code,agency_type,agency_status').eq('agency_status', 'approved');
+      if (!mounted) return;
+      setState(() {
+        _channels = (channels as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _agencies = (agencies as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  void _clearForm() {
+    setState(() {
+      _editingId = null;
+      _agencyId = '';
+      _active = true;
+      _label.clear();
+      _country.text = 'UAE';
+      _method.clear();
+      _accountName.clear();
+      _accountNumber.clear();
+      _whatsapp.clear();
+      _instructions.clear();
+      _message = null;
+    });
+  }
+
+  void _edit(Map<String, dynamic> row) {
+    setState(() {
+      _editingId = row['id'].toString();
+      _agencyId = row['agency_id']?.toString() ?? '';
+      _active = row['is_active'] == true;
+      _label.text = row['label']?.toString() ?? '';
+      _country.text = row['country']?.toString() ?? '';
+      _method.text = row['payment_method']?.toString() ?? '';
+      _accountName.text = row['account_name']?.toString() ?? '';
+      _accountNumber.text = row['account_number']?.toString() ?? '';
+      _whatsapp.text = row['whatsapp_number']?.toString() ?? '';
+      _instructions.text = row['instructions']?.toString() ?? '';
+      _message = null;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (_label.text.trim().length < 2 || _method.text.trim().length < 2 ||
+        _accountName.text.trim().length < 2 || _accountNumber.text.trim().length < 3) {
+      setState(() => _error = 'Complete the channel label, payment method, account name and official number.');
+      return;
+    }
+    setState(() { _saving = true; _error = null; _message = null; });
+    try {
+      await _db.rpc('owner_upsert_manual_topup_channel', params: {
+        'p_id': _editingId,
+        'p_label': _label.text.trim(),
+        'p_country': _country.text.trim(),
+        'p_payment_method': _method.text.trim(),
+        'p_account_name': _accountName.text.trim(),
+        'p_account_number': _accountNumber.text.trim(),
+        'p_whatsapp_number': _whatsapp.text.trim(),
+        'p_instructions': _instructions.text.trim(),
+        'p_agency_id': _agencyId.isEmpty ? null : _agencyId,
+        'p_is_active': _active,
+      });
+      if (!mounted) return;
+      setState(() => _message = 'Payment channel saved.');
+      _clearForm();
+      await _load();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _label.dispose(); _country.dispose(); _method.dispose();
+    _accountName.dispose(); _accountNumber.dispose();
+    _whatsapp.dispose(); _instructions.dispose();
+    super.dispose();
+  }
+
+  Widget _field(String label, TextEditingController controller) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: TextField(controller: controller, decoration: InputDecoration(labelText: label)),
+  );
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Official Payment Channels')),
+    body: _loading
+      ? const Center(child: CircularProgressIndicator(color: _gold))
+      : ListView(padding: const EdgeInsets.all(16), children: [
+        _portalCard('OWNER-ONLY PAYMENT SETTINGS',
+          'Only verified Owner can publish or change official payment numbers. Users see active channels only. Manual top-ups remain pending until receipt review.',
+          Icons.verified_user),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: Text(_editingId == null ? 'CREATE PAYMENT CHANNEL' : 'EDIT PAYMENT CHANNEL',
+            style: const TextStyle(color: _gold, fontWeight: FontWeight.w800))),
+          TextButton.icon(onPressed: _clearForm, icon: const Icon(Icons.add), label: const Text('NEW')),
+        ]),
+        _field('Channel label', _label),
+        _field('Country', _country),
+        _field('Payment method (Bank / Wallet / Exchange)', _method),
+        _field('Account holder / business name', _accountName),
+        _field('Official payment number / account', _accountNumber),
+        _field('WhatsApp contact (optional)', _whatsapp),
+        _field('Payment instructions', _instructions),
+        DropdownButtonFormField<String>(
+          value: _agencyId,
+          decoration: const InputDecoration(labelText: 'Link approved agency (optional)'),
+          items: [
+            const DropdownMenuItem(value: '', child: Text('Platform official channel')),
+            ..._agencies.map((a) => DropdownMenuItem(
+              value: a['id'].toString(),
+              child: Text((a['agency_name'] ?? 'Agency').toString() + ' • ' + (a['agency_code'] ?? '').toString()),
+            )),
+          ],
+          onChanged: (v) => setState(() => _agencyId = v ?? ''),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: _active,
+          onChanged: (v) => setState(() => _active = v),
+          title: const Text('Publish this payment channel'),
+          subtitle: const Text('Only active channels appear in user Top-up screens.'),
+        ),
+        FilledButton.icon(
+          onPressed: _saving ? null : _save,
+          icon: const Icon(Icons.save),
+          label: Text(_saving ? 'SAVING...' : 'SAVE PAYMENT CHANNEL'),
+        ),
+        if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: const TextStyle(color: Color(0xFFE47777)))),
+        if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!, style: const TextStyle(color: _teal))),
+        const Divider(height: 28, color: Color(0xFF354653)),
+        const Text('SAVED PAYMENT CHANNELS', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+        if (_channels.isEmpty) const Padding(padding: EdgeInsets.all(12), child: Text('No channels configured.', style: TextStyle(color: _muted))),
+        for (final row in _channels)
+          Card(color: _panel, child: ListTile(
+            onTap: () => _edit(row),
+            leading: Icon(row['is_active'] == true ? Icons.public : Icons.visibility_off, color: row['is_active'] == true ? _teal : _muted),
+            title: Text((row['label'] ?? '').toString(), style: const TextStyle(color: Colors.white)),
+            subtitle: Text((row['payment_method'] ?? '').toString() + ' • ' + (row['country'] ?? '').toString() + '\n' + (row['account_number'] ?? '').toString(),
+              style: const TextStyle(color: _muted, fontSize: 10)),
+            trailing: const Icon(Icons.edit, color: _gold),
+          )),
+      ]),
+  );
+}
+
+
+  final String title;
+  final IconData icon;
+  const _PortalSection(this.title, this.icon);
+}
+
+Widget _portalHeader(String title, String subtitle, IconData icon) => Container(
+  margin: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+  padding: const EdgeInsets.all(17),
+  decoration: BoxDecoration(
+    gradient: const LinearGradient(colors: [Color(0xFF293B49), _panel, _bg]),
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: _gold.withOpacity(.55)),
+  ),
+  child: Row(children: [
+    Container(width: 48, height: 48, decoration: BoxDecoration(color: _gold.withOpacity(.14), borderRadius: BorderRadius.circular(14)), child: Icon(icon, color: _gold, size: 26)),
+    const SizedBox(width: 13),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: .8)),
+      const SizedBox(height: 4),
+      Text(subtitle, style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w700)),
+    ])),
+    const Icon(Icons.verified, color: _teal),
+  ]),
+);
+
+Widget _portalCard(String title, String body, IconData icon) => Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(15),
+  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF354653))),
+  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Icon(icon, color: _gold, size: 24),
+    const SizedBox(width: 12),
+    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(color: _gold, fontSize: 12, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 5),
+      Text(body, style: const TextStyle(color: _muted, fontSize: 11, height: 1.45)),
+    ])),
+  ]),
+);
+
   final String title;
   final IconData icon;
   const _PortalSection(this.title, this.icon);
