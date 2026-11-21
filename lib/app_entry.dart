@@ -91,6 +91,13 @@ class ZoonlAuthGate extends StatelessWidget {
             }
 
             final profile = profileSnapshot.data!;
+            int serverLevel = (profile['user_level'] as num?)?.toInt() ?? 1;
+            try {
+              final dynamic resolvedLevel = await Backend.client.rpc('zoonl_my_level');
+              if (resolvedLevel is num) serverLevel = resolvedLevel.toInt();
+            } catch (_) {
+              // Keep the stored profile level if the trusted level RPC is unavailable.
+            }
 
             // Owner status is checked asynchronously by the trusted
             // Supabase function. Never grant Owner from a client-editable ID.
@@ -148,7 +155,7 @@ class ZoonlAuthGate extends StatelessWidget {
                       'isOwner': isOwner,
                       'trustedRole': isOwner ? 'OWNER' : 'USER',
                       'isVerifiedStreamer': profile['is_verified'] == true,
-                      'level': profile['user_level'] ?? 1,
+                      'level': serverLevel,
                       'coins': (home.wallet['coins'] as num?)?.toInt() ?? 0,
                       'diamonds': (home.wallet['diamonds'] as num?)?.toInt() ?? 0,
                       'sentCoins': 0,
