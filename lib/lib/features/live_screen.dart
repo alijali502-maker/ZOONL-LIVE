@@ -9,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
 import 'package:just_audio/just_audio.dart' show AudioPlayer;
 
+import '../../features/pk_battle_screen.dart';
+
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).
 
@@ -1116,6 +1118,18 @@ class _LiveScreenState extends State<LiveScreen> {
 
   // ---------- Controls ----------
 
+  Future<void> _openPkBattle() async {
+    if (!_isHost || !_isLive) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => PkBattleScreen(
+          currentUserName: widget.userName,
+          currentUserId: widget.userId,
+        ),
+      ),
+    );
+  }
+
   Future<void> _showPrivacySettings() async {
     if (!_isHost || _roomId == null) return;
     var privateValue = _privateRoom;
@@ -1940,6 +1954,7 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Widget> _hostControls() {
     return [
       _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
+      _control(icon: Icons.sports_mma, label: 'PK Battle', onTap: _openPkBattle),
       _control(icon: _privateRoom || _lockedRoom ? Icons.lock : Icons.lock_open,
           label: 'Privacy', onTap: _showPrivacySettings),
       _control(icon: Icons.person_add_alt_1, label: 'Invite', onTap: _showPrivateRoomInvite),
