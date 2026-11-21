@@ -26,6 +26,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   Map<String, dynamic> _profile = {};
   List<Map<String, dynamic>> _rooms = [];
   List<Map<String, dynamic>> _gifts = [];
+  List<Map<String, dynamic>> _guestInvites = [];
 
   @override
   void initState() {
@@ -75,6 +76,14 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .order('created_at', ascending: false)
           .limit(30);
 
+      final guestInvitesRaw = await Backend.client
+          .from('room_guest_invitations')
+          .select('id, room_id, inviter_id, invitee_id, seat_number, invite_status, expires_at, is_video_enabled, is_audio_enabled')
+          .eq('invitee_id', userId)
+          .eq('invite_status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+
       final giftsRaw = await Backend.client
           .from('gifts')
           .select('id, gift_name, coin_price')
@@ -93,6 +102,9 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
             .map((row) => _map(row))
             .toList();
         _gifts = (giftsRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _guestInvites = (guestInvitesRaw as List)
             .map((row) => _map(row))
             .toList();
         _loading = false;
@@ -129,6 +141,41 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       ),
     );
     _loadDashboard();
+  }
+
+  Future<void> _respondGuestInvite(
+    Map<String, dynamic> invitation,
+    bool accept,
+  ) async {
+    try {
+      await Backend.client.rpc(
+        'room_respond_guest_invitation',
+        params: <String, dynamic>{
+          'p_invitation_id': invitation['id'],
+          'p_accept': accept,
+        },
+      );
+      if (!mounted) return;
+      if (accept) {
+        final roomId = invitation['room_id'].toString();
+        final room = await Backend.client
+            .from('live_rooms')
+            .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
+            .eq('id', roomId)
+            .maybeSingle();
+        if (room == null || room['is_live'] != true) {
+          _notice('This live room has already ended.');
+          await _loadDashboard();
+          return;
+        }
+        await _joinRoom(_map(room));
+      } else {
+        _notice('Guest invitation declined.');
+      }
+      await _loadDashboard();
+    } catch (error) {
+      _notice('Guest invitation could not be processed: $error');
+    }
   }
 
   Future<void> _joinRoom(Map<String, dynamic> room) async {
@@ -187,7 +234,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   @override
   Widget build(BuildContext context) {
     final name = (_profile['display_name'] ?? 'ZOONL Member').toString();
-    final publicId = (_profile['username'] ?? '').toString();
+    final publicId = (_profile['zoonl_id'] ?? '').toString();
     final level = (_profile['user_level'] as num?)?.toInt() ?? 1;
 
     return Scaffold(
@@ -311,6 +358,37 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                   ),
                 );
               }),
+            if (_guestInvites.isNotEmpty) ...[
+              _sectionTitle('Guest Seat Invitations'),
+              ..._guestInvites.map((invite) => _panelCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.video_call_rounded, color: _gold, size: 28),
+                  title: Text('Room ${invite['room_id']} • Seat ${invite['seat_number']}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    '${invite['is_video_enabled'] == true ? 'Video' : 'Audio only'} guest invitation',
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                  trailing: Wrap(
+                    spacing: 2,
+                    children: [
+                      IconButton(
+                        tooltip: 'Accept',
+                        onPressed: () => _respondGuestInvite(invite, true),
+                        icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
+                      ),
+                      IconButton(
+                        tooltip: 'Decline',
+                        onPressed: () => _respondGuestInvite(invite, false),
+                        icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+            ],
             _sectionTitle('Gift Collection'),
             if (_gifts.isEmpty && !_loading)
               _panelCard(child: const Text('Gift catalog is empty or unavailable.', style: TextStyle(color: _muted, fontSize: 12)))
