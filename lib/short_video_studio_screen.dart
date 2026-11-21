@@ -26,6 +26,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   bool _cameraLoading = true;
   bool _recording = false;
   bool _uploading = false;
+  bool _filterLoading = false;
   String _filter = 'Natural';
   CubeLut? _activeLut;
   String? _activeLutPath;
@@ -87,21 +88,34 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   }
 
   Future<void> _loadFilterLut() async {
-    if (_filter == 'Natural') {
-      if (mounted) setState(() { _activeLut = null; _activeLutPath = null; });
+    final selectedFilter = _filter;
+    if (selectedFilter == 'Natural') {
+      if (mounted) setState(() {
+        _activeLut = null;
+        _activeLutPath = null;
+        _filterLoading = false;
+      });
       return;
     }
+    if (mounted) setState(() => _filterLoading = true);
     try {
-      final path = '${Directory.systemTemp.path}/zoonl_${_filter.toLowerCase()}_17.cube';
+      final path = '${Directory.systemTemp.path}/zoonl_${selectedFilter.toLowerCase()}_17.cube';
       final lutFile = File(path);
       if (!await lutFile.exists()) {
-        await lutFile.writeAsString(_filterLutText(_filter), flush: true);
+        await lutFile.writeAsString(_filterLutText(selectedFilter), flush: true);
       }
       final lut = await CubeLut.fromFile(path);
-      if (!mounted) return;
-      setState(() { _activeLut = lut; _activeLutPath = path; });
+      if (!mounted || _filter != selectedFilter) return;
+      setState(() {
+        _activeLut = lut;
+        _activeLutPath = path;
+        _filterLoading = false;
+      });
     } catch (error) {
-      _notice('Filter could not load: $error');
+      if (mounted && _filter == selectedFilter) {
+        setState(() => _filterLoading = false);
+        _notice('Filter could not load: $error');
+      }
     }
   }
 
@@ -403,15 +417,15 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
               )
             else if (preview == null)
               FilledButton.icon(
-                onPressed: _cameraLoading || _uploading ? null : _startRecording,
+                onPressed: _cameraLoading || _uploading || _filterLoading ? null : _startRecording,
                 icon: const Icon(Icons.fiber_manual_record),
                 label: const Text('Record Short'),
               )
             else ...[
               FilledButton.icon(
-                onPressed: _uploading ? null : _uploadVideo,
+                onPressed: _uploading || _filterLoading ? null : _uploadVideo,
                 icon: const Icon(Icons.cloud_upload),
-                label: Text(_uploading ? 'Uploading...' : 'Publish Short'),
+                label: Text(_filterLoading ? 'Loading filter...' : _uploading ? 'Uploading...' : 'Publish Short'),
               ),
               OutlinedButton.icon(
                 onPressed: _uploading ? null : _retake,
