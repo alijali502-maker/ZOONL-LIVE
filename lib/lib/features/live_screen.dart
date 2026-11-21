@@ -1722,6 +1722,24 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Future<void> _endLive() async {
     if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF171126),
+        title: const Text('End this live broadcast?'),
+        content: const Text('The room will close for every viewer and all guest seats will be released.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('KEEP LIVE')),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.call_end),
+            label: const Text('END LIVE'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
 
     final roomId = _roomId;
@@ -2290,7 +2308,8 @@ class _LiveScreenState extends State<LiveScreen> {
           icon: Icon(icon, color: Colors.white),
           style: IconButton.styleFrom(
             backgroundColor: color,
-            fixedSize: const Size(52, 52),
+            fixedSize: const Size(54, 54),
+            shape: const CircleBorder(),
           ),
         ),
         const SizedBox(height: 5),
