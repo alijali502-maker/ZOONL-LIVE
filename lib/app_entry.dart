@@ -222,6 +222,22 @@ class ZoonlAuthGate extends StatelessWidget {
     List<Map<String, dynamic>> cosmetics = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> baggage = <Map<String, dynamic>>[];
+    Map<String, dynamic> userTrial = <String, dynamic>{};
+
+    try {
+      await Backend.client.rpc('expire_zoonl_user_trial');
+    } catch (_) {}
+
+    try {
+      final trial = await Backend.client
+          .from('zoonl_user_trials')
+          .select('started_at, expires_at, trial_status, svip_active')
+          .eq('user_id', authUserId)
+          .maybeSingle();
+      if (trial != null) userTrial = Map<String, dynamic>.from(trial);
+    } catch (_) {
+      userTrial = <String, dynamic>{};
+    }
 
     try {
       wallet = await Backend.client
