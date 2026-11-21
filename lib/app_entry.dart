@@ -91,14 +91,6 @@ class ZoonlAuthGate extends StatelessWidget {
             }
 
             final profile = profileSnapshot.data!;
-            int serverLevel = (profile['user_level'] as num?)?.toInt() ?? 1;
-            try {
-              final dynamic resolvedLevel = await Backend.client.rpc('zoonl_my_level');
-              if (resolvedLevel is num) serverLevel = resolvedLevel.toInt();
-            } catch (_) {
-              // Keep the stored profile level if the trusted level RPC is unavailable.
-            }
-
             // Owner status is checked asynchronously by the trusted
             // Supabase function. Never grant Owner from a client-editable ID.
             return FutureBuilder<bool>(
@@ -155,7 +147,7 @@ class ZoonlAuthGate extends StatelessWidget {
                       'isOwner': isOwner,
                       'trustedRole': isOwner ? 'OWNER' : 'USER',
                       'isVerifiedStreamer': profile['is_verified'] == true,
-                      'level': serverLevel,
+                      'level': profile['server_level'] ?? profile['user_level'] ?? 1,
                       'coins': (home.wallet['coins'] as num?)?.toInt() ?? 0,
                       'diamonds': (home.wallet['diamonds'] as num?)?.toInt() ?? 0,
                       'sentCoins': 0,
@@ -446,6 +438,13 @@ class ZoonlAuthGate extends StatelessWidget {
         .maybeSingle();
 
     final zoonlId = publicProfile?['zoonl_id']?.toString().trim() ?? '';
+    int serverLevel = (profile['user_level'] as num?)?.toInt() ?? 1;
+    try {
+      final dynamic resolvedLevel = await client.rpc('zoonl_my_level');
+      if (resolvedLevel is num) serverLevel = resolvedLevel.toInt();
+    } catch (_) {
+      // Keep the stored profile level if the trusted level RPC is unavailable.
+    }
     if (zoonlId.isEmpty) {
       throw StateError(
         'ZOONL ID is missing from user_public_profiles for this account.',
@@ -455,6 +454,7 @@ class ZoonlAuthGate extends StatelessWidget {
     return <String, dynamic>{
       ...profile,
       'zoonl_id': zoonlId,
+      'server_level': serverLevel,
     };
   }
 }
