@@ -3278,6 +3278,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  List<Color> _cosmeticGradientColors(String? raw) {
+    final colors = <Color>[];
+    for (final part in (raw ?? '').split(',')) {
+      final hex = part.trim().replaceFirst('#', '');
+      if (hex.length != 6) continue;
+      try {
+        colors.add(Color(int.parse('FF$hex', radix: 16)));
+      } catch (_) {}
+    }
+    if (colors.length < 2) {
+      return const [Color(0xFF29365E), Color(0xFF34245B), Color(0xFF153E4C)];
+    }
+    return colors.take(3).toList();
+  }
+
   Widget _buildProfileAndSettingsScreen() {
     final bool isLive = store.currentUser['isLive'] == true;
     final String displayName =
@@ -3290,6 +3305,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         (store.currentUser['avatarUrl'] ?? '').toString();
     final String profileBackgroundUrl =
         (store.currentUser['profileBackgroundUrl'] ?? '').toString();
+    final activeBgCode = store.currentUser['activeProfileBgCode']?.toString() ?? '';
+    final activeFrameCode = store.currentUser['activeFrameCode']?.toString() ?? '';
+    Map<String, dynamic>? activeBgItem;
+    Map<String, dynamic>? activeFrameItem;
+    for (final item in store.cosmeticsCatalog) {
+      if (item['zoonl_item_code']?.toString() == activeBgCode) activeBgItem = item;
+      if (item['zoonl_item_code']?.toString() == activeFrameCode) activeFrameItem = item;
+    }
+    final activeBgUrl = activeBgItem?['media_url']?.toString() ?? '';
+    final effectiveBgUrl = activeBgUrl.startsWith('http') ? activeBgUrl : profileBackgroundUrl;
+    final hasPremiumBg = activeBgItem != null;
+    final hasEquippedFrame = activeFrameItem != null && store.userBaggage.any((item) {
+      if (item['zoonl_item_code']?.toString() != activeFrameCode || item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    });
+    final profileBgColors = _cosmeticGradientColors(activeBgItem?['color_theme_hex']?.toString());
+    final frameColors = _cosmeticGradientColors(activeFrameItem?['color_theme_hex']?.toString());
 
     Future<void> openProfileEditor() async {
       final bool? saved = await Navigator.of(context).push<bool>(
@@ -3324,23 +3357,32 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
-        if (profileBackgroundUrl.startsWith('http'))
+        if (effectiveBgUrl.startsWith('http') || hasPremiumBg)
           Container(
             height: 136,
             margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
+              gradient: LinearGradient(colors: profileBgColors),
               borderRadius: BorderRadius.circular(18),
-              image: DecorationImage(
-                image: NetworkImage(profileBackgroundUrl),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withOpacity(.38), BlendMode.darken),
-              ),
-              border: Border.all(color: const Color(0xFFD6B46A).withOpacity(.7)),
+              image: effectiveBgUrl.startsWith('http')
+                  ? DecorationImage(
+                      image: NetworkImage(effectiveBgUrl),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(Colors.black.withOpacity(.32), BlendMode.darken),
+                    )
+                  : null,
+              border: Border.all(color: const Color(0xFF8CEBFF).withOpacity(.7)),
             ),
             alignment: Alignment.bottomLeft,
             padding: const EdgeInsets.all(16),
-            child: const Text('PROFILE BACKGROUND',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            child: Text(
+              hasPremiumBg
+                  ? 'PROFILE BACKGROUND • ${activeBgItem?['zoonl_item_name'] ?? 'PREMIUM'}'
+                  : 'PROFILE BACKGROUND',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
@@ -3350,15 +3392,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
-                  CircleAvatar(
-                    radius: 38,
-                    backgroundColor: const Color(0xFF293B49),
-                    backgroundImage: avatarUrl.startsWith('http')
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: avatarUrl.startsWith('http')
-                        ? null
-                        : const Icon(Icons.person, size: 38, color: Color(0xFFD6B46A)),
+                  Container(
+                    width: 82,
+                    height: 82,
+                    padding: EdgeInsets.all(hasEquippedFrame ? 3 : 0),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: hasEquippedFrame ? LinearGradient(colors: frameColors) : null,
+                      border: hasEquippedFrame
+                          ? Border.all(color: const Color(0xFF8CEBFF), width: 1)
+                          : null,
+                    ),
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: const Color(0xFF293B49),
+                      backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl.startsWith('http')
+                          ? null
+                          : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
