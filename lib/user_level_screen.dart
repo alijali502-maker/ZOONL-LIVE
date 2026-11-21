@@ -22,7 +22,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
     Color(0xFFE5D17C), Color(0xFFEC777F), Color(0xFF78D9EA),
     Color(0xFFD5B8FF),
   ];
-  Color _rankColor(int level) => _rankColors[(level - 1).clamp(0, _rankColors.length - 1)];
+  Color _rankColor(int level) => _rankColors[(level - 1).clamp(0, _rankColors.length - 1).toInt()];
 
   @override
   void initState() { super.initState(); _load(); }
@@ -41,7 +41,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
         _db.from('level_definitions').select('level,required_exp,level_name').order('level'),
         _db.rpc('is_zoonl_owner'),
         _db.from('user_prime_memberships').select('id,prime_tier_id,expires_at,is_active').eq('user_id', user.id).eq('is_active', true),
-        _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,zoonl_item_name,is_equipped,expires_at').eq('user_id', user.id).eq('project_name', 'ZOONL LIVE'),
+        _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,is_equipped,expires_at').eq('user_id', user.id).eq('project_name', 'ZOONL LIVE'),
       ]);
       final sent = (r[1] as List).fold<int>(0, (sum, row) => sum + ((row['total_coins'] as num?)?.toInt() ?? 0));
       final now = DateTime.now();
@@ -61,7 +61,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
         _levels = (r[2] as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         _isOwner = r[3] == true;
         _primeStatus = prime ? 'ACTIVE' : 'Not assigned to this account';
-        _entryStatus = entries.isEmpty ? 'No Entry effect in account inventory' : entries.map((e) => e['zoonl_item_name']?.toString() ?? 'Entry effect').join(', ');
+        _entryStatus = entries.isEmpty ? 'No Entry effect in account inventory' : entries.map((e) => e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_ENTRY' ? 'Owner Royal Entry' : (e['zoonl_item_code']?.toString() ?? 'Entry effect')).join(', ');
         _loading = false;
       });
     } catch (e) {
