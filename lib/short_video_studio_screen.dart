@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:filmkit/filmkit.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +27,8 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   bool _recording = false;
   bool _uploading = false;
   String _filter = 'Natural';
+  CubeLut? _activeLut;
+  String? _activeLutPath;
   String? _error;
 
   static const List<String> _filters = [
@@ -39,7 +42,67 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   @override
   void initState() {
     super.initState();
+    _loadFilterLut();
     _initializeCamera();
+  }
+
+  String _filterLutText(String filter) {
+    const size = 17;
+    final out = StringBuffer()
+      ..writeln('TITLE "$filter"')
+      ..writeln('LUT_3D_SIZE $size')
+      ..writeln('DOMAIN_MIN 0.0 0.0 0.0')
+      ..writeln('DOMAIN_MAX 1.0 1.0 1.0');
+    for (var b = 0; b < size; b++) {
+      for (var g = 0; g < size; g++) {
+        for (var r = 0; r < size; r++) {
+          var red = r / (size - 1);
+          var green = g / (size - 1);
+          var blue = b / (size - 1);
+          switch (filter) {
+            case 'Warm':
+              red = (red * 1.07 + 0.015).clamp(0.0, 1.0);
+              blue = (blue * 0.91).clamp(0.0, 1.0);
+              break;
+            case 'Cool':
+              red = (red * 0.92).clamp(0.0, 1.0);
+              blue = (blue * 1.08 + 0.015).clamp(0.0, 1.0);
+              break;
+            case 'Rose':
+              red = (red * 1.06 + 0.012).clamp(0.0, 1.0);
+              blue = (blue * 1.025 + 0.006).clamp(0.0, 1.0);
+              break;
+            case 'Mono':
+              final luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+              red = luminance;
+              green = luminance;
+              blue = luminance;
+              break;
+          }
+          out.writeln('${red.toStringAsFixed(6)} ${green.toStringAsFixed(6)} ${blue.toStringAsFixed(6)}');
+        }
+      }
+    }
+    return out.toString();
+  }
+
+  Future<void> _loadFilterLut() async {
+    if (_filter == 'Natural') {
+      if (mounted) setState(() { _activeLut = null; _activeLutPath = null; });
+      return;
+    }
+    try {
+      final path = '${Directory.systemTemp.path}/zoonl_${_filter.toLowerCase()}_17.cube';
+      final lutFile = File(path);
+      if (!await lutFile.exists()) {
+        await lutFile.writeAsString(_filterLutText(_filter), flush: true);
+      }
+      final lut = await CubeLut.fromFile(path);
+      if (!mounted) return;
+      setState(() { _activeLut = lut; _activeLutPath = path; });
+    } catch (error) {
+      _notice('Filter could not load: $error');
+    }
   }
 
   ColorFilter get _previewFilter {
@@ -168,20 +231,41 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
     }
     setState(() => _uploading = true);
     String? uploadedPath;
+    String? processedPath;
     try {
-      final localFile = File(file.path);
-      final size = await localFile.length();
-      if (size > 100 * 1024 * 1024) {
+      File localFile = File(file.path);
+      final originalSize = await localFile.length();
+      if (originalSize > 100 * 1024 * 1024) {
         throw StateError('Video file is larger than 100 MB.');
       }
-      final extension = file.path.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-      final mime = extension == 'mov' ? 'video/quicktime' : 'video/mp4';
-      uploadedPath = '$userId/${DateTime.now().microsecondsSinceEpoch}.$extension';
 
+      if (_filter != 'Natural') {
+        final lutPath = _activeLutPath;
+        if (lutPath == null || _activeLut == null) {
+          throw StateError('Selected filter is not ready. Please select it again.');
+        }
+        processedPath = '${Directory.systemTemp.path}/zoonl_filtered_${DateTime.now().microsecondsSinceEpoch}.mp4';
+        final export = Filmkit.exportVideo(
+          input: localFile.path,
+          output: processedPath,
+          edit: EditSpec(lut: lutPath, lutIntensity: 1.0, maxDimension: 1080),
+        );
+        await export.result;
+        localFile = File(processedPath);
+        if (!await localFile.exists() || await localFile.length() == 0) {
+          throw StateError('Filtered video export did not create a valid MP4.');
+        }
+      }
+
+      final size = await localFile.length();
+      if (size > 100 * 1024 * 1024) {
+        throw StateError('Processed video is larger than 100 MB.');
+      }
+      uploadedPath = '$userId/${DateTime.now().microsecondsSinceEpoch}.mp4';
       await _db.storage.from('zoonl-shorts').upload(
         uploadedPath,
         localFile,
-        fileOptions: FileOptions(contentType: mime, upsert: false),
+        fileOptions: const FileOptions(contentType: 'video/mp4', upsert: false),
       );
       final publicUrl = _db.storage.from('zoonl-shorts').getPublicUrl(uploadedPath);
       await _db.from('short_videos').insert({
@@ -190,6 +274,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
         'video_url': publicUrl,
         'caption': _caption.text.trim(),
         'filter_name': _filter,
+        'is_filter_baked': true,
         'duration_seconds': _recordingSeconds,
         'is_public': true,
       });
@@ -203,6 +288,9 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
       }
       _notice('Upload failed: $error');
     } finally {
+      if (processedPath != null) {
+        try { await File(processedPath).delete(); } catch (_) {}
+      }
       if (mounted) setState(() => _uploading = false);
     }
   }
@@ -253,13 +341,14 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                   : preview != null && preview.value.isInitialized
                       ? AspectRatio(
                           aspectRatio: preview.value.aspectRatio,
-                          child: VideoPlayer(preview),
+                          child: _activeLut == null
+                              ? VideoPlayer(preview)
+                              : LutFilter(lut: _activeLut!, intensity: 1, child: VideoPlayer(preview)),
                         )
                       : camera != null && camera.value.isInitialized
-                          ? ColorFiltered(
-                              colorFilter: _previewFilter,
-                              child: CameraPreview(camera),
-                            )
+                          ? (_activeLut == null
+                              ? CameraPreview(camera)
+                              : LutFilter(lut: _activeLut!, intensity: 1, child: CameraPreview(camera)))
                           : Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -279,13 +368,13 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
               children: _filters.map((filter) => ChoiceChip(
                 label: Text(filter),
                 selected: _filter == filter,
-                onSelected: _recording || _uploading ? null : (_) => setState(() => _filter = filter),
+                onSelected: _recording || _uploading ? null : (_) { setState(() => _filter = filter); _loadFilterLut(); },
               )).toList(),
             ),
             const Padding(
               padding: EdgeInsets.only(top: 7),
               child: Text(
-                'Colour filters currently affect the camera preview only. The uploaded recording remains the original camera video.',
+                'The same selected colour filter is previewed and encoded into the MP4 before it is published. Audio is preserved.',
                 style: TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ),
