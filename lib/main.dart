@@ -3096,7 +3096,26 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         ),
       );
       if (saved == true && mounted) {
-        _showMessage('Profile saved. Reopen this page to refresh account details.');
+        try {
+          final authId = Backend.currentUserId;
+          if (authId != null) {
+            final profile = await Backend.client.from('profiles')
+                .select('display_name,country,bio,avatar_url,profile_background_url,user_level')
+                .eq('id', authId).maybeSingle();
+            if (profile != null) {
+              store.currentUser['name'] = profile['display_name'] ?? store.currentUser['name'];
+              store.currentUser['country'] = profile['country'] ?? '';
+              store.currentUser['bio'] = profile['bio'] ?? '';
+              store.currentUser['avatarUrl'] = profile['avatar_url'] ?? '';
+              store.currentUser['profileBackgroundUrl'] = profile['profile_background_url'] ?? '';
+              store.currentUser['level'] = profile['user_level'] ?? store.currentUser['level'] ?? 1;
+              store.refresh();
+            }
+          }
+          _showMessage('Profile saved and refreshed.');
+        } catch (error) {
+          _showMessage('Profile saved. Refresh could not load: $error');
+        }
       }
     }
 
