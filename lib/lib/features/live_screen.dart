@@ -943,17 +943,6 @@ class _LiveScreenState extends State<LiveScreen> {
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
-          table: 'live_room_members',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'room_id',
-            value: roomId,
-          ),
-          callback: (payload) => unawaited(_showRoomEntry(payload.newRecord)),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
           table: 'live_rooms',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
