@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/backend.dart';
+import 'event_control_screen.dart';
 
 const Color _bg = Color(0xFF080D14);
 const Color _panel = Color(0xFF17232E);
@@ -242,6 +243,16 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
         onPressed: () => _select(5),
         icon: const Icon(Icons.account_balance_wallet),
         label: const Text('OPEN WALLET & TOP-UP RECORDS'),
+      ),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const EventControlScreen(),
+          ),
+        ),
+        icon: const Icon(Icons.event_available),
+        label: const Text('OPEN LIVE EVENT & REWARD CONTROL'),
       ),
 
     ],
