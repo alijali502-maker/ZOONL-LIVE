@@ -32,9 +32,16 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     [Color(0xFFB57A20),Color(0xFFFFF0AE),Color(0xFF62400C)],
   ];
   int _tier(int n) => n >= 100 ? 9 : n <= 10 ? n-1 : ((n-1) ~/ 10).clamp(1,9).toInt();
-  List<Color> _colors(int n) => n >= 100
-      ? const [Color(0xFFFFE6A1),Color(0xFFFFFFFF),Color(0xFFB77A22),Color(0xFF57320D)]
-      : _palettes[_tier(n)];
+  List<Color> _colors(int n) {
+    if (n >= 100) return const [Color(0xFFFFE6A1),Color(0xFFFFFFFF),Color(0xFFB77A22),Color(0xFF57320D)];
+    final base = _palettes[_tier(n)];
+    final shift = (n % 10) * 3.2;
+    Color vary(Color c) {
+      final hsv = HSVColor.fromColor(c);
+      return hsv.withHue((hsv.hue + shift) % 360).toColor();
+    }
+    return [vary(base[0]), vary(base[1]), vary(base[2])];
+  }
   String _name(int n) {
     if(n>=100) return 'SOVEREIGN OWNER';
     const titles=['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
@@ -91,18 +98,20 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 
   Widget _emblem(int n,{double size=90,bool animated=true}){
     final colors=_colors(n);
-    return AnimatedBuilder(animation:Listenable.merge([_shine,_float]),builder:(context,_){
-      final rotation=animated?math.sin(_float.value*math.pi*2)*.035:0.0;
-      return Transform(alignment:Alignment.center,transform:Matrix4.identity()..setEntry(3,2,.002)..rotateY(rotation),
-        child:SizedBox(width:size*1.2,height:size*1.28,child:Stack(alignment:Alignment.center,children:[
-          CustomPaint(size:Size(size*1.08,size*1.16),painter:_EmblemPainter(colors:colors,tier:_tier(n),shine:_shine.value,owner:n>=100)),
-          Positioned(top:size*.36,child:Text('$n',style:TextStyle(color:Colors.white,fontSize:size*.27,fontWeight:FontWeight.w900,
-            shadows:[Shadow(color:Colors.black,blurRadius:5,offset:Offset(1,3)),Shadow(color:colors[1],blurRadius:size*.16)]))),
-          Positioned(bottom:size*.15,child:Text(n>=100?'VIP':n<=10?'RANK':'ELITE',
-            style:TextStyle(color:Colors.white,fontSize:size*.075,fontWeight:FontWeight.w900,letterSpacing:1.5,
-              shadows:[Shadow(color:colors[1],blurRadius:8)]))),
-        ])));
-    });
+    Widget face(double sweep,double rotation)=>Transform(
+      alignment:Alignment.center,
+      transform:Matrix4.identity()..setEntry(3,2,.002)..rotateY(rotation),
+      child:SizedBox(width:size*1.2,height:size*1.28,child:Stack(alignment:Alignment.center,children:[
+        CustomPaint(size:Size(size*1.08,size*1.16),painter:_EmblemPainter(colors:colors,tier:_tier(n),shine:sweep,owner:n>=100)),
+        Positioned(top:size*.36,child:Text('$n',style:TextStyle(color:Colors.white,fontSize:size*.27,fontWeight:FontWeight.w900,
+          shadows:[Shadow(color:Colors.black,blurRadius:5,offset:Offset(1,3)),Shadow(color:colors[1],blurRadius:size*.16)]))),
+        Positioned(bottom:size*.15,child:Text(n>=100?'VIP':n<=10?'RANK':'ELITE',
+          style:TextStyle(color:Colors.white,fontSize:size*.075,fontWeight:FontWeight.w900,letterSpacing:1.5,
+            shadows:[Shadow(color:colors[1],blurRadius:8)]))),
+      ])));
+    if(!animated)return face(.32,0);
+    return AnimatedBuilder(animation:Listenable.merge([_shine,_float]),builder:(context,_)=>
+      face(_shine.value,math.sin(_float.value*math.pi*2)*.035));
   }
 
   Widget _bar(double v,List<Color> c)=>ClipRRect(borderRadius:BorderRadius.circular(20),child:Stack(children:[
