@@ -171,8 +171,14 @@ class ZoonlAuthGate extends StatelessWidget {
                       'bio': profile['bio'],
                     };
 
-                    zoonl.ZoonlStore.instance.setAppMode(zoonl.ZoonlAppMode.live);
-                    zoonl.ZoonlStore.instance.streamers
+                    final appStore = zoonl.ZoonlStore.instance;
+                    appStore.setAppMode(zoonl.ZoonlAppMode.live);
+                    appStore.memberships = home.memberships;
+                    appStore.agencyApplications = home.agencyApplications;
+                    appStore.giftCatalog = home.gifts;
+                    appStore.cosmeticsCatalog = home.cosmetics;
+                    appStore.userBaggage = home.baggage;
+                    appStore.streamers
                       ..clear()
                       ..addAll(home.rooms.map((room) => <String, dynamic>{
                         'roomId': room['id'],
@@ -203,6 +209,11 @@ class ZoonlAuthGate extends StatelessWidget {
   Future<_HomeData> _loadHomeData(String authUserId) async {
     Map<String, dynamic> wallet = <String, dynamic>{};
     List<Map<String, dynamic>> rooms = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> memberships = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> agencyApplications = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> gifts = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> cosmetics = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> baggage = <Map<String, dynamic>>[];
 
     try {
       wallet = await Backend.client
@@ -227,7 +238,83 @@ class ZoonlAuthGate extends StatelessWidget {
       rooms = <Map<String, dynamic>>[];
     }
 
-    return _HomeData(wallet: wallet, rooms: rooms);
+    try {
+      final rows = await Backend.client
+          .from('user_prime_memberships')
+          .select('id, prime_tier_id, started_at, expires_at, is_active')
+          .eq('user_id', authUserId)
+          .eq('is_active', true)
+          .order('started_at', ascending: false);
+      memberships = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      memberships = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('agency_applications')
+          .select('id, proposed_name, contact_details, application_status, reviewed_at, created_at')
+          .eq('applicant_id', authUserId)
+          .order('created_at', ascending: false);
+      agencyApplications = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      agencyApplications = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('gifts')
+          .select('id, gift_name, image_url, animation_url, animation_3d_url, sound_url, preview_url, coin_price, diamond_value, category, gift_config')
+          .eq('is_active', true)
+          .order('coin_price', ascending: true);
+      gifts = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      gifts = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_cosmetics')
+          .select('id, zoonl_item_code, zoonl_item_name, item_type, media_url, sound_fx, color_theme_hex, duration_sec, min_level_req, coin_price, reward_points')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('is_active', true)
+          .order('sort_order', ascending: true);
+      cosmetics = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      cosmetics = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_user_baggage')
+          .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', authUserId)
+          .order('created_at', ascending: false);
+      baggage = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      baggage = <Map<String, dynamic>>[];
+    }
+
+    return _HomeData(
+      wallet: wallet,
+      rooms: rooms,
+      memberships: memberships,
+      agencyApplications: agencyApplications,
+      gifts: gifts,
+      cosmetics: cosmetics,
+      baggage: baggage,
+    );
   }
 
   Future<bool> _loadOwnerStatus() async {
@@ -308,11 +395,29 @@ class ZoonlAuthGate extends StatelessWidget {
 class _HomeData {
   final Map<String, dynamic> wallet;
   final List<Map<String, dynamic>> rooms;
+  final List<Map<String, dynamic>> memberships;
+  final List<Map<String, dynamic>> agencyApplications;
+  final List<Map<String, dynamic>> gifts;
+  final List<Map<String, dynamic>> cosmetics;
+  final List<Map<String, dynamic>> baggage;
 
-  const _HomeData({required this.wallet, required this.rooms});
+  const _HomeData({
+    required this.wallet,
+    required this.rooms,
+    required this.memberships,
+    required this.agencyApplications,
+    required this.gifts,
+    required this.cosmetics,
+    required this.baggage,
+  });
 
   factory _HomeData.empty() => const _HomeData(
     wallet: <String, dynamic>{},
     rooms: <Map<String, dynamic>>[],
+    memberships: <Map<String, dynamic>>[],
+    agencyApplications: <Map<String, dynamic>>[],
+    gifts: <Map<String, dynamic>>[],
+    cosmetics: <Map<String, dynamic>>[],
+    baggage: <Map<String, dynamic>>[],
   );
 }
