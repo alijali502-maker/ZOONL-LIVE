@@ -335,6 +335,20 @@ class ZoonlAuthGate extends StatelessWidget {
 
     try {
       final rows = await Backend.client
+          .from('wallet_transactions')
+          .select('id, transaction_type, currency, amount, description, created_at')
+          .eq('user_id', authUserId)
+          .order('created_at', ascending: false)
+          .limit(30);
+      walletTransactions = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      walletTransactions = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
           .from('zoonl_live_user_baggage')
           .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
           .eq('project_name', 'ZOONL LIVE')
