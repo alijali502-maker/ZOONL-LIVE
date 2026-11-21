@@ -2484,7 +2484,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   subtitle: Text('${price} coins • $days days • ' + (benefits is Map
                       ? benefits.entries.map((e) => '${e.key}: ${e.value}').join(' • ')
                       : 'Tier $tierId')),
-                  trailing: Wrap(mainAxisSize: MainAxisSize.min, spacing: 4, children: [
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     if (_isStoreOwner) IconButton(
                       tooltip: 'Owner: edit Prime price and duration',
                       icon: const Icon(Icons.edit, color: Color(0xFF8CEBFF), size: 18),
