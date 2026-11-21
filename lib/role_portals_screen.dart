@@ -829,6 +829,8 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
   final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _phone = TextEditingController();
+  final TextEditingController _whatsapp = TextEditingController();
+  final TextEditingController _country = TextEditingController();
   final TextEditingController _depositReference = TextEditingController();
   String _agencyType = 'streamer';
   XFile? _receipt;
@@ -889,6 +891,8 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
           'p_contact_details': <String, dynamic>{
             'email': _email.text.trim(),
             'phone': _phone.text.trim(),
+            'whatsapp': _whatsapp.text.trim(),
+            'country': _country.text.trim(),
           },
           'p_deposit_reference': _depositReference.text.trim(),
           'p_deposit_receipt_path': _receiptPath,
@@ -911,6 +915,8 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
     _name.dispose();
     _email.dispose();
     _phone.dispose();
+    _whatsapp.dispose();
+    _country.dispose();
     _depositReference.dispose();
     super.dispose();
   }
@@ -939,7 +945,13 @@ class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScree
         decoration: const InputDecoration(labelText: 'Contact email')),
       const SizedBox(height: 8),
       TextField(controller: _phone, keyboardType: TextInputType.phone,
-        decoration: const InputDecoration(labelText: 'Contact phone / WhatsApp')),
+        decoration: const InputDecoration(labelText: 'Contact mobile number')),
+      const SizedBox(height: 8),
+      TextField(controller: _whatsapp, keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(labelText: 'WhatsApp number')),
+      const SizedBox(height: 8),
+      TextField(controller: _country,
+        decoration: const InputDecoration(labelText: 'Agency country')),
       const SizedBox(height: 8),
       TextField(controller: _depositReference,
         decoration: const InputDecoration(labelText: 'Deposit reference')),
