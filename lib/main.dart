@@ -17,6 +17,7 @@ import 'short_video_feed_screen.dart';
 import 'short_video_studio_screen.dart';
 import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
+import 'features/pk_broadcast_screen.dart';
 import 'lib/features/live_screen.dart';
 
 Future<void> main() async {
@@ -2155,12 +2156,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  Widget _buildPkSection() {
-    return PkBattleScreen(
-      currentUserName: (store.currentUser['name'] ?? 'ZOONL Host').toString(),
-      currentUserId: (store.currentUser['id'] ?? '').toString(),
-    );
-  }
+  Widget _buildPkSection() => const PkBroadcastScreen();
 
   Widget _buildAudioSection() {
     final Map<String, dynamic>? audioRoom =
