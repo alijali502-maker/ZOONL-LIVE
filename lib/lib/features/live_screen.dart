@@ -2501,15 +2501,57 @@ class _LiveScreenState extends State<LiveScreen> {
                     boxShadow: const [BoxShadow(color: Color(0x559360F5), blurRadius: 14)],
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.circle, size: 8, color: Colors.white),
-                      SizedBox(width: 6),
-                      Text(
-                        _privateRoom || _lockedRoom ? 'PRIVATE LIVE • $_liveLevelSticker • LV $_hostLevel' : 'LIVE • $_liveLevelSticker • LV $_hostLevel',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        width: 27,
+                        height: 27,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE6C47A), Color(0xFF9360F5)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(color: Colors.white70, width: 1),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x669360F5), blurRadius: 9),
+                          ],
                         ),
+                        child: Center(
+                          child: Text(
+                            '$_hostLevel',
+                            style: const TextStyle(
+                              color: Color(0xFF160F22),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _privateRoom || _lockedRoom ? 'PRIVATE LIVE' : 'LIVE NOW',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .7,
+                            ),
+                          ),
+                          Text(
+                            '$_liveLevelSticker  •  LEVEL $_hostLevel',
+                            style: const TextStyle(
+                              color: Color(0xFFE6C47A),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
