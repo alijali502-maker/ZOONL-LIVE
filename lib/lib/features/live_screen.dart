@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../event_control_screen.dart';
@@ -15,6 +16,129 @@ import '../../features/pk_battle_screen.dart';
 
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).
+
+
+class _AudioRoomThemeBackdrop extends StatefulWidget {
+  const _AudioRoomThemeBackdrop({required this.themeCode, required this.child});
+  final String themeCode;
+  final Widget child;
+
+  @override
+  State<_AudioRoomThemeBackdrop> createState() => _AudioRoomThemeBackdropState();
+}
+
+class _AudioRoomThemeBackdropState extends State<_AudioRoomThemeBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _motion = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 16),
+  )..repeat();
+
+  static const Map<String, List<Color>> _palettes = {
+    'aurora': [Color(0xFF103C55), Color(0xFF30245C), Color(0xFF071725)],
+    'rose_garden': [Color(0xFF762D58), Color(0xFF341C48), Color(0xFF130F2A)],
+    'moonlight': [Color(0xFF18365E), Color(0xFF17213F), Color(0xFF080F24)],
+    'golden_palace': [Color(0xFF77501E), Color(0xFF3B2549), Color(0xFF160F29)],
+    'waterfall': [Color(0xFF126A78), Color(0xFF174A68), Color(0xFF081C35)],
+    'ocean_dream': [Color(0xFF075B83), Color(0xFF142F69), Color(0xFF07182F)],
+    'sakura': [Color(0xFF8A426D), Color(0xFF57315F), Color(0xFF21162F)],
+    'starfall': [Color(0xFF253A73), Color(0xFF30245D), Color(0xFF090F2C)],
+    'rainy_window': [Color(0xFF31536D), Color(0xFF26334F), Color(0xFF0C1428)],
+    'butterfly': [Color(0xFF315B6D), Color(0xFF62406C), Color(0xFF16182F)],
+    'crystal_cave': [Color(0xFF3D5E8B), Color(0xFF563B7C), Color(0xFF101A38)],
+    'neon_city': [Color(0xFF3C1B68), Color(0xFF142C61), Color(0xFF090E27)],
+    'cloud_dream': [Color(0xFF6582A5), Color(0xFF725A8B), Color(0xFF29234C)],
+    'ember_glow': [Color(0xFF87401F), Color(0xFF4C243E), Color(0xFF170F27)],
+    'love_lights': [Color(0xFF87365F), Color(0xFF49275F), Color(0xFF180F2D)],
+  };
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _palettes[widget.themeCode] ?? _palettes['aurora']!;
+    return AnimatedBuilder(
+      animation: _motion,
+      builder: (context, _) => Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors,
+              ),
+            ),
+          ),
+          CustomPaint(
+            painter: _AudioThemePainter(
+              themeCode: widget.themeCode,
+              phase: _motion.value,
+            ),
+          ),
+          widget.child,
+        ],
+      ),
+    );
+  }
+}
+
+class _AudioThemePainter extends CustomPainter {
+  const _AudioThemePainter({required this.themeCode, required this.phase});
+  final String themeCode;
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final isWater = themeCode == 'waterfall' || themeCode == 'ocean_dream' ||
+        themeCode == 'rainy_window';
+    final isWarm = themeCode == 'rose_garden' || themeCode == 'sakura' ||
+        themeCode == 'love_lights' || themeCode == 'ember_glow';
+    final particleColor = isWater
+        ? const Color(0x8878E9F2)
+        : isWarm ? const Color(0x99FFC1D9) : const Color(0x99FFE8A6);
+
+    for (var i = 0; i < 34; i++) {
+      final seed = i * 37.0;
+      final x = ((seed * 13.7) % 100) / 100 * size.width;
+      final travel = (phase + (i * 0.071)) % 1.0;
+      final y = isWater
+          ? ((travel * (size.height + 30)) - 15)
+          : (size.height * (1 - travel));
+      final drift = math.sin((phase * math.pi * 2) + i) * 13;
+      final radius = 1.5 + (i % 4) * 1.1;
+      paint.color = particleColor.withOpacity(0.25 + (i % 5) * 0.11);
+      canvas.drawCircle(Offset(x + drift, y), radius, paint);
+    }
+
+    if (isWater) {
+      final wavePaint = Paint()
+        ..color = const Color(0x447FE8F4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2;
+      for (var row = 0; row < 5; row++) {
+        final path = Path();
+        final baseY = size.height * (0.58 + row * 0.075);
+        path.moveTo(0, baseY);
+        for (var x = 0.0; x <= size.width; x += 12) {
+          final y = baseY + math.sin((x / 42) + phase * math.pi * 2 + row) * 7;
+          path.lineTo(x, y);
+        }
+        canvas.drawPath(path, wavePaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AudioThemePainter oldDelegate) =>
+      oldDelegate.phase != phase || oldDelegate.themeCode != themeCode;
+}
 
 class _LiveGiftMedia extends StatefulWidget {
   const _LiveGiftMedia({required this.url, required this.size});
@@ -138,6 +262,12 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _previewLoading = false;
   bool _frontCamera = true;
   String? _previewError;
+  String _audioThemeCode = 'aurora';
+  bool _audioThemeLoading = false;
+  List<Map<String, dynamic>> _audioThemeCatalog = <Map<String, dynamic>>[];
+  final Set<String> _audioThemeUnlocked = <String>{
+    'aurora', 'rose_garden', 'moonlight', 'golden_palace',
+  };
   String _previewFilter = 'Natural';
   bool _filterConfirmed = false;
   double _filterStrength = 0.35;
@@ -202,6 +332,7 @@ class _LiveScreenState extends State<LiveScreen> {
       unawaited(_initializePreviewCamera());
     }
     if (_isHost) unawaited(_loadMyLevel());
+    if (_isHost) unawaited(_loadAudioThemeCatalog());
     _guestPoller = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _refreshGuestState(),
@@ -209,6 +340,165 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
 
+
+
+  Future<void> _loadAudioThemeCatalog() async {
+    try {
+      final rows = await _supabase.from('audio_room_themes')
+          .select('theme_code,theme_name,description,coin_price,sort_order')
+          .eq('is_active', true)
+          .order('sort_order');
+      final userId = _myId;
+      final owned = userId == null
+          ? <dynamic>[]
+          : await _supabase.from('user_audio_room_theme_inventory')
+              .select('theme_code').eq('user_id', userId);
+      if (!mounted) return;
+      setState(() {
+        _audioThemeCatalog = List<Map<String, dynamic>>.from(rows);
+        for (final row in owned as List) {
+          _audioThemeUnlocked.add(row['theme_code'].toString());
+        }
+      });
+    } catch (error) {
+      if (mounted) _showMessage('Audio themes could not load: ${_readable(error)}');
+    }
+  }
+
+  Future<void> _chooseAudioTheme(String code) async {
+    final theme = _audioThemeCatalog.where((item) => item['theme_code'] == code)
+        .cast<Map<String, dynamic>?>().firstOrNull;
+    if (theme == null) {
+      _showMessage('This audio theme is not available yet.');
+      return;
+    }
+    final price = (theme['coin_price'] as num?)?.toInt() ?? 0;
+    if (!_audioThemeUnlocked.contains(code) && price > 0) {
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: const Color(0xFF171126),
+          title: Text('Unlock ${theme['theme_name']}',
+              style: const TextStyle(color: Color(0xFFE6C47A))),
+          content: Text('Unlock this animated audio background for $price coins?',
+              style: const TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('CANCEL')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('UNLOCK')),
+          ],
+        ),
+      );
+      if (approved != true) return;
+      try {
+        await _supabase.rpc('unlock_audio_room_theme',
+            params: <String, dynamic>{'p_theme_code': code});
+        _audioThemeUnlocked.add(code);
+      } catch (error) {
+        _showMessage('Theme unlock failed: ${_readable(error)}');
+        return;
+      }
+    }
+
+    final roomId = _roomId;
+    final userId = _myId;
+    if (_isLive && _isHost && roomId != null && userId != null &&
+        _selectedRoomType == 'audio') {
+      try {
+        final updated = await _supabase.from('live_rooms')
+            .update({'audio_theme_code': code})
+            .eq('id', roomId)
+            .eq('owner_id', userId)
+            .select('id')
+            .maybeSingle();
+        if (updated == null) {
+          _showMessage('Theme could not be applied to this room.');
+          return;
+        }
+      } catch (error) {
+        _showMessage('Theme update failed: ${_readable(error)}');
+        return;
+      }
+    }
+    if (mounted) setState(() => _audioThemeCode = code);
+  }
+
+  Future<void> _openAudioThemePicker() async {
+    if (_audioThemeCatalog.isEmpty) await _loadAudioThemeCatalog();
+    if (!mounted || _audioThemeCatalog.isEmpty) {
+      _showMessage('Audio themes are not available right now.');
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF171126),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.72,
+          child: Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('AUDIO ROOM BACKGROUND THEMES',
+                    style: TextStyle(color: Color(0xFFE6C47A),
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+              const Text('4 free themes • More themes unlock with coins',
+                  style: TextStyle(color: Colors.white60, fontSize: 12)),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _audioThemeCatalog.length,
+                  itemBuilder: (context, index) {
+                    final item = _audioThemeCatalog[index];
+                    final code = item['theme_code'].toString();
+                    final price = (item['coin_price'] as num?)?.toInt() ?? 0;
+                    final owned = price == 0 || _audioThemeUnlocked.contains(code);
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF49305E),
+                        child: Icon(
+                          code == 'waterfall' || code == 'ocean_dream'
+                              ? Icons.water
+                              : code == 'rose_garden' || code == 'sakura'
+                                  ? Icons.local_florist
+                                  : code == 'starfall' || code == 'moonlight'
+                                      ? Icons.nights_stay
+                                      : Icons.auto_awesome,
+                          color: const Color(0xFFE6C47A),
+                        ),
+                      ),
+                      title: Text(item['theme_name'].toString(),
+                          style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(item['description'].toString(),
+                          style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                      trailing: Text(
+                        owned ? (code == _audioThemeCode ? 'ACTIVE' : 'APPLY')
+                            : '$price COINS',
+                        style: TextStyle(
+                          color: owned ? const Color(0xFF77DCCB) : const Color(0xFFE6C47A),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _chooseAudioTheme(code);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadMyLevel() async {
     final userId = _myId;
@@ -354,6 +644,7 @@ class _LiveScreenState extends State<LiveScreen> {
             'is_live': true,
             'video_filter_code': _selectedRoomType == 'video' ? _previewFilter : 'Natural',
             'video_filter_strength': _selectedRoomType == 'video' ? _filterStrength : 0.35,
+            'audio_theme_code': _selectedRoomType == 'audio' ? _audioThemeCode : 'aurora',
           })
           .select('id')
           .single();
@@ -407,7 +698,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       final room = await _supabase
           .from('live_rooms')
-          .select('room_name, owner_id, is_live, room_type, is_private, is_locked, video_filter_code, video_filter_strength')
+          .select('room_name, owner_id, is_live, room_type, is_private, is_locked, video_filter_code, video_filter_strength, audio_theme_code')
           .eq('id', roomId)
           .maybeSingle();
 
@@ -418,6 +709,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       _roomOwnerId = room['owner_id'] as String?;
       _roomName = (room['room_name'] ?? '').toString();
+      _audioThemeCode = (room['audio_theme_code'] ?? 'aurora').toString();
       _selectedRoomType = (room['room_type'] ?? 'video').toString().toLowerCase();
       _privateRoom = room['is_private'] == true;
       _lockedRoom = room['is_locked'] == true;
@@ -965,6 +1257,14 @@ class _LiveScreenState extends State<LiveScreen> {
           callback: (payload) {
             final row = payload.newRecord;
             if (!_isHost) {
+              if (_selectedRoomType == 'audio') {
+                final theme = row['audio_theme_code']?.toString() ?? 'aurora';
+                if (mounted && _audioThemeCatalog.any((item) => item['theme_code'] == theme)) {
+                  setState(() => _audioThemeCode = theme);
+                } else if (mounted) {
+                  setState(() => _audioThemeCode = theme);
+                }
+              }
               final code = row['video_filter_code']?.toString() ?? 'Natural';
               final strength = (row['video_filter_strength'] as num?)?.toDouble() ?? 0.35;
               if (mounted && _previewFilters.contains(code)) {
@@ -1919,25 +2219,34 @@ class _LiveScreenState extends State<LiveScreen> {
               )),
             ]),
           ),
-        ] else
-          Container(
+        ] else ...[
+          SizedBox(
             height: 190,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF6E3B8F), Color(0xFF1B2844)]),
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(22),
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.headphones, size: 72, color: Color(0xFFB9AEFF)),
-                SizedBox(height: 10),
-                Text('AUDIO LIVE READY',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
-              ],
+              child: _AudioRoomThemeBackdrop(
+                themeCode: _audioThemeCode,
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.headphones, size: 72, color: Colors.white),
+                      SizedBox(height: 10),
+                      Text('AUDIO LIVE READY',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _openAudioThemePicker,
+            icon: const Icon(Icons.wallpaper),
+            label: const Text('CHOOSE AUDIO BACKGROUND'),
+          ),
+        ],
         const SizedBox(height: 20),
         const Text('Start Your Live Room',
             style: TextStyle(
@@ -2118,7 +2427,14 @@ class _LiveScreenState extends State<LiveScreen> {
               Container(
                 color: const Color(0xFF1B2844),
                 child: _selectedRoomType == 'audio'
-                    ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.headphones, size: 100, color: Color(0xFFB9AEFF)), SizedBox(height: 12), Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]))
+                    ? _AudioRoomThemeBackdrop(
+                        themeCode: _audioThemeCode,
+                        child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.headphones, size: 100, color: Colors.white),
+                          SizedBox(height: 12),
+                          Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                        ])),
+                      )
                     : _videoLayer(),
               ),
               if (_giftBanner != null)
@@ -2265,6 +2581,8 @@ class _LiveScreenState extends State<LiveScreen> {
 
   List<Widget> _hostControls() {
     return [
+      if (_selectedRoomType == 'audio')
+        _control(icon: Icons.wallpaper, label: 'Theme', onTap: _openAudioThemePicker),
       if (_selectedRoomType == 'video')
         _control(icon: Icons.auto_awesome, label: 'Filter', onTap: _openLiveFilterSettings),
       _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
