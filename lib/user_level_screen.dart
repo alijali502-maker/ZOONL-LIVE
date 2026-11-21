@@ -12,7 +12,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
   final SupabaseClient _db = Supabase.instance.client;
   bool _loading = true, _isOwner = false;
   String? _error;
-  String _primeStatus = 'Checking…', _entryStatus = 'Checking…';
+  String _primeStatus = 'Checking…', _entryStatus = 'Checking…', _frameStatus = 'Checking…', _badgeStatus = 'Checking…';
   int _level = 1, _sentCoins = 0;
   List<Map<String, dynamic>> _levels = [];
 
@@ -49,7 +49,8 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
         final exp = row['expires_at'];
         return exp == null || (DateTime.tryParse(exp.toString())?.isAfter(now) ?? false);
       });
-      final entries = (r[5] as List).where((row) {
+      final inventory = r[5] as List;
+      final entries = inventory.where((row) {
         if (row['item_type']?.toString() != 'ENTRY_EFFECT') return false;
         final exp = row['expires_at'];
         return exp == null || (DateTime.tryParse(exp.toString())?.isAfter(now) ?? false);
@@ -62,6 +63,8 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
         _isOwner = r[3] == true;
         _primeStatus = prime ? 'ACTIVE' : 'Not assigned to this account';
         _entryStatus = entries.isEmpty ? 'No Entry effect in account inventory' : entries.map((e) => e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_ENTRY' ? 'Owner Royal Entry' : (e['zoonl_item_code']?.toString() ?? 'Entry effect')).join(', ');
+        _frameStatus = inventory.any((e) => e['item_type']?.toString() == 'AVATAR_FRAME' && e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_FRAME') ? 'Owner Imperial Frame • Permanent' : 'No Owner frame found';
+        _badgeStatus = inventory.any((e) => e['item_type']?.toString() == 'ID_BADGE' && e['zoonl_item_code']?.toString() == 'ZOONL_OWNER_BADGE') ? 'Sovereign Owner Glass Badge • Equipped' : 'No Owner badge found';
         _loading = false;
       });
     } catch (e) {
@@ -184,6 +187,8 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
                 _statusLine(Icons.verified_user_rounded, 'Trusted role', 'OWNER verified by Supabase', const Color(0xFFFFD98B)),
                 _statusLine(Icons.workspace_premium_rounded, 'Prime membership', _primeStatus, const Color(0xFFBCA0FF)),
                 _statusLine(Icons.bolt_rounded, 'Entry effect', _entryStatus, const Color(0xFF83DDF0)),
+                _statusLine(Icons.shield_moon_rounded, 'Avatar frame', _frameStatus, const Color(0xFFE3A1D0)),
+                _statusLine(Icons.workspace_premium_rounded, 'Level ID badge', _badgeStatus, const Color(0xFFFFE6A1)),
                 const Divider(color: Colors.white12, height: 18),
                 const Text('Owner identity is verified separately from the public ZOONL ID. Prime and Entry status above is read from the real account records.',
                   style: TextStyle(color: Colors.white60, fontSize: 10, height: 1.45)),
