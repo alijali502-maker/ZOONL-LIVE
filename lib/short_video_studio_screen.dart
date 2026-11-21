@@ -28,6 +28,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   bool _uploading = false;
   bool _filterLoading = false;
   String _filter = 'Natural';
+  double _filterStrength = 0.65;
   CubeLut? _activeLut;
   String? _activeLutPath;
   String? _error;
@@ -262,7 +263,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
         final export = Filmkit.exportVideo(
           input: localFile.path,
           output: processedPath,
-          edit: EditSpec(lut: lutPath, lutIntensity: 1.0, maxDimension: 1080),
+          edit: EditSpec(lut: lutPath, lutIntensity: _filterStrength, maxDimension: 1080),
         );
         await export.result;
         localFile = File(processedPath);
@@ -357,12 +358,12 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                           aspectRatio: preview.value.aspectRatio,
                           child: _activeLut == null
                               ? VideoPlayer(preview)
-                              : LutFilter(lut: _activeLut!, intensity: 1, child: VideoPlayer(preview)),
+                              : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: VideoPlayer(preview)),
                         )
                       : camera != null && camera.value.isInitialized
                           ? (_activeLut == null
                               ? CameraPreview(camera)
-                              : LutFilter(lut: _activeLut!, intensity: 1, child: CameraPreview(camera)))
+                              : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: CameraPreview(camera)))
                           : Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -385,10 +386,27 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                 onSelected: _recording || _uploading ? null : (_) { setState(() => _filter = filter); _loadFilterLut(); },
               )).toList(),
             ),
+            Row(
+              children: [
+                const Text('Filter intensity', style: TextStyle(color: Colors.white70)),
+                Expanded(
+                  child: Slider(
+                    value: _filterStrength,
+                    min: 0,
+                    max: 1,
+                    onChanged: _recording || _uploading
+                        ? null
+                        : (value) => setState(() => _filterStrength = value),
+                  ),
+                ),
+                Text('${(_filterStrength * 100).round()}%',
+                    style: const TextStyle(color: Colors.white)),
+              ],
+            ),
             const Padding(
-              padding: EdgeInsets.only(top: 7),
+              padding: EdgeInsets.only(top: 2),
               child: Text(
-                'The same selected colour filter is previewed and encoded into the MP4 before it is published. Audio is preserved.',
+                'The selected colour effect and intensity are previewed and encoded into the published MP4. Audio is preserved.',
                 style: TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ),
