@@ -2526,7 +2526,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               }),
               const SizedBox(height: 4),
               const Text(
-                'Prime activation requires a verified payment and server-side membership confirmation.',
+                'Prime purchases debit wallet Coins on the server and activate a time-limited membership. The Owner controls each tier's price and duration.',
                 style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
             ],
