@@ -177,6 +177,7 @@ class ZoonlAuthGate extends StatelessWidget {
                     appStore.agencyApplications = home.agencyApplications;
                     appStore.giftCatalog = home.gifts;
                     appStore.cosmeticsCatalog = home.cosmetics;
+                    appStore.primeTiers = home.primeTiers;
                     appStore.userBaggage = home.baggage;
                     appStore.streamers
                       ..clear()
@@ -213,6 +214,7 @@ class ZoonlAuthGate extends StatelessWidget {
     List<Map<String, dynamic>> agencyApplications = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> gifts = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> cosmetics = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
     List<Map<String, dynamic>> baggage = <Map<String, dynamic>>[];
 
     try {
@@ -294,6 +296,19 @@ class ZoonlAuthGate extends StatelessWidget {
 
     try {
       final rows = await Backend.client
+          .from('prime_tiers')
+          .select('id, tier_name, benefits')
+          .eq('is_active', true)
+          .order('id', ascending: true);
+      primeTiers = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      primeTiers = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
           .from('zoonl_live_user_baggage')
           .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
           .eq('project_name', 'ZOONL LIVE')
@@ -313,6 +328,7 @@ class ZoonlAuthGate extends StatelessWidget {
       agencyApplications: agencyApplications,
       gifts: gifts,
       cosmetics: cosmetics,
+      primeTiers: primeTiers,
       baggage: baggage,
     );
   }
@@ -399,6 +415,7 @@ class _HomeData {
   final List<Map<String, dynamic>> agencyApplications;
   final List<Map<String, dynamic>> gifts;
   final List<Map<String, dynamic>> cosmetics;
+  final List<Map<String, dynamic>> primeTiers;
   final List<Map<String, dynamic>> baggage;
 
   const _HomeData({
@@ -408,6 +425,7 @@ class _HomeData {
     required this.agencyApplications,
     required this.gifts,
     required this.cosmetics,
+    required this.primeTiers,
     required this.baggage,
   });
 
@@ -418,6 +436,7 @@ class _HomeData {
     agencyApplications: <Map<String, dynamic>>[],
     gifts: <Map<String, dynamic>>[],
     cosmetics: <Map<String, dynamic>>[],
+    primeTiers: <Map<String, dynamic>>[],
     baggage: <Map<String, dynamic>>[],
   );
 }
