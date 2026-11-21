@@ -47,6 +47,16 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     const titles=['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
     return '${titles[_tier(n)]} • LEVEL $n';
   }
+  String _rankName(int level) {
+    for (final row in _levels) {
+      if ((row['level'] as num?)?.toInt() == level) {
+        final configured = row['level_name']?.toString().trim() ?? '';
+        if (configured.isNotEmpty) return configured;
+      }
+    }
+    return _name(level);
+  }
+
   String _fmt(int n) => n>=1000000000 ? '${(n/1000000000).toStringAsFixed(2)}B' :
       n>=1000000 ? '${(n/1000000).toStringAsFixed(2)}M' :
       n>=1000 ? '${(n/1000).toStringAsFixed(1)}K' : '$n';
@@ -142,7 +152,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     return Padding(padding:const EdgeInsets.only(bottom:8),child:_glass(Row(children:[
       SizedBox(width:49,height:51,child:_emblem(n,size:36,animated:false)),
       const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(_name(n),style:TextStyle(color:reached?Colors.white:Colors.white38,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:.5)),
+        Text(_rankName(n),style:TextStyle(color:reached?Colors.white:Colors.white38,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:.5)),
         const SizedBox(height:4),Text('Lifetime target  ${_fmt(goal)} EXP',style:const TextStyle(color:Colors.white54,fontSize:9))])),
       Icon(active?Icons.auto_awesome:reached?Icons.verified:Icons.lock_outline,color:active||reached?c[1]:Colors.white24,size:18),
     ]),active?c[1]:reached?c[0]:Colors.white24,padding:const EdgeInsets.symmetric(horizontal:11,vertical:8)));
@@ -171,7 +181,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
                 boxShadow:const [BoxShadow(color:Color(0x99E8C46E),blurRadius:14)]),
                 child:const Text('✦ SOVEREIGN OWNER',style:TextStyle(color:Color(0xFF3B2509),fontSize:8,fontWeight:FontWeight.w900)))]),
             const SizedBox(height:7),Row(children:[_emblem(_level),const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-              Text(_name(_level),style:TextStyle(color:c[1],fontSize:13,fontWeight:FontWeight.w900)),
+              Text(_rankName(_level),style:TextStyle(color:c[1],fontSize:13,fontWeight:FontWeight.w900)),
               const SizedBox(height:5),Text('${_fmt(_exp)} EXP',style:const TextStyle(color:Colors.white,fontSize:24,fontWeight:FontWeight.w900)),
               const Text('LIFETIME GIFT EXP • RECORD KEPT',style:TextStyle(color:Colors.white54,fontSize:8,letterSpacing:1))]))]),
             const SizedBox(height:12),Container(padding:const EdgeInsets.all(11),decoration:BoxDecoration(
