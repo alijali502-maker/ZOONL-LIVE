@@ -6,8 +6,8 @@ import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_player/video_player.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
+import 'package:just_audio/just_audio.dart' show AudioPlayer;
 
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).
