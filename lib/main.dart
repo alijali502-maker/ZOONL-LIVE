@@ -1496,14 +1496,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   final TextEditingController shortCaptionCtrl =
       TextEditingController();
 
-  double skinSmooth = 0.75;
-  double faceSize = 0.50;
-  double eyeSize = 0.65;
-
-  String eyeLens = 'Crystal Hazel';
-  String eyeColor = 'Amber Gold';
-  String makeupPreset = 'Royal Glamour';
-
   bool micMuted = false;
   bool camMuted = false;
 
@@ -2175,38 +2167,17 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ],
               ),
               const SizedBox(height: 10),
-              const Text(
-                'VIP Beauty Filter Controls',
-                style: TextStyle(
-                  color: Color(0xFFD6B46A),
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF171D36),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF9360F5).withOpacity(.5)),
                 ),
-              ),
-              Slider(
-                value: skinSmooth,
-                onChanged: (double value) {
-                  setState(() => skinSmooth = value);
-                },
-              ),
-              Slider(
-                value: faceSize,
-                onChanged: (double value) {
-                  setState(() => faceSize = value);
-                },
-              ),
-              Slider(
-                value: eyeSize,
-                onChanged: (double value) {
-                  setState(() => eyeSize = value);
-                },
-              ),
-              Wrap(
-                spacing: 8,
-                children: <Widget>[
-                  Chip(label: Text('Lens: $eyeLens')),
-                  Chip(label: Text('Eye Color: $eyeColor')),
-                  Chip(label: Text('Makeup: $makeupPreset')),
-                ],
+                child: const Text(
+                  'Camera colour filters are selected on the Pre-Live screen before Start. Face retouch controls stay hidden until they can process the outgoing LiveKit video, not just change a local slider.',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
               const SizedBox(height: 8),
               _buildGiftControls(activeStreamer),
