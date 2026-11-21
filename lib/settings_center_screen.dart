@@ -246,16 +246,6 @@ class SettingsCenterScreen extends StatelessWidget {
                 builder: (_) => const InAppNotificationsScreen(),
               )),
             ),
-            _SettingItem(
-              Icons.language,
-              'Language',
-              'Application language preferences',
-              () => _showDetails(
-                context,
-                'Language',
-                'Language selection will be connected to the application localization settings.',
-              ),
-            ),
           ]),
           const SizedBox(height: 4),
           OutlinedButton.icon(
