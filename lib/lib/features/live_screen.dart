@@ -63,6 +63,13 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _guestInviteDialogShown = false;
   String? _guestSeatId;
   List<Map<String, dynamic>> _guestSeats = <Map<String, dynamic>>[];
+  bool _privateRoom = false;
+  bool _lockedRoom = false;
+  bool _giftLoading = false;
+  List<Map<String, dynamic>> _giftCatalog = <Map<String, dynamic>>[];
+  Map<String, dynamic>? _giftBanner;
+  Timer? _giftBannerTimer;
+  int _hostLevel = 1;
 
   final TextEditingController _titleController =
       TextEditingController();
@@ -195,6 +202,8 @@ class _LiveScreenState extends State<LiveScreen> {
             'owner_id': myId,
             'room_name': title,
             'room_type': _selectedRoomType,
+            'is_private': _privateRoom,
+            'is_locked': _lockedRoom || _privateRoom,
             'is_live': true,
           })
           .select('id')
@@ -203,6 +212,9 @@ class _LiveScreenState extends State<LiveScreen> {
       final roomId = row['id'] as String;
       _roomId = roomId;
       _roomOwnerId = myId;
+      final hostProfile = await _supabase.from('profiles')
+          .select('user_level').eq('id', myId).maybeSingle();
+      _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
 
       await _connectLiveKit(roomId);
       _subscribeRealtime(roomId);
@@ -246,7 +258,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       final room = await _supabase
           .from('live_rooms')
-          .select('room_name, owner_id, is_live, room_type')
+          .select('room_name, owner_id, is_live, room_type, is_private, is_locked')
           .eq('id', roomId)
           .maybeSingle();
 
@@ -258,6 +270,11 @@ class _LiveScreenState extends State<LiveScreen> {
       _roomOwnerId = room['owner_id'] as String?;
       _roomName = (room['room_name'] ?? '').toString();
       _selectedRoomType = (room['room_type'] ?? 'video').toString().toLowerCase();
+      _privateRoom = room['is_private'] == true;
+      _lockedRoom = room['is_locked'] == true;
+      final hostProfile = await _supabase.from('profiles')
+          .select('user_level').eq('id', _roomOwnerId!).maybeSingle();
+      _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
 
       await _connectLiveKit(roomId);
       _subscribeRealtime(roomId);
@@ -760,6 +777,17 @@ class _LiveScreenState extends State<LiveScreen> {
           callback: (payload) => _addIncoming(payload.newRecord),
         )
         .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'gift_sends',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => unawaited(_showRemoteGift(payload.newRecord)),
+        )
+        .onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
           table: 'live_rooms',
@@ -911,6 +939,213 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   // ---------- Controls ----------
+
+  Future<void> _showPrivacySettings() async {
+    if (!_isHost || _roomId == null) return;
+    var privateValue = _privateRoom;
+    var lockedValue = _lockedRoom;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF241630),
+          title: const Text('Live Privacy Settings', style: TextStyle(color: Color(0xFFE5BD70))),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Private Room', style: TextStyle(color: Colors.white)),
+              value: privateValue, onChanged: (v) => setDialogState(() { privateValue = v; if (v) lockedValue = true; })),
+            SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
+              value: lockedValue, onChanged: (v) => setDialogState(() => lockedValue = v)),
+            const Text('Only invited members or approved guest seats can enter a private or locked room.',
+              style: TextStyle(color: Colors.white60, fontSize: 11)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (save != true) return;
+    try {
+      await _supabase.from('live_rooms').update({
+        'is_private': privateValue, 'is_locked': lockedValue || privateValue,
+      }).eq('id', _roomId!).eq('owner_id', _myId!);
+      if (!mounted) return;
+      setState(() { _privateRoom = privateValue; _lockedRoom = lockedValue || privateValue; });
+      _showMessage('Room privacy updated.');
+    } catch (error) {
+      _showMessage('Privacy update failed: ${_readable(error)}');
+    }
+  }
+
+  Future<void> _showPrivateRoomInvite() async {
+    if (!_isHost || _roomId == null) return;
+    final controller = TextEditingController();
+    final zoonlId = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF241630),
+        title: const Text('Invite by ZOONL ID', style: TextStyle(color: Color(0xFFE5BD70))),
+        content: TextField(controller: controller, keyboardType: TextInputType.number,
+          style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Member ZOONL ID')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Send Invite')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (zoonlId == null || zoonlId.isEmpty) return;
+    try {
+      await _supabase.rpc('private_room_invite_by_zoonl_id', params: {
+        'p_room_id': _roomId, 'p_target_zoonl_id': zoonlId,
+      });
+      _showMessage('Private room invitation sent.');
+    } catch (error) {
+      _showMessage('Invite failed: ${_readable(error)}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadLiveGifts() async {
+    final rows = await _supabase.from('gifts')
+      .select('id, gift_name, image_url, animation_url, animation_3d_url, sound_url, preview_url, coin_price, diamond_value, category')
+      .eq('is_active', true).order('coin_price', ascending: true);
+    return (rows as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<void> _openGiftPanel() async {
+    final roomId = _roomId;
+    if (roomId == null || !_isLive || _giftLoading) return;
+    setState(() => _giftLoading = true);
+    try {
+      _giftCatalog = await _loadLiveGifts();
+    } catch (error) {
+      if (mounted) { setState(() => _giftLoading = false); _showMessage('Gift catalogue could not load: ${_readable(error)}'); }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _giftLoading = false);
+    var category = 'ALL';
+    var quantity = 1;
+    var sending = false;
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF171126),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final categories = <String>{'ALL', ..._giftCatalog.map((g) => (g['category'] ?? 'General').toString().trim()).where((v) => v.isNotEmpty)};
+          final visible = category == 'ALL' ? _giftCatalog : _giftCatalog.where((g) => (g['category'] ?? 'General').toString() == category).toList();
+          return SafeArea(child: SizedBox(
+            height: MediaQuery.of(context).size.height * .78,
+            child: Column(children: [
+              Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+                const Expanded(child: Text('ALL LIVE GIFTS', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.w900, fontSize: 17))),
+                IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close, color: Colors.white)),
+              ])),
+              SizedBox(height: 42, child: ListView(scrollDirection: Axis.horizontal, children: categories.map((c) =>
+                Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(
+                  label: Text(c), selected: category == c, onSelected: (_) => setSheetState(() => category = c),
+                ))).toList())),
+              Expanded(child: visible.isEmpty
+                ? const Center(child: Text('No active gifts in this category.', style: TextStyle(color: Colors.white70)))
+                : GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: .78),
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) {
+                    final gift = visible[index];
+                    final imageUrl = (gift['image_url'] ?? gift['preview_url'] ?? '').toString();
+                    return InkWell(
+                      onTap: sending ? null : () async {
+                        setSheetState(() => sending = true);
+                        try {
+                          final response = await _supabase.rpc('send_live_gift', params: {
+                            'p_gift_id': gift['id'], 'p_room_id': roomId, 'p_quantity': quantity,
+                          });
+                          final result = response is Map ? Map<String, dynamic>.from(response) : <String, dynamic>{};
+                          _setGiftBanner({
+                            'gift_name': gift['gift_name'], 'image_url': imageUrl,
+                            'sender_name': widget.userName, 'quantity': quantity,
+                            'total_coins': result['total_coins'] ?? ((gift['coin_price'] as num? ?? 0) * quantity),
+                          });
+                          if (mounted) _showMessage('Gift sent: ${gift['gift_name']} ×$quantity');
+                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        } catch (error) {
+                          if (mounted) _showMessage('Gift not sent: ${_readable(error)}');
+                          setSheetState(() => sending = false);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(13),
+                          border: Border.all(color: const Color(0xFFE5BD70).withOpacity(.28))),
+                        child: Column(children: [
+                          Expanded(child: imageUrl.isEmpty
+                            ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70))
+                            : Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70)))),
+                          Text((gift['gift_name'] ?? 'Gift').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 11)),
+                          const SizedBox(height: 3),
+                          Text('${gift['coin_price'] ?? 0} coins', style: const TextStyle(color: Color(0xFFE5BD70), fontSize: 10)),
+                        ]),
+                      ),
+                    );
+                  },
+                )),
+              Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 12), child: Row(children: [
+                const Text('Quantity', style: TextStyle(color: Colors.white)),
+                IconButton(onPressed: quantity > 1 ? () => setSheetState(() => quantity--) : null, icon: const Icon(Icons.remove_circle_outline, color: Colors.white)),
+                Text('$quantity', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                IconButton(onPressed: quantity < 99 ? () => setSheetState(() => quantity++) : null, icon: const Icon(Icons.add_circle_outline, color: Colors.white)),
+                const Spacer(), if (sending) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              ])),
+            ]),
+          ));
+        },
+      ),
+    );
+  }
+
+  void _setGiftBanner(Map<String, dynamic> data) {
+    _giftBannerTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _giftBanner = data);
+    _giftBannerTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) setState(() => _giftBanner = null);
+    });
+  }
+
+  Future<void> _showRemoteGift(Map<String, dynamic> row) async {
+    try {
+      final gift = await _supabase.from('gifts').select('gift_name,image_url,coin_price').eq('id', row['gift_id']).maybeSingle();
+      final sender = await _supabase.from('profiles').select('display_name').eq('id', row['sender_id']).maybeSingle();
+      if (!mounted || gift == null) return;
+      _setGiftBanner({
+        'gift_name': gift['gift_name'], 'image_url': gift['image_url'],
+        'sender_name': sender?['display_name'] ?? 'Viewer', 'quantity': row['quantity'] ?? 1,
+        'total_coins': row['total_coins'] ?? gift['coin_price'] ?? 0,
+      });
+    } catch (_) {}
+  }
+
+  Widget _liveGiftBanner() {
+    final gift = _giftBanner ?? <String, dynamic>{};
+    final image = (gift['image_url'] ?? '').toString();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6D3BA5), Color(0xFF2A1740)]),
+        borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE5BD70), width: 1.2)),
+      child: Row(children: [
+        if (image.isNotEmpty) SizedBox(width: 38, height: 38, child: Image.network(image, fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70))))
+        else const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70), size: 30),
+        const SizedBox(width: 10),
+        Expanded(child: Text('${gift['sender_name'] ?? 'Viewer'} sent ${gift['gift_name'] ?? 'a gift'} ×${gift['quantity'] ?? 1}',
+          maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
+        Text('${gift['total_coins'] ?? 0} coins', style: const TextStyle(color: Color(0xFFE5BD70), fontSize: 10)),
+      ]),
+    );
+  }
+
   Future<void> _toggleMicrophone() async {
     final next = !_microphoneEnabled;
     try {
@@ -983,6 +1218,7 @@ class _LiveScreenState extends State<LiveScreen> {
     unawaited(_disconnectLiveKit());
 
     _guestPoller?.cancel();
+    _giftBannerTimer?.cancel();
     if (_isGuest && _guestSeatId != null) {
       unawaited(_supabase.rpc(
         'room_leave_guest_seat',
@@ -1196,6 +1432,29 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
         ),
         const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(14)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('ROOM PRIVACY SETTINGS', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Private Room', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Only invited members and approved guest seats can enter.', style: TextStyle(color: Colors.white60, fontSize: 11)),
+              value: _privateRoom,
+              activeColor: const Color(0xFFE5BD70),
+              onChanged: _busy ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
+              value: _lockedRoom,
+              activeColor: const Color(0xFFE5BD70),
+              onChanged: _busy ? null : (v) => setState(() => _lockedRoom = v),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 8),
         const Text('Room Type',
             style: TextStyle(
                 color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
@@ -1330,6 +1589,8 @@ class _LiveScreenState extends State<LiveScreen> {
                     ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.headphones, size: 100, color: Color(0xFFE5BD70)), SizedBox(height: 12), Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]))
                     : _videoLayer(),
               ),
+              if (_giftBanner != null)
+                Positioned(top: 62, left: 14, right: 14, child: _liveGiftBanner()),
               Positioned(
                 top: 14,
                 left: 14,
@@ -1347,7 +1608,7 @@ class _LiveScreenState extends State<LiveScreen> {
                       Icon(Icons.circle, size: 8, color: Colors.white),
                       SizedBox(width: 6),
                       Text(
-                        'LIVE',
+                        _privateRoom || _lockedRoom ? 'PRIVATE LIVE • LEVEL $_hostLevel' : 'LIVE • LEVEL $_hostLevel',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1464,9 +1725,9 @@ class _LiveScreenState extends State<LiveScreen> {
             vertical: 14,
           ),
           color: const Color(0xFF1B1225),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: _isHost ? _hostControls() : _viewerControls(),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: _isHost ? _hostControls() : _viewerControls()),
           ),
         ),
       ],
@@ -1475,6 +1736,10 @@ class _LiveScreenState extends State<LiveScreen> {
 
   List<Widget> _hostControls() {
     return [
+      _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
+      _control(icon: _privateRoom || _lockedRoom ? Icons.lock : Icons.lock_open,
+          label: 'Privacy', onTap: _showPrivacySettings),
+      _control(icon: Icons.person_add_alt_1, label: 'Invite', onTap: _showPrivateRoomInvite),
       _control(
         icon: _microphoneEnabled ? Icons.mic : Icons.mic_off,
         label: 'Microphone',
@@ -1507,6 +1772,7 @@ class _LiveScreenState extends State<LiveScreen> {
   List<Widget> _viewerControls() {
     if (_isGuest) {
       return [
+        _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
         _control(
           icon: Icons.chat,
           label: 'Chat',
@@ -1533,6 +1799,7 @@ class _LiveScreenState extends State<LiveScreen> {
       ];
     }
     return [
+      _control(icon: Icons.card_giftcard, label: 'Gifts', onTap: _openGiftPanel),
       _control(
         icon: Icons.chat,
         label: 'Chat',
