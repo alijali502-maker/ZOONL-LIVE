@@ -1797,61 +1797,64 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Widget _liveGiftBanner() {
     final gift = _giftBanner ?? <String, dynamic>{};
-    final image = (gift['media_url'] ?? gift['image_url'] ?? '').toString();
+    final media = (gift['media_url'] ?? gift['image_url'] ?? '').toString().trim();
     final screen = MediaQuery.of(context).size;
-    final mediaSize = math.min(screen.width * 0.82, screen.height * 0.52)
-        .clamp(150.0, 360.0).toDouble();
+    final mediaSize = math.min(screen.width * .94, screen.height * .68)
+        .clamp(180.0, 520.0).toDouble();
     return IgnorePointer(
-      child: AnimatedOpacity(
-        opacity: 1,
-        duration: const Duration(milliseconds: 240),
-        child: Container(
-          color: const Color(0xCC080510),
-          child: Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF302047), Color(0xFF171126), Color(0xFF100B1D)],
+      child: SizedBox.expand(
+        child: ColoredBox(
+          color: const Color(0x33000000),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (media.isNotEmpty)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: .72, end: 1),
+                  duration: const Duration(milliseconds: 520),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) => Transform.scale(
+                    scale: scale,
+                    child: child,
+                  ),
+                  child: _LiveGiftMedia(url: media, size: mediaSize),
+                )
+              else
+                Icon(Icons.card_giftcard, size: mediaSize * .48,
+                    color: Colors.white),
+              Positioned(
+                left: 18,
+                right: 18,
+                bottom: MediaQuery.of(context).padding.bottom + 94,
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0x99000000),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: const Color(0x66FFFFFF)),
+                        ),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Text((gift['gift_name'] ?? 'Live Gift').toString(),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white,
+                              fontSize: 17, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 3),
+                          Text('${gift['sender_name'] ?? 'Viewer'}  •  ×${gift['quantity'] ?? 1}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70,
+                              fontSize: 12, fontWeight: FontWeight.w700)),
+                        ]),
+                      ),
+                    ),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: const Color(0xFFE6C47A), width: 1.4),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x669360F5), blurRadius: 34, spreadRadius: 3),
-                  BoxShadow(color: Color(0x55E6C47A), blurRadius: 20),
-                ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('GIFT ARRIVED',
-                    style: TextStyle(color: Color(0xFFE6C47A), fontSize: 12,
-                      fontWeight: FontWeight.w900, letterSpacing: 2)),
-                  const SizedBox(height: 12),
-                  if (image.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: _LiveGiftMedia(url: image, size: mediaSize),
-                    )
-                  else
-                    SizedBox(width: mediaSize, height: mediaSize,
-                      child: const Icon(Icons.card_giftcard, color: Color(0xFFE6C47A), size: 100)),
-                  const SizedBox(height: 14),
-                  Text((gift['gift_name'] ?? 'Live Gift').toString(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 22,
-                      fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 6),
-                  Text('${gift['sender_name'] ?? 'Viewer'}  •  ×${gift['quantity'] ?? 1}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Color(0xFFD9C9EC), fontSize: 13,
-                      fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ),
