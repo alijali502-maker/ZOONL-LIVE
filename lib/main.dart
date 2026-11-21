@@ -2162,10 +2162,177 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  Future<void> _refreshCosmeticsData() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return;
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_user_baggage')
+          .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      store.userBaggage = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+      final wallet = await Backend.client
+          .from('wallets')
+          .select('coins, diamonds')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (wallet != null) {
+        store.currentUser['coins'] =
+            (wallet['coins'] as num?)?.toInt() ?? 0;
+        store.currentUser['diamonds'] =
+            (wallet['diamonds'] as num?)?.toInt() ?? 0;
+      }
+      store.refresh();
+    } catch (error) {
+      _showMessage('Supabase inventory refresh failed: $error');
+    }
+  }
+
+  Future<void> _buyCosmetic(String itemCode, String itemName) async {
+    try {
+      await Backend.client.rpc(
+        'buy_zoonl_cosmetic',
+        params: <String, dynamic>{'p_item_code': itemCode},
+      );
+      await _refreshCosmeticsData();
+      _showMessage('$itemName added to your ZOONL LIVE inventory.');
+    } catch (error) {
+      _showMessage('Purchase not completed: $error');
+    }
+  }
+
+  Future<void> _equipCosmetic(String itemCode, String itemName) async {
+    try {
+      await Backend.equipZoonlCosmetic(itemCode: itemCode);
+      await _refreshCosmeticsData();
+      _showMessage('$itemName equipped.');
+    } catch (error) {
+      _showMessage('Could not equip item: $error');
+    }
+  }
+
   Widget _buildVipHubSection() {
+    final ownedCodes = store.userBaggage
+        .where((item) {
+          final expiry = item['expires_at'];
+          final validExpiry = expiry == null ||
+              (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ??
+                  false);
+          return validExpiry;
+        })
+        .map((item) => item['zoonl_item_code']?.toString() ?? '')
+        .toSet();
+
+    final equippedCodes = store.userBaggage
+        .where((item) => item['is_equipped'] == true)
+        .map((item) => item['zoonl_item_code']?.toString() ?? '')
+        .toSet();
+
+    final activePrime = store.memberships
+        .where((item) => item['is_active'] == true)
+        .toList();
+
     return ListView(
       padding: const EdgeInsets.all(12),
       children: <Widget>[
+        _luxuryCard(
+          title: 'Prime Membership',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(activePrime.isEmpty
+                  ? 'No active Prime membership on this account.'
+                  : 'Active Prime memberships: ${activePrime.length}'),
+              const SizedBox(height: 8),
+              ...store.primeTiers.map((tier) {
+                final tierId = (tier['id'] as num?)?.toInt() ?? 0;
+                final benefits = tier['benefits'];
+                return ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.workspace_premium,
+                      color: Color(0xFFD6B46A)),
+                  title: Text((tier['tier_name'] ?? 'Prime').toString()),
+                  subtitle: Text(benefits is Map
+                      ? benefits.entries
+                          .map((e) => '${e.key}: ${e.value}')
+                          .join(' • ')
+                      : 'Tier $tierId'),
+                  trailing: Text(
+                    activePrime.any((m) =>
+                            (m['prime_tier_id'] as num?)?.toInt() == tierId)
+                        ? 'ACTIVE'
+                        : 'AVAILABLE',
+                    style: const TextStyle(
+                        color: Color(0xFFD6B46A), fontSize: 10),
+                  ),
+                );
+              }),
+              const SizedBox(height: 4),
+              const Text(
+                'Prime activation requires a verified payment and server-side membership confirmation.',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        _luxuryCard(
+          title: 'ZOONL LIVE Frames • Entries • Backgrounds',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Coins: ${store.currentUser['coins'] ?? 0} • Owned items: ${ownedCodes.length}',
+              ),
+              const SizedBox(height: 8),
+              if (store.cosmeticsCatalog.isEmpty)
+                const Text('No active cosmetics are available from Supabase.')
+              else
+                ...store.cosmeticsCatalog.map((item) {
+                  final code = (item['zoonl_item_code'] ?? '').toString();
+                  final name = (item['zoonl_item_name'] ?? 'Cosmetic').toString();
+                  final type = (item['item_type'] ?? '').toString();
+                  final price = (item['coin_price'] as num?)?.toInt() ?? 0;
+                  final owned = ownedCodes.contains(code);
+                  final equipped = equippedCodes.contains(code);
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.auto_awesome,
+                        color: Color(0xFFD6B46A)),
+                    title: Text(name),
+                    subtitle: Text(
+                      '$type • ${price == 0 ? 'Reward / Owner item' : '$price coins'}',
+                    ),
+                    trailing: SizedBox(
+                      width: 92,
+                      child: equipped
+                          ? const Text('EQUIPPED',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Color(0xFFD6B46A), fontSize: 10))
+                          : OutlinedButton(
+                              onPressed: code.isEmpty
+                                  ? null
+                                  : () => owned
+                                      ? _equipCosmetic(code, name)
+                                      : _buyCosmetic(code, name),
+                              child: Text(owned ? 'Equip' : 'Buy'),
+                            ),
+                    ),
+                  );
+                }),
+              const SizedBox(height: 6),
+              OutlinedButton.icon(
+                onPressed: _refreshCosmeticsData,
+                icon: const Icon(Icons.sync),
+                label: const Text('Refresh Inventory'),
+              ),
+            ],
+          ),
+        ),
         _luxuryCard(
           title: 'VIP Top-Up & Backup Store',
           child: Column(
@@ -2183,34 +2350,33 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 },
                 child: const Text('VIP / SVIP Top-Up'),
               ),
-              const SizedBox(height: 8),
-              if (store.backupStore.isEmpty)
+              if (store.userBaggage.isEmpty)
                 const Text(
-                  'No saved rewards.',
+                  'No owned cosmetics in Supabase inventory.',
                   style: TextStyle(color: Colors.white60),
                 ),
-              ...store.backupStore.map(
-                (Map<String, dynamic> item) {
-                  return ListTile(
-                    title: Text(
-                      '${item['name']} (${item['type']})',
-                    ),
-                    trailing: Switch(
-                      value: item['equipped'] == true,
-                      onChanged: (bool value) {
-                        if (store.isLiveMode) {
-                          _showMessage(
-                            'Reward changes require server verification.',
-                          );
-                          return;
-                        }
-                        item['equipped'] = value;
-                        store.refresh();
-                      },
-                    ),
-                  );
-                },
-              ),
+              ...store.userBaggage.map((item) {
+                final code = (item['zoonl_item_code'] ?? '').toString();
+                final catalogItem = store.cosmeticsCatalog.firstWhere(
+                  (catalog) =>
+                      catalog['zoonl_item_code']?.toString() == code,
+                  orElse: () => <String, dynamic>{},
+                );
+                final name =
+                    (catalogItem['zoonl_item_name'] ?? code).toString();
+                final expiry = item['expires_at']?.toString();
+                return ListTile(
+                  title: Text(name),
+                  subtitle: Text(
+                    expiry == null ? 'Permanent item' : 'Expires: $expiry',
+                  ),
+                  trailing: Text(
+                    item['is_equipped'] == true ? 'EQUIPPED' : 'OWNED',
+                    style: const TextStyle(
+                        color: Color(0xFFD6B46A), fontSize: 10),
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -2224,9 +2390,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     Icons.lock,
                     color: Color(0xFFD6B46A),
                   ),
-                  title: Text(
-                    'Private Room ${room['roomId']}',
-                  ),
+                  title: Text('Private Room ${room['roomId']}'),
                   subtitle: const Text(
                     'Room key and access must be verified by the server.',
                   ),
