@@ -60,6 +60,11 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .eq('id', userId)
           .maybeSingle();
 
+      final publicProfile = await Backend.client
+          .from('user_public_profiles')
+          .select('zoonl_id')
+          .eq('user_id', userId)
+          .maybeSingle();
       final owner = await Backend.isZoonlOwner();
       final roomsRaw = await Backend.client
           .from('live_rooms')
@@ -79,7 +84,10 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
 
       if (!mounted) return;
       setState(() {
-        _profile = _map(profile);
+        _profile = <String, dynamic>{
+          ..._map(profile),
+          'zoonl_id': publicProfile?['zoonl_id'],
+        };
         _canHost = owner || profile?['is_verified'] == true;
         _rooms = (roomsRaw as List)
             .map((row) => _map(row))
@@ -115,7 +123,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL Host').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: (_profile['zoonl_id'] ?? '').toString(),
           roomType: roomType,
         ),
       ),
