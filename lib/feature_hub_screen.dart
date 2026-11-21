@@ -16,12 +16,12 @@ class FeatureHubScreen extends StatefulWidget {
 }
 
 class _FeatureHubScreenState extends State<FeatureHubScreen> {
-  static const Color _bg = Color(0xFF080D14);
-  static const Color _panel = Color(0xFF17232E);
-  static const Color _panelRaised = Color(0xFF1D2B37);
-  static const Color _gold = Color(0xFFD6B46A);
-  static const Color _teal = Color(0xFF4BC2B0);
-  static const Color _muted = Color(0xFFAAB5BE);
+  static const Color _bg = Color(0xFF050505);
+  static const Color _panel = Color(0xCC111111);
+  static const Color _panelRaised = Color(0xCC202020);
+  static const Color _gold = Color(0xFFF5F5F5);
+  static const Color _teal = Color(0xFFBDBDBD);
+  static const Color _muted = Color(0xFFBDBDBD);
 
   bool _loading = true;
   bool _canHost = false;
@@ -278,7 +278,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF354653)),
+        border: Border.all(color: const Color(0x55FFFFFF)),
       ),
       child: child,
     );
