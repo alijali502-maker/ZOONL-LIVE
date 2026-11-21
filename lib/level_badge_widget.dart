@@ -29,7 +29,8 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     final client = Supabase.instance.client;
     if (client.auth.currentUser == null) return 1;
     final result = await client.rpc('zoonl_my_level');
-    return (result as num?)?.toInt().clamp(1, 100) ?? 1;
+    final level = (result as num?)?.toInt() ?? 1;
+    return level.clamp(1, 100).toInt();
   }
 
   @override
