@@ -29,6 +29,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   List<Map<String, dynamic>> _rooms = [];
   List<Map<String, dynamic>> _gifts = [];
   List<Map<String, dynamic>> _guestInvites = [];
+  List<Map<String, dynamic>> _privateInvites = [];
   List<Map<String, dynamic>> _shortVideos = [];
 
   @override
@@ -87,6 +88,14 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .gt('expires_at', DateTime.now().toUtc().toIso8601String())
           .order('created_at', ascending: false);
 
+      final privateInvitesRaw = await Backend.client
+          .from('private_room_invites')
+          .select('id, room_id, inviter_id, invite_status, expires_at, created_at')
+          .eq('invitee_id', userId)
+          .eq('invite_status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+
       final shortsRaw = await Backend.client
           .from('short_videos')
           .select('id,user_id,video_url,caption,duration_seconds,likes_count,created_at')
@@ -115,6 +124,9 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
             .map((row) => _map(row))
             .toList();
         _guestInvites = (guestInvitesRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _privateInvites = (privateInvitesRaw as List)
             .map((row) => _map(row))
             .toList();
         _shortVideos = (shortsRaw as List)
@@ -209,6 +221,34 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       await _loadDashboard();
     } catch (error) {
       _notice('Guest invitation could not be processed: $error');
+    }
+  }
+
+
+  Future<void> _respondPrivateInvite(Map<String, dynamic> invite, bool accept) async {
+    try {
+      await Backend.client.rpc('private_room_respond_invite', params: {
+        'p_invite_id': invite['id'],
+        'p_accept': accept,
+      });
+      if (!mounted) return;
+      if (!accept) {
+        _notice('Private room invitation declined.');
+        await _loadDashboard();
+        return;
+      }
+      final room = await Backend.client.from('live_rooms')
+          .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked, is_live')
+          .eq('id', invite['room_id'].toString()).maybeSingle();
+      if (room == null || room['is_live'] != true) {
+        _notice('This private live has already ended.');
+        await _loadDashboard();
+        return;
+      }
+      await _joinRoom(_map(room));
+      await _loadDashboard();
+    } catch (error) {
+      _notice('Private invitation could not be processed: $error');
     }
   }
 
@@ -454,6 +494,25 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                   ),
                 );
               }),
+            if (_privateInvites.isNotEmpty) ...[
+              _sectionTitle('Private Live Invitations'),
+              ..._privateInvites.map((invite) => _panelCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.lock_person_rounded, color: _gold, size: 28),
+                  title: Text('Private Live • ${invite['room_id']}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Invitation expires in 10 minutes', style: TextStyle(color: _muted, fontSize: 11)),
+                  trailing: Wrap(spacing: 2, children: [
+                    IconButton(tooltip: 'Accept', onPressed: () => _respondPrivateInvite(invite, true),
+                      icon: const Icon(Icons.check_circle, color: Colors.greenAccent)),
+                    IconButton(tooltip: 'Decline', onPressed: () => _respondPrivateInvite(invite, false),
+                      icon: const Icon(Icons.cancel, color: Colors.redAccent)),
+                  ]),
+                ),
+              )),
+            ],
             if (_guestInvites.isNotEmpty) ...[
               _sectionTitle('Guest Seat Invitations'),
               ..._guestInvites.map((invite) => _panelCard(
