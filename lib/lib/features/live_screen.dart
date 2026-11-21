@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../event_control_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
@@ -91,7 +92,7 @@ class _LiveGiftMediaState extends State<_LiveGiftMedia> {
         width: widget.size,
         height: widget.size,
         child: Image.network(widget.url, fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70), size: 38)),
+          errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, color: Color(0xFFB9AEFF), size: 38)),
       );
     }
     return SizedBox(width: widget.size, height: widget.size,
@@ -600,9 +601,9 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF241630),
+        backgroundColor: const Color(0xFF141E35),
         title: const Text('Guest Seat Invitation',
-            style: TextStyle(color: Color(0xFFE5BD70))),
+            style: TextStyle(color: Color(0xFFB9AEFF))),
         content: Text(
           'The host invited you to guest seat ${invitation['seat_number']}. Join this live room as a guest?',
           style: const TextStyle(color: Colors.white),
@@ -709,8 +710,8 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF241630),
-          title: const Text('Invite Guest', style: TextStyle(color: Color(0xFFE5BD70))),
+          backgroundColor: const Color(0xFF141E35),
+          title: const Text('Invite Guest', style: TextStyle(color: Color(0xFFB9AEFF))),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -726,7 +727,7 @@ class _LiveScreenState extends State<LiveScreen> {
               const SizedBox(height: 10),
               DropdownButton<int>(
                 value: seatNumber,
-                dropdownColor: const Color(0xFF241630),
+                dropdownColor: const Color(0xFF141E35),
                 isExpanded: true,
                 items: List<DropdownMenuItem<int>>.generate(
                   6,
@@ -812,9 +813,9 @@ class _LiveScreenState extends State<LiveScreen> {
         height: 156,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFF21152F),
+          color: const Color(0xFF1B2844),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE5BD70), width: 2),
+          border: Border.all(color: const Color(0xFFB9AEFF), width: 2),
         ),
         child: VideoTrackRenderer(localTrack),
       );
@@ -847,9 +848,9 @@ class _LiveScreenState extends State<LiveScreen> {
       height: 156,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFF21152F),
+        color: const Color(0xFF1B2844),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5BD70), width: 2),
+        border: Border.all(color: const Color(0xFFB9AEFF), width: 2),
       ),
       child: Stack(
         fit: StackFit.expand,
@@ -1138,8 +1139,8 @@ class _LiveScreenState extends State<LiveScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: const Color(0xFF241630),
-          title: const Text('Live Privacy Settings', style: TextStyle(color: Color(0xFFE5BD70))),
+          backgroundColor: const Color(0xFF141E35),
+          title: const Text('Live Privacy Settings', style: TextStyle(color: Color(0xFFB9AEFF))),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Private Room', style: TextStyle(color: Colors.white)),
               value: privateValue, onChanged: !_canUsePrivateRooms ? null : (v) => setDialogState(() { privateValue = v; if (v) lockedValue = true; })),
@@ -1174,8 +1175,8 @@ class _LiveScreenState extends State<LiveScreen> {
     final zoonlId = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF241630),
-        title: const Text('Invite by ZOONL ID', style: TextStyle(color: Color(0xFFE5BD70))),
+        backgroundColor: const Color(0xFF141E35),
+        title: const Text('Invite by ZOONL ID', style: TextStyle(color: Color(0xFFB9AEFF))),
         content: TextField(controller: controller, keyboardType: TextInputType.number,
           style: const TextStyle(color: Colors.white), decoration: const InputDecoration(labelText: 'Member ZOONL ID')),
         actions: [
@@ -1215,11 +1216,26 @@ class _LiveScreenState extends State<LiveScreen> {
     }
     if (!mounted) return;
     setState(() => _giftLoading = false);
+    var eventRows = <Map<String, dynamic>>[];
+    try {
+      final rows = await _supabase
+          .from('live_events')
+          .select('id,title,description,event_type,starts_at,ends_at,status')
+          .inFilter('status', ['upcoming', 'active'])
+          .gte('ends_at', DateTime.now().toUtc().toIso8601String())
+          .order('starts_at', ascending: true)
+          .limit(5);
+      eventRows = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      // Event discovery is independent from the gift transaction flow.
+    }
     var category = 'ALL';
     var quantity = 1;
     var sending = false;
     await showModalBottomSheet<void>(
-      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF171126),
+      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF0D1426),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
           final categories = <String>{'ALL', ..._giftCatalog.map((g) => (g['category'] ?? 'General').toString().trim()).where((v) => v.isNotEmpty)};
@@ -1228,9 +1244,50 @@ class _LiveScreenState extends State<LiveScreen> {
             height: MediaQuery.of(context).size.height * .78,
             child: Column(children: [
               Padding(padding: const EdgeInsets.all(14), child: Row(children: [
-                const Expanded(child: Text('ALL LIVE GIFTS', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.w900, fontSize: 17))),
+                const Expanded(child: Text('ALL LIVE GIFTS', style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.w900, fontSize: 17))),
+                if (_isTrustedOwner)
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(sheetContext).push<void>(
+                      MaterialPageRoute<void>(builder: (_) => const EventControlScreen()),
+                    ),
+                    icon: const Icon(Icons.event_available, size: 16),
+                    label: const Text('EVENTS'),
+                  ),
                 IconButton(onPressed: () => Navigator.pop(sheetContext), icon: const Icon(Icons.close, color: Colors.white)),
               ])),
+              if (eventRows.isNotEmpty)
+                SizedBox(
+                  height: 82,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children: eventRows.map((event) => Container(
+                      width: 230,
+                      margin: const EdgeInsets.only(right: 8, bottom: 7),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF29365E), Color(0xFF17243D)]),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF8F7BFF).withOpacity(.55)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(event['title'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${event['event_type'].toString().toUpperCase()} • ${event['status'].toString().toUpperCase()}',
+                            style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 10, fontWeight: FontWeight.w700),
+                          ),
+                          Expanded(child: Text(event['description']?.toString() ?? '',
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 10))),
+                        ],
+                      ),
+                    )).toList(),
+                  ),
+                ),
               if (_isHost)
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1276,17 +1333,17 @@ class _LiveScreenState extends State<LiveScreen> {
                       },
                       child: Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(13),
-                          border: Border.all(color: const Color(0xFFE5BD70).withOpacity(.28))),
+                        decoration: BoxDecoration(color: const Color(0xFF141E35), borderRadius: BorderRadius.circular(13),
+                          border: Border.all(color: const Color(0xFFB9AEFF).withOpacity(.28))),
                         child: Column(children: [
                           Expanded(child: imageUrl.isEmpty
-                            ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70))
+                            ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFB9AEFF))
                             : Image.network(imageUrl, fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70)))),
+                                errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFB9AEFF)))),
                           Text((gift['gift_name'] ?? 'Gift').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white, fontSize: 11)),
                           const SizedBox(height: 3),
-                          Text('${gift['coin_price'] ?? 0} coins', style: const TextStyle(color: Color(0xFFE5BD70), fontSize: 10)),
+                          Text('${gift['coin_price'] ?? 0} coins', style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 10)),
                         ]),
                       ),
                     );
@@ -1350,15 +1407,15 @@ class _LiveScreenState extends State<LiveScreen> {
     final image = (gift['media_url'] ?? gift['image_url'] ?? '').toString();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF6D3BA5), Color(0xFF2A1740)]),
-        borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE5BD70), width: 1.2)),
+      decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF5145A8), Color(0xFF1B2A4A)]),
+        borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFB9AEFF), width: 1.2)),
       child: Row(children: [
         if (image.isNotEmpty) _LiveGiftMedia(url: image, size: 42)
-        else const Icon(Icons.card_giftcard, color: Color(0xFFE5BD70), size: 30),
+        else const Icon(Icons.card_giftcard, color: Color(0xFFB9AEFF), size: 30),
         const SizedBox(width: 10),
         Expanded(child: Text('${gift['sender_name'] ?? 'Viewer'} sent ${gift['gift_name'] ?? 'a gift'} ×${gift['quantity'] ?? 1}',
           maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12))),
-        Text('${gift['total_coins'] ?? 0} coins', style: const TextStyle(color: Color(0xFFE5BD70), fontSize: 10)),
+        Text('${gift['total_coins'] ?? 0} coins', style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 10)),
       ]),
     );
   }
@@ -1464,7 +1521,7 @@ class _LiveScreenState extends State<LiveScreen> {
       body = _buildStartScreen();
     } else {
       body = const Center(
-        child: CircularProgressIndicator(color: Color(0xFFE5BD70)),
+        child: CircularProgressIndicator(color: Color(0xFFB9AEFF)),
       );
     }
 
@@ -1476,7 +1533,7 @@ class _LiveScreenState extends State<LiveScreen> {
         title: const Text(
           'ZOONL LIVE ROOM',
           style: TextStyle(
-            color: Color(0xFFE5BD70),
+            color: Color(0xFFB9AEFF),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -1493,7 +1550,7 @@ class _LiveScreenState extends State<LiveScreen> {
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: const Color(0xFF21152F),
+        color: const Color(0xFF1B2844),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFF9360F5)),
       ),
@@ -1511,7 +1568,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(_previewLoading ? Icons.camera : Icons.no_photography,
-                      size: 58, color: const Color(0xFFE5BD70)),
+                      size: 58, color: const Color(0xFFB9AEFF)),
                   const SizedBox(height: 10),
                   Text(
                     _previewError ?? (_previewLoading ? 'Opening camera...' : 'Camera preview unavailable'),
@@ -1571,7 +1628,7 @@ class _LiveScreenState extends State<LiveScreen> {
           const SizedBox(height: 16),
           const Text('Preview Filters',
               style: TextStyle(
-                  color: Color(0xFFE5BD70),
+                  color: Color(0xFFB9AEFF),
                   fontSize: 18,
                   fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -1617,13 +1674,13 @@ class _LiveScreenState extends State<LiveScreen> {
             height: 190,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                  colors: [Color(0xFF6E3B8F), Color(0xFF21152F)]),
+                  colors: [Color(0xFF6E3B8F), Color(0xFF1B2844)]),
               borderRadius: BorderRadius.circular(22),
             ),
             child: const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.headphones, size: 72, color: Color(0xFFE5BD70)),
+                Icon(Icons.headphones, size: 72, color: Color(0xFFB9AEFF)),
                 SizedBox(height: 10),
                 Text('AUDIO LIVE READY',
                     style: TextStyle(
@@ -1634,7 +1691,7 @@ class _LiveScreenState extends State<LiveScreen> {
         const SizedBox(height: 20),
         const Text('Start Your Live Room',
             style: TextStyle(
-                color: Color(0xFFE5BD70),
+                color: Color(0xFFB9AEFF),
                 fontSize: 22,
                 fontWeight: FontWeight.bold)),
         const SizedBox(height: 14),
@@ -1646,7 +1703,7 @@ class _LiveScreenState extends State<LiveScreen> {
             labelText: 'Live Room Title',
             labelStyle: const TextStyle(color: Colors.white70),
             filled: true,
-            fillColor: const Color(0xFF241630),
+            fillColor: const Color(0xFF141E35),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14)),
           ),
@@ -1654,22 +1711,22 @@ class _LiveScreenState extends State<LiveScreen> {
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: const Color(0xFF241630), borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(color: const Color(0xFF141E35), borderRadius: BorderRadius.circular(14)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('ROOM PRIVACY SETTINGS', style: TextStyle(color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+            const Text('ROOM PRIVACY SETTINGS', style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Private Room', style: TextStyle(color: Colors.white)),
               subtitle: Text(_canUsePrivateRooms ? 'Only invited members and approved guest seats can enter.' : 'Unlocks at Level 10. Current level: $_hostLevel.', style: const TextStyle(color: Colors.white60, fontSize: 11)),
               value: _privateRoom,
-              activeColor: const Color(0xFFE5BD70),
+              activeColor: const Color(0xFFB9AEFF),
               onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
               value: _lockedRoom,
-              activeColor: const Color(0xFFE5BD70),
+              activeColor: const Color(0xFFB9AEFF),
               onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() => _lockedRoom = v),
             ),
           ]),
@@ -1677,7 +1734,7 @@ class _LiveScreenState extends State<LiveScreen> {
         const SizedBox(height: 8),
         const Text('Room Type',
             style: TextStyle(
-                color: Color(0xFFE5BD70), fontWeight: FontWeight.bold)),
+                color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -1712,11 +1769,11 @@ class _LiveScreenState extends State<LiveScreen> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-              color: const Color(0xFF241630),
+              color: const Color(0xFF141E35),
               borderRadius: BorderRadius.circular(14)),
           child: Row(
             children: [
-              const Icon(Icons.person, color: Color(0xFFE5BD70)),
+              const Icon(Icons.person, color: Color(0xFFB9AEFF)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text('${widget.userName}  •  ID ${widget.userId}',
@@ -1780,7 +1837,7 @@ class _LiveScreenState extends State<LiveScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.person, size: 110, color: Color(0xFFE5BD70)),
+          const Icon(Icons.person, size: 110, color: Color(0xFFB9AEFF)),
           if (!_isHost)
             const Padding(
               padding: EdgeInsets.only(top: 12),
@@ -1804,9 +1861,9 @@ class _LiveScreenState extends State<LiveScreen> {
             fit: StackFit.expand,
             children: [
               Container(
-                color: const Color(0xFF21152F),
+                color: const Color(0xFF1B2844),
                 child: _selectedRoomType == 'audio'
-                    ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.headphones, size: 100, color: Color(0xFFE5BD70)), SizedBox(height: 12), Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]))
+                    ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.headphones, size: 100, color: Color(0xFFB9AEFF)), SizedBox(height: 12), Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20))]))
                     : _videoLayer(),
               ),
               if (_giftBanner != null)
@@ -1927,7 +1984,7 @@ class _LiveScreenState extends State<LiveScreen> {
                       onPressed: _sendMessage,
                       icon: const Icon(
                         Icons.send,
-                        color: Color(0xFFE5BD70),
+                        color: Color(0xFFB9AEFF),
                       ),
                     ),
                   ],
