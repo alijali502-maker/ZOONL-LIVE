@@ -100,6 +100,7 @@ class ZoonlStore extends ChangeNotifier {
       <Map<String, dynamic>>[];
   List<Map<String, dynamic>> giftCatalog = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> cosmeticsCatalog = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> userBaggage = <Map<String, dynamic>>[];
 
   String officialHostingEmail = 'hosting@zoonllive.com';
@@ -236,6 +237,7 @@ class ZoonlStore extends ChangeNotifier {
     agencyApplications = <Map<String, dynamic>>[];
     giftCatalog = <Map<String, dynamic>>[];
     cosmeticsCatalog = <Map<String, dynamic>>[];
+    primeTiers = <Map<String, dynamic>>[];
     userBaggage = <Map<String, dynamic>>[];
     streamers.clear();
     shortVideos.clear();
