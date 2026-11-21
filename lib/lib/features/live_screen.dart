@@ -656,32 +656,61 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   ColorFilter get _selectedPreviewColorFilter {
+    const identity = <double>[
+      1, 0, 0, 0, 0,
+      0, 1, 0, 0, 0,
+      0, 0, 1, 0, 0,
+      0, 0, 0, 1, 0,
+    ];
     final strength = _filterStrength.clamp(0.0, 1.0);
-    if (_previewFilter == 'Mono') {
-      return ColorFilter.matrix(<double>[
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0, 0, 0, 1, 0,
-      ]);
+    if (_previewFilter == 'Natural' || strength == 0) {
+      return const ColorFilter.matrix(identity);
     }
-    final presets = <String, Color>{
-      'Soft Glow': const Color(0xFFFFE7D6),
-      'Vivid': const Color(0xFFFF4D65),
-      'Cinema': const Color(0xFF526B82),
-      'Warm': const Color(0xFFFFA45B),
-      'Sunset': const Color(0xFFFF6A45),
-      'Cool': const Color(0xFF73B9FF),
-      'Ice': const Color(0xFF9BE8FF),
-      'Rose': const Color(0xFFFF78B7),
-      'Peach': const Color(0xFFFFB58F),
-      'Mint': const Color(0xFF79E2C3),
-      'Lavender': const Color(0xFFB79AFF),
+
+    // Real per-channel tone, contrast and saturation transforms. These are
+    // rendered over the published LiveKit track for host and viewers.
+    final presets = <String, ({double saturation, double contrast, double brightness, double red, double green, double blue})>{
+      'Soft Glow': (saturation: .92, contrast: .96, brightness: 9, red: 3, green: 2, blue: 0),
+      'Vivid': (saturation: 1.34, contrast: 1.12, brightness: 1, red: 0, green: 0, blue: 0),
+      'Cinema': (saturation: .86, contrast: 1.20, brightness: -5, red: 3, green: 1, blue: 7),
+      'Warm': (saturation: 1.08, contrast: 1.05, brightness: 3, red: 8, green: 2, blue: -8),
+      'Sunset': (saturation: 1.18, contrast: 1.10, brightness: 2, red: 12, green: 0, blue: -10),
+      'Cool': (saturation: 1.04, contrast: 1.06, brightness: 2, red: -5, green: 1, blue: 9),
+      'Ice': (saturation: .92, contrast: 1.12, brightness: 7, red: -5, green: 2, blue: 12),
+      'Rose': (saturation: 1.12, contrast: 1.04, brightness: 3, red: 9, green: -3, blue: 3),
+      'Peach': (saturation: 1.05, contrast: 1.02, brightness: 7, red: 10, green: 3, blue: -4),
+      'Mint': (saturation: 1.08, contrast: 1.06, brightness: 3, red: -4, green: 8, blue: 3),
+      'Lavender': (saturation: .98, contrast: 1.08, brightness: 4, red: 5, green: 0, blue: 10),
+      'Mono': (saturation: 0, contrast: 1.08, brightness: 0, red: 0, green: 0, blue: 0),
     };
-    final tint = presets[_previewFilter];
-    if (tint == null || strength <= 0) return const ColorFilter.mode(Colors.transparent, BlendMode.srcOver);
-    final opacity = (strength * (_previewFilter == 'Soft Glow' ? .24 : .38)).clamp(0.0, .38);
-    return ColorFilter.mode(tint.withOpacity(opacity), BlendMode.softLight);
+    final preset = presets[_previewFilter];
+    if (preset == null) return const ColorFilter.matrix(identity);
+
+    const lr = .2126;
+    const lg = .7152;
+    const lb = .0722;
+    final sat = preset.saturation;
+    final contrast = 1 + (preset.contrast - 1) * strength;
+    final saturation = 1 + (sat - 1) * strength;
+    final red = (preset.red * strength) + 128 * (1 - contrast);
+    final green = (preset.green * strength) + 128 * (1 - contrast);
+    final blue = (preset.blue * strength) + 128 * (1 - contrast);
+    final matrix = <double>[
+      (lr * (1 - saturation) + saturation) * contrast,
+      (lg * (1 - saturation)) * contrast,
+      (lb * (1 - saturation)) * contrast, 0,
+      red + preset.brightness * strength,
+      (lr * (1 - saturation)) * contrast,
+      (lg * (1 - saturation) + saturation) * contrast,
+      (lb * (1 - saturation)) * contrast, 0,
+      green + preset.brightness * strength,
+      (lr * (1 - saturation)) * contrast,
+      (lg * (1 - saturation)) * contrast,
+      (lb * (1 - saturation) + saturation) * contrast, 0,
+      blue + preset.brightness * strength,
+      0, 0, 0, 1, 0,
+    ];
+    return ColorFilter.matrix(matrix);
   }
 
   // ---------- Host: go live ----------
