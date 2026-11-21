@@ -443,7 +443,7 @@ class _LiveScreenState extends State<LiveScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF080808),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -2033,8 +2033,8 @@ class _LiveScreenState extends State<LiveScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('LIVE VIDEO FILTER',
-                  style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold, fontSize: 17)),
+                const Text('LIVE VIDEO FILTERS',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
@@ -2042,6 +2042,10 @@ class _LiveScreenState extends State<LiveScreen> {
                   children: _previewFilters.map((filter) => ChoiceChip(
                     label: Text(filter),
                     selected: selected == filter,
+                    selectedColor: Colors.white,
+                    backgroundColor: const Color(0xFF202020),
+                    side: const BorderSide(color: Color(0x66FFFFFF)),
+                    labelStyle: TextStyle(color: selected == filter ? Colors.black : Colors.white, fontWeight: FontWeight.w700),
                     onSelected: saving ? null : (_) => setSheetState(() => selected = filter),
                   )).toList(),
                 ),
@@ -2057,7 +2061,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   Text('${(strength * 100).round()}%', style: const TextStyle(color: Colors.white)),
                 ]),
                 const Text(
-                  'This colour effect is synchronized to ZOONL LIVE viewers. It changes the in-app video display, not the original camera source.',
+                  '13 image and lighting presets adjust colour channels, contrast and saturation in the live video view for viewers. Face reshaping, skin retouch and eye enlargement are separate AI features and are not enabled in this build.',
                   style: TextStyle(color: Colors.white60, fontSize: 11),
                 ),
                 const SizedBox(height: 14),
