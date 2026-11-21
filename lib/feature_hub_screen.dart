@@ -177,7 +177,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
     bool accept,
   ) async {
     try {
-      await Backend.client.rpc(
+      final seatId = await Backend.client.rpc(
         'room_respond_guest_invitation',
         params: <String, dynamic>{
           'p_invitation_id': invitation['id'],
@@ -186,6 +186,11 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       );
       if (!mounted) return;
       if (accept) {
+        if (seatId == null) {
+          _notice('This guest invitation expired or the seat was taken.');
+          await _loadDashboard();
+          return;
+        }
         final roomId = invitation['room_id'].toString();
         final room = await Backend.client
             .from('live_rooms')
