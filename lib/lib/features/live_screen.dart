@@ -299,6 +299,12 @@ class _LiveScreenState extends State<LiveScreen> {
   String? _entryBannerMedia;
   AudioPlayer? _giftAudioPlayer;
   int _hostLevel = 1;
+  int _hostStarDailyCoins = 0;
+  int _hostStarCount = 0;
+  List<Map<String, dynamic>> _viewerPreviewProfiles = <Map<String, dynamic>>[];
+  bool _loadingViewerPreview = false;
+  static const List<int> _starThresholds = <int>[10000, 50000, 300000, 600000, 1000000];
+  static const List<Color> _starColors = <Color>[Color(0xFF42C7FF), Color(0xFF56E39B), Color(0xFFB68AFF), Color(0xFFFF6F75), Color(0xFFFFD66E)];
   String _hostDisplayName = '';
   String _hostZoonlId = '';
   String? _hostAvatarUrl;
@@ -510,6 +516,40 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  Future<void> _loadHostStarProgress(String userId) async {
+    try {
+      final row = await _supabase.from('streamer_gifting_summary').select('daily_coins').eq('streamer_id', userId).maybeSingle();
+      final coins = (row?['daily_coins'] as num?)?.toInt() ?? 0;
+      var stars = 0;
+      for (final target in _starThresholds) { if (coins >= target) { stars++; } else { break; } }
+      if (!mounted) return;
+      setState(() { _hostStarDailyCoins = coins; _hostStarCount = stars; });
+    } catch (_) { if (mounted) setState(() { _hostStarDailyCoins = 0; _hostStarCount = 0; }); }
+  }
+
+  Widget _hostStarStrip() {
+    final stars = _hostStarCount.clamp(0, 5);
+    final next = stars >= 5 ? _starThresholds.last : _starThresholds[stars];
+    final previous = stars == 0 ? 0 : _starThresholds[stars - 1];
+    final progress = stars >= 5 ? 1.0 : ((_hostStarDailyCoins - previous) / (next - previous)).clamp(0.0, 1.0).toDouble();
+    final color = stars == 0 ? _starColors.first : _starColors[stars - 1];
+    return Container(width: 250, margin: const EdgeInsets.only(top: 6), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(gradient: LinearGradient(colors: [const Color(0xD9161A2A), color.withOpacity(.28), const Color(0xE9080B14)]),
+        borderRadius: BorderRadius.circular(13), border: Border.all(color: color.withOpacity(.85)),
+        boxShadow: [BoxShadow(color: color.withOpacity(.24), blurRadius: 12), const BoxShadow(color: Colors.black54, blurRadius: 6, offset: Offset(1,3))]),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [const Text('STREAMER STAR', style: TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900)), const Spacer(),
+          Text('$stars / 5', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900))]),
+        Row(children: List.generate(5, (i) => Expanded(child: Icon(i < stars ? Icons.star : Icons.star_border, size: 17,
+          color: i < stars ? _starColors[i] : Colors.white30,
+          shadows: i < stars ? [Shadow(color: _starColors[i].withOpacity(.85), blurRadius: 8)] : null)))),
+        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 4,
+          backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation<Color>(color))),
+        Text(stars >= 5 ? '5-star daily target reached' : '$_hostStarDailyCoins / $next coins today',
+          style: const TextStyle(color: Colors.white70, fontSize: 8)),
+      ]));
+  }
+
   Future<void> _loadHostIdentity(String userId) async {
     try {
       final profile = await _supabase.from('profiles')
@@ -522,6 +562,7 @@ class _LiveScreenState extends State<LiveScreen> {
         _hostAvatarUrl = profile?['avatar_url']?.toString();
         _hostZoonlId = (publicProfile?['zoonl_id'] ?? widget.userId).toString();
       });
+      unawaited(_loadHostStarProgress(userId));
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -788,6 +829,7 @@ class _LiveScreenState extends State<LiveScreen> {
       final hostProfile = await _supabase.from('profiles')
           .select('user_level').eq('id', myId).maybeSingle();
       _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
+      unawaited(_loadHostStarProgress(myId));
 
       await _connectLiveKit(roomId);
       _subscribeRealtime(roomId);
@@ -927,6 +969,41 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  Future<void> _refreshViewerPreview() async {
+    final room = _lk;
+    if (room == null || _loadingViewerPreview) return;
+    final ids = room.remoteParticipants.values.where((p) => _isHost || p.identity != _roomOwnerId)
+      .map((p) => p.identity).where((id) => id.isNotEmpty).take(40).toList();
+    if (ids.isEmpty) { if (mounted && _viewerPreviewProfiles.isNotEmpty) setState(() => _viewerPreviewProfiles = []); return; }
+    _loadingViewerPreview = true;
+    try {
+      final rows = await _supabase.from('profiles').select('id,display_name,avatar_url').inFilter('id', ids);
+      final byId = <String, Map<String, dynamic>>{for (final row in rows) row['id'].toString(): Map<String, dynamic>.from(row)};
+      final next = ids.map((id) => byId[id] ?? <String, dynamic>{'id':id,'display_name':'Viewer','avatar_url':null}).toList();
+      if (mounted) setState(() => _viewerPreviewProfiles = next);
+    } catch (_) {
+      if (mounted) setState(() => _viewerPreviewProfiles = ids.map((id) => <String,dynamic>{'id':id,'display_name':'Viewer'}).toList());
+    } finally { _loadingViewerPreview = false; }
+  }
+
+  Widget _viewerPreviewStrip(int viewers) {
+    final preview = _viewerPreviewProfiles.take(4).toList();
+    return Material(color: Colors.transparent, child: InkWell(onTap: _showLiveViewerList, borderRadius: BorderRadius.circular(22),
+      child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(color: const Color(0xAA050505), borderRadius: BorderRadius.circular(22), border: Border.all(color: const Color(0x77FFFFFF))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.visibility, color: Colors.white, size: 15), const SizedBox(width: 5),
+          Text('$viewers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+          const SizedBox(width: 5),
+          ...preview.map((p) { final url=(p['avatar_url']??'').toString(); return Container(width:29,height:29,margin:const EdgeInsets.only(right:3),
+            decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:const Color(0xFFE6C47A))),
+            child:ClipOval(child:url.isEmpty?const ColoredBox(color:Color(0xFF29243A),child:Icon(Icons.person,color:Colors.white70,size:17))
+              :Image.network(url,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Icon(Icons.person,color:Colors.white70,size:17)))); }),
+          if (viewers > 4) const Text('+', style: TextStyle(color: Colors.white70, fontSize: 9)),
+          const Icon(Icons.chevron_right, color: Colors.white70, size: 15),
+        ]))));
+  }
+
   void _onRoomChanged() {
     if (!mounted) return;
 
@@ -947,6 +1024,7 @@ class _LiveScreenState extends State<LiveScreen> {
     }
 
     setState(() {});
+    unawaited(_refreshViewerPreview());
   }
 
   Future<void> _showLiveViewerList() async {
@@ -2270,7 +2348,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF100B18),
-      appBar: AppBar(
+      appBar: _isLive ? null : AppBar(
         backgroundColor: const Color(0xFF1B1225),
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
@@ -2632,157 +2710,82 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _buildLiveRoom() {
-    final liveParticipants = _lk?.remoteParticipants.values.where((p) =>
-      _isHost || p.identity != _roomOwnerId
-    ).toList() ?? [];
+    final liveParticipants = _lk?.remoteParticipants.values.where((p) => _isHost || p.identity != _roomOwnerId).toList() ?? [];
     final viewers = liveParticipants.length;
+    return Column(children: [
+      Expanded(child: Stack(fit: StackFit.expand, children: [
+        Positioned.fill(child: ColoredBox(color: const Color(0xFF080A12),
+          child: _selectedRoomType == 'audio'
+            ? _AudioRoomThemeBackdrop(themeCode: _audioThemeCode, child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.headphones, size: 92, color: Colors.white), SizedBox(height: 10),
+                Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20))])))
+            : SizedBox.expand(child: _videoLayer()))),
+        const Positioned.fill(child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+          begin: Alignment.topCenter,end: Alignment.bottomCenter,colors:[Color(0x99000000),Colors.transparent,Color(0xCC000000)],stops:[0,.48,1]))))),
+        Positioned(top: 12,left: 12,child: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[_hostIdentityGlass(),_hostStarStrip()])),
+        Positioned(top: 14,right: 12,child:_viewerPreviewStrip(viewers)),
+        if (_selectedRoomType == 'audio') Positioned(left: 12,right: 12,top: 150,child:_audioSeatStage()),
+        if ((_isHost && _guestSeats.any((seat)=>seat['seat_status']=='occupied')) || _isGuest)
+          Positioned(right:12,top:165,child:_guestMiniOverlay()),
+        if (_giftBanner != null) Positioned.fill(child:_liveGiftBanner()),
+        if (_chatEnabled) Positioned(left:10,right:10,bottom:8,
+          child: ConstrainedBox(constraints:BoxConstraints(maxHeight:math.min(184,MediaQuery.of(context).size.height*.25)),
+            child:Container(padding:const EdgeInsets.fromLTRB(10,7,10,8),
+              decoration:BoxDecoration(gradient:const LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,
+                colors:[Color(0xB8181424),Color(0xD9080A12)]),borderRadius:BorderRadius.circular(16),
+                border:Border.all(color:const Color(0x55FFFFFF)),boxShadow:const[BoxShadow(color:Colors.black54,blurRadius:14,offset:Offset(0,5))]),
+              child:Column(mainAxisSize:MainAxisSize.min,children:[
+                Row(children:[const Icon(Icons.chat_bubble,color:Color(0xFFE6C47A),size:13),const SizedBox(width:6),
+                  const Text('LIVE CHAT',style:TextStyle(color:Colors.white70,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:1)),
+                  const Spacer(),Text('\${_messages.length} messages',style:const TextStyle(color:Colors.white38,fontSize:8))]),
+                const SizedBox(height:4),
+                SizedBox(height:104,child:ListView.builder(reverse:true,itemCount:_messages.length,itemBuilder:(context,index){
+                  final item=_messages[_messages.length-1-index];return Padding(padding:const EdgeInsets.symmetric(vertical:2),child:_buildChatLine(item));})),
+                const SizedBox(height:5),
+                Row(children:[
+                  Expanded(child:TextField(controller:_messageController,maxLength:300,style:const TextStyle(color:Colors.white,fontSize:12),
+                    decoration:InputDecoration(hintText:'Write a message...',hintStyle:const TextStyle(color:Colors.white54,fontSize:11),
+                      counterText:'',isDense:true,filled:true,fillColor:const Color(0x88000000),
+                      contentPadding:const EdgeInsets.symmetric(horizontal:11,vertical:9),
+                      border:OutlineInputBorder(borderRadius:BorderRadius.circular(18),borderSide:BorderSide.none)),
+                    onSubmitted:(_)=>_sendMessage())),
+                  const SizedBox(width:5),
+                  IconButton.filled(onPressed:_sendMessage,style:IconButton.styleFrom(backgroundColor:const Color(0xFFE6C47A),foregroundColor:Colors.black,
+                    minimumSize:const Size(36,36),padding:EdgeInsets.zero),icon:const Icon(Icons.send,size:17)),
+                ]),
+              ])))),
+      ])),
+      Container(padding:const EdgeInsets.fromLTRB(8,7,8,8),
+        decoration:const BoxDecoration(color:Color(0xFF100C18),border:Border(top:BorderSide(color:Color(0x33FFFFFF)))),
+        child:SafeArea(top:false,child:SingleChildScrollView(scrollDirection:Axis.horizontal,
+          child:Row(children:_isHost?_hostControls():_viewerControls())))),
+    ]);
+  }
 
-    return Column(
-      children: [
-        Expanded(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                color: const Color(0xFF1B2844),
-                child: _selectedRoomType == 'audio'
-                    ? _AudioRoomThemeBackdrop(
-                        themeCode: _audioThemeCode,
-                        child: const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.headphones, size: 100, color: Colors.white),
-                          SizedBox(height: 12),
-                          Text('AUDIO LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                        ])),
-                      )
-                    : _videoLayer(),
-              ),
-              if (_giftBanner != null)
-                Positioned.fill(child: _liveGiftBanner()),
-              Positioned(
-                top: 14,
-                left: 14,
-                child: _hostIdentityGlass(),
-              ),
-              Positioned(
-                top: 14,
-                right: 14,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _showLiveViewerList,
-                    borderRadius: BorderRadius.circular(22),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
-                      child: BackdropFilter(
-                        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xAA050505),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(color: const Color(0x77FFFFFF)),
-                          ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.visibility, color: Colors.white, size: 17),
-                            const SizedBox(width: 6),
-                            Text('$viewers', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                            const SizedBox(width: 5),
-                            const Text('VIEWERS', style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800)),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.chevron_right, color: Colors.white70, size: 15),
-                          ]),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (_isHost && _guestSeats.any((seat) => seat['seat_status'] == 'occupied') || _isGuest)
-                Positioned(
-                  right: 14,
-                  bottom: 54,
-                  child: _guestMiniOverlay(),
-                ),
-              Positioned(
-                left: 14,
-                bottom: 14,
-                child: Text(
-                  _roomName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        if (_chatEnabled)
-          Container(
-            height: 145,
-            padding: const EdgeInsets.all(10),
-            color: const Color(0xFF1B1225),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    reverse: true,
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final item =
-                          _messages[_messages.length - 1 - index];
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: _buildChatLine(item),
-                      );
-                    },
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        maxLength: 300,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          hintText: 'Write a message...',
-                          hintStyle: TextStyle(color: Colors.white54),
-                          counterText: '',
-                          isDense: true,
-                        ),
-                        onSubmitted: (_) => _sendMessage(),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _sendMessage,
-                      icon: const Icon(
-                        Icons.send,
-                        color: Color(0xFFB9AEFF),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 14,
-          ),
-          color: const Color(0xFF1B1225),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: _isHost ? _hostControls() : _viewerControls()),
-          ),
-        ),
-      ],
-    );
+  Widget _audioSeatStage() {
+    final seats=_guestSeats;
+    final occupied=seats.where((s)=>s['seat_status']=='occupied').toList();
+    final empty=seats.where((s)=>s['seat_status']!='occupied').toList();
+    final shown=[...occupied,...empty].take(6).toList();
+    return Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:9),
+      decoration:BoxDecoration(color:const Color(0x99090C18),borderRadius:BorderRadius.circular(18),border:Border.all(color:const Color(0x66E6C47A))),
+      child:Column(mainAxisSize:MainAxisSize.min,children:[
+        const Text('AUDIO BROADCAST SEATS',style:TextStyle(color:Colors.white,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1)),
+        const SizedBox(height:9),
+        Wrap(alignment:WrapAlignment.center,spacing:12,runSpacing:8,children:List.generate(6,(i){
+          final seat=i<shown.length?shown[i]:<String,dynamic>{};
+          final active=seat['seat_status']=='occupied';
+          final name=active?(seat['display_name']??seat['user_name']??'Guest').toString():'Open Seat';
+          return SizedBox(width:76,child:Column(mainAxisSize:MainAxisSize.min,children:[
+            Container(width:43,height:43,decoration:BoxDecoration(shape:BoxShape.circle,
+              gradient:LinearGradient(colors:active?const[Color(0xFFFFD77C),Color(0xFF8A5524)]:const[Color(0xFF39445C),Color(0xFF151B2A)]),
+              border:Border.all(color:active?const Color(0xFFFFE7AE):Colors.white24,width:1.5),
+              boxShadow:active?const[BoxShadow(color:Color(0x66E6C47A),blurRadius:10)]:null),
+              child:Icon(active?Icons.mic:Icons.add,color:Colors.white,size:20)),
+            const SizedBox(height:3),Text(name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w800)),
+          ]));
+        })),
+      ]));
   }
 
   List<Widget> _hostControls() {
