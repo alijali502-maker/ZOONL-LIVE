@@ -2403,6 +2403,18 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         store.currentUser['diamonds'] =
             (wallet['diamonds'] as num?)?.toInt() ?? 0;
       }
+      final activeStyle = await Backend.client
+          .from('zoonl_live_active_styles')
+          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (activeStyle != null) {
+        store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
+        store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
+        store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
+        store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
+        store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
+      }
       store.refresh();
     } catch (error) {
       _showMessage('Supabase inventory refresh failed: $error');
