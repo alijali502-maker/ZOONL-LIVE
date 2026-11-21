@@ -3313,9 +3313,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       if (item['zoonl_item_code']?.toString() == activeBgCode) activeBgItem = item;
       if (item['zoonl_item_code']?.toString() == activeFrameCode) activeFrameItem = item;
     }
-    final activeBgUrl = activeBgItem?['media_url']?.toString() ?? '';
+    final hasEquippedBg = activeBgItem != null && store.userBaggage.any((item) {
+      if (item['zoonl_item_code']?.toString() != activeBgCode || item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    });
+    final activeBgUrl = hasEquippedBg ? activeBgItem?['media_url']?.toString() ?? '' : '';
     final effectiveBgUrl = activeBgUrl.startsWith('http') ? activeBgUrl : profileBackgroundUrl;
-    final hasPremiumBg = activeBgItem != null;
+    final hasPremiumBg = hasEquippedBg;
     final hasEquippedFrame = activeFrameItem != null && store.userBaggage.any((item) {
       if (item['zoonl_item_code']?.toString() != activeFrameCode || item['is_equipped'] != true) return false;
       final expiry = item['expires_at'];
