@@ -56,7 +56,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 
   Future<void> _load() async {
     final user=_db.auth.currentUser;
-    if(user==null){if(mounted)setState(()=>_error='Login required.');return;}
+    if(user==null){if(mounted)setState((){_loading=false;_error='Login required.';});return;}
     setState(()=>_loading=true);
     try{
       final r=await Future.wait<dynamic>([
@@ -150,7 +150,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 
   @override Widget build(BuildContext context){
     Map<String,dynamic>? current,next;
-    for(final r in _levels){final n=(r['level'] as num).toInt();if(n==_level)current=r;if(n>_level&&next==null)next=r;}
+    for(final r in _levels){final n=(r['level'] as num).toInt();if(n==100&&!_owner)continue;if(n==_level)current=r;if(n>_level&&next==null)next=r;}
     final start=(current?['required_exp'] as num?)?.toInt()??0;
     final target=(next?['required_exp'] as num?)?.toInt()??start;
     final remain=(target-_exp).clamp(0,target).toInt();
