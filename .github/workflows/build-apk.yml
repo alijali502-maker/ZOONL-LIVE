@@ -53,11 +53,11 @@ jobs:
 
           p = Path("android/settings.gradle.kts")
           s = p.read_text()
-          match = re.search(r"pluginManagement\s*\\{", s)
+          match = re.search(r"pluginManagement\s*\{", s)
           if not match:
               raise SystemExit("pluginManagement block was not generated.")
           start = match.end()
-          repo_match = re.search(r"repositories\s*\\{", s[start:])
+          repo_match = re.search(r"repositories\s*\{", s[start:])
           if not repo_match:
               raise SystemExit("pluginManagement repositories block was not generated.")
           repo_start = start + repo_match.end()
