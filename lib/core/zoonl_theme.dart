@@ -4,24 +4,24 @@ import 'package:flutter/material.dart';
 class ZoonlTheme {
   ZoonlTheme._();
 
-  static const Color background = Color(0xFF070B17);
-  static const Color backgroundRaised = Color(0xFF0D1426);
-  static const Color surface = Color(0xFF141E35);
-  static const Color surfaceRaised = Color(0xFF1B2844);
-  static const Color border = Color(0xFF2C3B59);
-  static const Color champagne = Color(0xFF9B8CFF);
-  static const Color champagneLight = Color(0xFFD2CEFF);
-  static const Color teal = Color(0xFF58D6CE);
+  static const Color background = Color(0xFF080510);
+  static const Color backgroundRaised = Color(0xFF100B1D);
+  static const Color surface = Color(0xFF171126);
+  static const Color surfaceRaised = Color(0xFF211735);
+  static const Color border = Color(0xFF49345F);
+  static const Color champagne = Color(0xFF9360F5);
+  static const Color champagneLight = Color(0xFFE6C47A);
+  static const Color teal = Color(0xFFDA65C8);
   static const Color textPrimary = Color(0xFFF4F6FF);
-  static const Color textSecondary = Color(0xFFA9B4CA);
+  static const Color textSecondary = Color(0xFFC2B8D2);
   static const Color danger = Color(0xFFFF788E);
 
   static ThemeData get dark {
     final ColorScheme scheme = const ColorScheme.dark(
       primary: champagne,
-      onPrimary: Color(0xFF17130A),
+      onPrimary: Color(0xFFFFFFFF),
       secondary: teal,
-      onSecondary: Color(0xFF071713),
+      onSecondary: Color(0xFFFFFFFF),
       surface: surface,
       onSurface: textPrimary,
       error: danger,
@@ -93,7 +93,7 @@ class ZoonlTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: champagne,
-          foregroundColor: const Color(0xFF17130A),
+          foregroundColor: Colors.white,
           minimumSize: const Size(48, 48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
