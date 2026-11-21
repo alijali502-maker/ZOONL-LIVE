@@ -1307,11 +1307,11 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
-  Future<void> _showGuestInviteDialog() async {
+  Future<void> _showGuestInviteDialog({int? initialSeatNumber}) async {
     final roomId = _roomId;
     if (roomId == null || !_isHost) return;
     final idController = TextEditingController();
-    int seatNumber = 1;
+    int seatNumber = initialSeatNumber ?? 1;
     bool videoEnabled = _selectedRoomType == 'video';
     bool audioEnabled = true;
 
@@ -2805,9 +2805,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Widget _audioSeatStage() {
     final seats=_guestSeats;
-    final occupied=seats.where((s)=>s['seat_status']=='occupied').toList();
-    final empty=seats.where((s)=>s['seat_status']!='occupied').toList();
-    final shown=[...occupied,...empty].take(6).toList();
+    final shown=seats.take(6).toList();
     return Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:9),
       decoration:BoxDecoration(color:const Color(0x99090C18),borderRadius:BorderRadius.circular(18),border:Border.all(color:const Color(0x66E6C47A))),
       child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -2817,14 +2815,20 @@ class _LiveScreenState extends State<LiveScreen> {
           final seat=i<shown.length?shown[i]:<String,dynamic>{};
           final active=seat['seat_status']=='occupied';
           final name=active?(seat['display_name']??seat['user_name']??'Guest').toString():'Open Seat';
-          return SizedBox(width:76,child:Column(mainAxisSize:MainAxisSize.min,children:[
-            Container(width:43,height:43,decoration:BoxDecoration(shape:BoxShape.circle,
-              gradient:LinearGradient(colors:active?const[Color(0xFFFFD77C),Color(0xFF8A5524)]:const[Color(0xFF39445C),Color(0xFF151B2A)]),
-              border:Border.all(color:active?const Color(0xFFFFE7AE):Colors.white24,width:1.5),
-              boxShadow:active?const[BoxShadow(color:Color(0x66E6C47A),blurRadius:10)]:null),
-              child:Icon(active?Icons.mic:Icons.add,color:Colors.white,size:20)),
-            const SizedBox(height:3),Text(name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w800)),
-          ]));
+          final seatNumber=(seat['seat_number'] as num?)?.toInt() ?? (i+1);
+          return SizedBox(width:76,child:InkWell(
+            onTap:_isHost && !active ? () => _showGuestInviteDialog(initialSeatNumber:seatNumber) : null,
+            borderRadius:BorderRadius.circular(14),
+            child:Column(mainAxisSize:MainAxisSize.min,children:[
+              Container(width:43,height:43,decoration:BoxDecoration(shape:BoxShape.circle,
+                gradient:LinearGradient(colors:active?const[Color(0xFFFFD77C),Color(0xFF8A5524)]:const[Color(0xFF39445C),Color(0xFF151B2A)]),
+                border:Border.all(color:active?const Color(0xFFFFE7AE):Colors.white24,width:1.5),
+                boxShadow:active?const[BoxShadow(color:Color(0x66E6C47A),blurRadius:10)]:null),
+                child:Icon(active?Icons.mic:Icons.add,color:Colors.white,size:20)),
+              const SizedBox(height:3),Text(name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w800)),
+              if(_isHost && !active) const Text('INVITE',style:TextStyle(color:Color(0xFFE6C47A),fontSize:7,fontWeight:FontWeight.w900)),
+            ]),
+          ));
         })),
       ]));
   }
