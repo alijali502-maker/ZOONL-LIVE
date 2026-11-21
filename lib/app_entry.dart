@@ -166,6 +166,7 @@ class ZoonlAuthGate extends StatelessWidget {
                       'isLive': false,
                       'offlineSince': null,
                       'avatarUrl': profile['avatar_url'],
+                      'profileBackgroundUrl': profile['profile_background_url'],
                       'country': profile['country'],
                       'language': profile['language'],
                       'bio': profile['bio'],
@@ -388,7 +389,7 @@ class ZoonlAuthGate extends StatelessWidget {
   }
 
   static const String _profileColumns =
-      'id, username, display_name, avatar_url, country, '
+      'id, username, display_name, avatar_url, profile_background_url, country, '
       'language, bio, is_verified, user_level';
 
   Future<Map<String, dynamic>?> _loadProfile(
