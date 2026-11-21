@@ -14,6 +14,7 @@ import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_feed_screen.dart';
+import 'short_video_studio_screen.dart';
 import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
@@ -769,6 +770,14 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
                         ),
                       );
                     },
+                    onCreateShortVideo: () async {
+                      final uploaded = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => const ShortVideoStudioScreen(),
+                        ),
+                      );
+                      if (uploaded == true && mounted) setState(() {});
+                    },
                     onOpenWallet: () => setState(() => bottomIndex = 2),
                     onOpenPrime: () => setState(() { bottomIndex = 0; topTabIndex = 4; }),
                   ),
@@ -1250,12 +1259,14 @@ class _ProfileSocialPanel extends StatefulWidget {
   const _ProfileSocialPanel({
     required this.userId,
     required this.onOpenShortVideos,
+    required this.onCreateShortVideo,
     required this.onOpenWallet,
     required this.onOpenPrime,
   });
 
   final String userId;
   final VoidCallback onOpenShortVideos;
+  final Future<void> Function() onCreateShortVideo;
   final VoidCallback onOpenWallet;
   final VoidCallback onOpenPrime;
 
@@ -1353,6 +1364,13 @@ class _ProfileSocialPanelState extends State<_ProfileSocialPanel> {
                     children: [
                       const Expanded(child: Text('MY SHORT VIDEOS',
                         style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold))),
+                      TextButton(
+                        onPressed: () async {
+                          await widget.onCreateShortVideo();
+                          if (mounted) setState(() => _future = _load());
+                        },
+                        child: const Text('CREATE'),
+                      ),
                       TextButton(onPressed: widget.onOpenShortVideos, child: const Text('OPEN ALL')),
                     ],
                   ),
@@ -3212,8 +3230,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         _ProfileSocialPanel(
-          userId: userId,
+          userId: Backend.currentUserId ?? '',
           onOpenShortVideos: widget.onOpenShortVideos,
+          onCreateShortVideo: widget.onCreateShortVideo,
           onOpenWallet: widget.onOpenWallet,
           onOpenPrime: widget.onOpenPrime,
         ),
