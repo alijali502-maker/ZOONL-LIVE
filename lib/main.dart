@@ -10,6 +10,7 @@ import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
+import 'features/pk_battle_screen.dart';
 import 'lib/features/live_screen.dart';
 
 Future<void> main() async {
@@ -1920,76 +1921,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildPkSection() {
-    final int slots = pkModeSelected == '6P'
-        ? 6
-        : pkModeSelected == '4GRID'
-            ? 4
-            : pkModeSelected == '3P'
-                ? 3
-                : 2;
-
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: <Widget>[
-        _luxuryCard(
-          title: 'PK Battle Arena',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Wrap(
-                spacing: 8,
-                children: <String>[
-                  '6P',
-                  '3P',
-                  '2P',
-                  'TRAIN',
-                  '4GRID',
-                ].map((String mode) {
-                  return ChoiceChip(
-                    label: Text(mode),
-                    selected: pkModeSelected == mode,
-                    onSelected: (_) {
-                      setState(() => pkModeSelected = mode);
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 10),
-              Text('Selected PK Mode: $pkModeSelected'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: List<Widget>.generate(slots, (int index) {
-                  return Container(
-                    width: 140,
-                    height: 80,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1D2B37),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFD6B46A),
-                      ),
-                    ),
-                    child: Text(
-                      'Slot ${index + 1} ($pkModeSelected)',
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'PK invitations, live score sync and participant connections require the live-room service.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+    return PkBattleScreen(
+      currentUserName: (store.currentUser['name'] ?? 'ZOONL Host').toString(),
+      currentUserId: (store.currentUser['id'] ?? '').toString(),
     );
   }
 
