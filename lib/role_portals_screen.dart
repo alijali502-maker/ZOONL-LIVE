@@ -6,12 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/backend.dart';
 import 'event_control_screen.dart';
 
-const Color _bg = Color(0xFF080D14);
-const Color _panel = Color(0xFF17232E);
-const Color _raised = Color(0xFF1D2B37);
-const Color _gold = Color(0xFFD6B46A);
-const Color _teal = Color(0xFF4BC2B0);
-const Color _muted = Color(0xFFAAB5BE);
+const Color _bg = Color(0xFF080510);
+const Color _panel = Color(0xFF171126);
+const Color _raised = Color(0xFF211735);
+const Color _gold = Color(0xFFE6C47A);
+const Color _teal = Color(0xFFDA65C8);
+const Color _muted = Color(0xFFC2B8D2);
 
 class RolePortalGateScreen extends StatefulWidget {
   const RolePortalGateScreen({super.key});
