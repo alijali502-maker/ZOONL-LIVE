@@ -932,7 +932,7 @@ class _LiveScreenState extends State<LiveScreen> {
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
-          table: 'live_room_members',
+          table: 'live_room_entry_events',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
             column: 'room_id',
@@ -976,9 +976,7 @@ class _LiveScreenState extends State<LiveScreen> {
     try {
       final profile = await _supabase.from('profiles')
           .select('display_name').eq('id', userId).maybeSingle();
-      final styles = await _supabase.from('zoonl_live_active_styles')
-          .select('active_entry_code').eq('user_id', userId).maybeSingle();
-      final code = styles?['active_entry_code']?.toString() ?? '';
+      final code = member['entry_code']?.toString() ?? '';
       Map<String, dynamic>? effect;
       if (code.isNotEmpty) {
         effect = await _supabase.from('zoonl_live_cosmetics')
