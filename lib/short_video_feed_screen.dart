@@ -25,17 +25,21 @@ class _ShortVideoFeedScreenState extends State<ShortVideoFeedScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      var query = _db.from('short_videos').select(
+      final select = _db.from('short_videos').select(
         'id,user_id,video_url,caption,filter_name,duration_seconds,likes_count,created_at',
       );
-      if (widget.onlyMine) {
-        final uid = _db.auth.currentUser?.id;
-        if (uid == null) throw StateError('Login required.');
-        query = query.eq('user_id', uid);
-      } else {
-        query = query.eq('is_public', true);
+      final rows = widget.onlyMine
+          ? await select
+              .eq('user_id', _db.auth.currentUser?.id ?? '')
+              .order('created_at', ascending: false)
+              .limit(60)
+          : await select
+              .eq('is_public', true)
+              .order('created_at', ascending: false)
+              .limit(60);
+      if (widget.onlyMine && _db.auth.currentUser == null) {
+        throw StateError('Login required.');
       }
-      final rows = await query.order('created_at', ascending: false).limit(60);
       final videos = (rows as List).map((e) => Map<String,dynamic>.from(e)).toList();
       final ids = videos.map((e) => e['user_id'].toString()).toSet().toList();
       if (ids.isNotEmpty) {
