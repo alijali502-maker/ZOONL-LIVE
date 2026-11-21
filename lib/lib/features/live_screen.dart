@@ -2201,237 +2201,196 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _buildStartScreen() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    final camera = _previewCamera;
+    return LayoutBuilder(builder: (context, constraints) => Stack(
+      fit: StackFit.expand,
       children: [
-        if (_selectedRoomType == 'video') ...[
-          _buildCameraPreviewPanel(),
-          const SizedBox(height: 16),
-          const Text('Preview Filters',
-              style: TextStyle(
-                  color: Color(0xFFB9AEFF),
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _previewFilters.map((filter) {
-              return ChoiceChip(
-                label: Text(filter),
-                selected: _previewFilter == filter,
-                onSelected: _busy
-                    ? null
-                    : (_) => setState(() {
-                        _previewFilter = filter;
-                        _filterConfirmed = true;
-                      }),
-              );
-            }).toList(),
-          ),
-          Row(
-            children: [
-              const Text('Intensity',
-                  style: TextStyle(color: Colors.white70)),
-              Expanded(
-                child: Slider(
-                  value: _filterStrength,
-                  min: 0,
-                  max: 1,
-                  activeColor: const Color(0xFFDA65C8),
-                  onChanged: (value) =>
-                      setState(() => _filterStrength = value),
-                ),
-              ),
-              Text('${(_filterStrength * 100).round()}%',
-                  style: const TextStyle(color: Colors.white)),
-            ],
-          ),
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF171D36),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _filterConfirmed ? const Color(0xFF58D6CE) : const Color(0xFF9360F5)),
-            ),
-            child: Row(children: [
-              Icon(_filterConfirmed ? Icons.check_circle : Icons.tune,
-                color: _filterConfirmed ? const Color(0xFF58D6CE) : const Color(0xFFB9AEFF), size: 18),
-              const SizedBox(width: 8),
-              Expanded(child: Text(
-                _filterConfirmed
-                  ? '$_previewFilter is saved on this room and rendered for everyone using ZOONL LIVE. It is a display-side colour effect, not baked into the source video. Face retouch still needs a dedicated video-effects engine.'
-                  : 'Choose one filter above before starting the video room.',
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              )),
-            ]),
-          ),
-        ] else ...[
-          SizedBox(
-            height: 190,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: _AudioRoomThemeBackdrop(
-                themeCode: _audioThemeCode,
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.headphones, size: 72, color: Colors.white),
-                      SizedBox(height: 10),
-                      Text('AUDIO LIVE READY',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _openAudioThemePicker,
-            icon: const Icon(Icons.wallpaper),
-            label: const Text('CHOOSE AUDIO BACKGROUND'),
-          ),
-        ],
-        const SizedBox(height: 20),
-        const Text('Start Your Live Room',
-            style: TextStyle(
-                color: Color(0xFFB9AEFF),
-                fontSize: 22,
-                fontWeight: FontWeight.bold)),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _titleController,
-          style: const TextStyle(color: Colors.white),
-          maxLength: 60,
-          decoration: InputDecoration(
-            labelText: 'Live Room Title',
-            labelStyle: const TextStyle(color: Colors.white70),
-            filled: true,
-            fillColor: const Color(0xFF141E35),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: const Color(0xFF141E35), borderRadius: BorderRadius.circular(14)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('ROOM PRIVACY SETTINGS', style: TextStyle(color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Private Room', style: TextStyle(color: Colors.white)),
-              subtitle: Text(_canUsePrivateRooms ? 'Only invited members and approved guest seats can enter.' : 'Unlocks at Level 10. Current level: $_hostLevel.', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-              value: _privateRoom,
-              activeColor: const Color(0xFFB9AEFF),
-              onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
-              value: _lockedRoom,
-              activeColor: const Color(0xFFB9AEFF),
-              onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() => _lockedRoom = v),
+        if (_selectedRoomType == 'video' && camera != null && camera.value.isInitialized)
+          ColorFiltered(
+            colorFilter: _selectedPreviewColorFilter,
+            child: SizedBox.expand(child: CameraPreview(camera)),
+          )
+        else if (_selectedRoomType == 'audio')
+          _AudioRoomThemeBackdrop(
+            themeCode: _audioThemeCode,
+            child: const Center(child: Icon(Icons.graphic_eq, size: 112, color: Colors.white70)),
+          )
+        else
+          const ColoredBox(color: Color(0xFF080808)),
+        const Positioned.fill(child: IgnorePointer(child: DecoratedBox(
+          decoration: BoxDecoration(gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [Color(0x88000000), Colors.transparent, Color(0xEE000000)],
+            stops: [0, .38, 1]))))),
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 8,
+          left: 14,
+          right: 14,
+          child: Row(children: [
+            _startGlass(child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.wifi_tethering, color: Colors.white, size: 19),
+              const SizedBox(width: 9),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('ZOONL BROADCAST STUDIO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: .8)),
+                Text('${widget.userName}  •  ID ${widget.userId}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+              ]),
+            ])),
+            const Spacer(),
+            IconButton.filled(
+              onPressed: _previewLoading ? null : _flipPreviewCamera,
+              style: IconButton.styleFrom(backgroundColor: const Color(0xAA000000), foregroundColor: Colors.white),
+              icon: const Icon(Icons.flip_camera_android),
             ),
           ]),
         ),
-        const SizedBox(height: 8),
-        const Text('Room Type',
-            style: TextStyle(
-                color: Color(0xFFB9AEFF), fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Video Live'),
-                selected: _selectedRoomType == 'video',
-                onSelected: _busy
-                    ? null
-                    : (_) {
-                        setState(() => _selectedRoomType = 'video');
-                        unawaited(_initializePreviewCamera());
-                      },
-              ),
+        if (_selectedRoomType == 'video' && (camera == null || !camera.value.isInitialized))
+          Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.camera_alt_outlined, size: 52, color: Colors.white),
+            const SizedBox(height: 10),
+            Text(_previewError ?? (_previewLoading ? 'Camera opening…' : 'Camera preview unavailable'),
+              style: const TextStyle(color: Colors.white70)),
+            if (!_previewLoading) TextButton(onPressed: _initializePreviewCamera, child: const Text('RETRY CAMERA')),
+          ])),
+        Positioned(
+          left: 10, right: 10, bottom: 10,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: constraints.maxHeight * .62),
+            child: _startGlass(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              child: SingleChildScrollView(child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Expanded(child: Text('GO LIVE SETUP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.1, fontSize: 12))),
+                    Text('PREVIEW', style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 9, fontWeight: FontWeight.w800)),
+                  ]),
+                  const SizedBox(height: 9),
+                  Row(children: [
+                    Expanded(child: _startModeButton('VIDEO LIVE', _selectedRoomType == 'video', () {
+                      setState(() => _selectedRoomType = 'video');
+                      unawaited(_initializePreviewCamera());
+                    })),
+                    const SizedBox(width: 8),
+                    Expanded(child: _startModeButton('AUDIO LIVE', _selectedRoomType == 'audio', () {
+                      setState(() => _selectedRoomType = 'audio');
+                      unawaited(_disposePreviewCamera());
+                    })),
+                  ]),
+                  if (_selectedRoomType == 'video') ...[
+                    const SizedBox(height: 10),
+                    const Text('FILTER LOOK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 6, runSpacing: 6, children: _previewFilters.map((filter) =>
+                      ChoiceChip(
+                        label: Text(filter, style: const TextStyle(fontSize: 10)),
+                        selected: _previewFilter == filter,
+                        onSelected: _busy ? null : (_) => setState(() { _previewFilter = filter; _filterConfirmed = true; }),
+                        selectedColor: Colors.white,
+                        backgroundColor: const Color(0x44000000),
+                        side: const BorderSide(color: Color(0x66FFFFFF)),
+                        labelStyle: TextStyle(color: _previewFilter == filter ? Colors.black : Colors.white),
+                      )).toList()),
+                    Row(children: [
+                      const Text('Strength', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                      Expanded(child: Slider(value: _filterStrength, onChanged: _busy ? null : (v) => setState(() => _filterStrength = v))),
+                      Text('${(_filterStrength * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                    ]),
+                    const Text('Current filter is a colour look only. Real-time face retouch is not yet connected to the outgoing LiveKit stream.',
+                      style: TextStyle(color: Colors.white70, fontSize: 9)),
+                  ] else
+                    Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                      onPressed: _busy ? null : _openAudioThemePicker,
+                      icon: const Icon(Icons.wallpaper, color: Colors.white),
+                      label: const Text('ROOM BACKGROUND', style: TextStyle(color: Colors.white)),
+                    )),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _titleController,
+                    maxLength: 60,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Broadcast title',
+                      hintStyle: const TextStyle(color: Colors.white60),
+                      counterText: '',
+                      filled: true,
+                      fillColor: const Color(0x44000000),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0x66FFFFFF))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0x44FFFFFF))),
+                    ),
+                  ),
+                  SwitchListTile(
+                    dense: true, contentPadding: EdgeInsets.zero,
+                    title: const Text('Private room', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    subtitle: Text(_canUsePrivateRooms ? 'Invite-only access' : 'Unlocks at Level 10', style: const TextStyle(color: Colors.white60, fontSize: 10)),
+                    value: _privateRoom,
+                    onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
+                  ),
+                  SwitchListTile(
+                    dense: true, contentPadding: EdgeInsets.zero,
+                    title: const Text('Lock room', style: TextStyle(color: Colors.white, fontSize: 12)),
+                    value: _lockedRoom,
+                    onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() => _lockedRoom = v),
+                  ),
+                  Row(children: [
+                    IconButton.filled(
+                      onPressed: _toggleMicrophone,
+                      style: IconButton.styleFrom(backgroundColor: const Color(0x66FFFFFF), foregroundColor: Colors.white),
+                      icon: Icon(_microphoneEnabled ? Icons.mic : Icons.mic_off),
+                    ),
+                    Expanded(child: Text(_microphoneEnabled ? 'Microphone on' : 'Microphone muted', style: const TextStyle(color: Colors.white70, fontSize: 11))),
+                    SizedBox(
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: _busy || (_selectedRoomType == 'video' && (!_filterConfirmed || camera?.value.isInitialized != true)) ? null : _startLive,
+                        icon: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering),
+                        label: Text(_busy ? 'CONNECTING' : 'GO LIVE'),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+                      ),
+                    ),
+                  ]),
+                ],
+              )),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: ChoiceChip(
-                label: const Text('Audio Live'),
-                selected: _selectedRoomType == 'audio',
-                onSelected: _busy
-                    ? null
-                    : (_) {
-                        setState(() => _selectedRoomType = 'audio');
-                        unawaited(_disposePreviewCamera());
-                      },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-              color: const Color(0xFF141E35),
-              borderRadius: BorderRadius.circular(14)),
-          child: Row(
-            children: [
-              const Icon(Icons.person, color: Color(0xFFB9AEFF)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('${widget.userName}  •  ID ${widget.userId}',
-                    style: const TextStyle(color: Colors.white)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            IconButton.filled(
-              onPressed: _toggleMicrophone,
-              style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFF39234D),
-                  foregroundColor: Colors.white),
-              icon: Icon(_microphoneEnabled ? Icons.mic : Icons.mic_off),
-              tooltip: 'Toggle microphone before live',
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _microphoneEnabled
-                    ? 'Microphone will be ON when live starts'
-                    : 'Live will start with microphone muted',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 54,
-          child: ElevatedButton.icon(
-            onPressed: _busy || (_selectedRoomType == 'video' &&
-                (!_filterConfirmed || _previewCamera?.value.isInitialized != true))
-                ? null : _startLive,
-            icon: _busy
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.play_circle),
-            label: Text(_busy
-                ? 'CONNECTING...'
-                : _selectedRoomType == 'audio'
-                    ? 'START AUDIO LIVE'
-                    : 'GO LIVE'),
           ),
         ),
       ],
+    ));
+  }
+
+  Widget _startGlass({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: const Color(0x99000000),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0x66FFFFFF)),
+            boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 28, offset: Offset(0, 8))],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _startModeButton(String label, bool selected, VoidCallback onTap) {
+    return InkWell(
+      onTap: _busy ? null : onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : const Color(0x33000000),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0x66FFFFFF)),
+        ),
+        child: Center(child: Text(label, style: TextStyle(color: selected ? Colors.black : Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+      ),
     );
   }
 
