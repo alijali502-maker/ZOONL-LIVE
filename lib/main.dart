@@ -720,15 +720,12 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
   int topTabIndex = 0;
   int bottomIndex = 0;
-  bool _isStoreOwner = false;
-  String _storeFilter = 'ALL';
 
   @override
   void initState() {
     super.initState();
     store.checkTrialExpiryAndMoveToBackup();
     store.addListener(_onStoreChanged);
-    unawaited(_loadVipStoreData());
   }
 
   @override
@@ -739,171 +736,6 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
   void _onStoreChanged() {
     if (mounted) setState(() {});
-  }
-
-  Future<void> _loadVipStoreData() async {
-    final userId = Backend.currentUserId;
-    if (userId == null) return;
-    try {
-      final client = Backend.client;
-      final owner = await Backend.isZoonlOwner();
-      final catalog = await client
-          .from('zoonl_live_cosmetics')
-          .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
-          .eq('project_name', 'ZOONL LIVE')
-          .eq('is_active', true)
-          .order('sort_order');
-      final tiers = await client
-          .from('prime_tiers')
-          .select('id,tier_name,benefits,is_active,coin_price,duration_days')
-          .eq('is_active', true)
-          .order('id');
-      final inventory = await client
-          .from('zoonl_live_user_baggage')
-          .select('id,zoonl_item_code,item_type,is_equipped,acquired_via,expires_at,created_at')
-          .eq('project_name', 'ZOONL LIVE')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      final prime = await client
-          .from('user_prime_memberships')
-          .select('id,prime_tier_id,started_at,expires_at,is_active')
-          .eq('user_id', userId)
-          .eq('is_active', true);
-      final wallet = await client
-          .from('wallets')
-          .select('coins,diamonds')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final trial = await client
-          .from('zoonl_user_trials')
-          .select('started_at,expires_at,trial_status,svip_active')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final activeStyle = await client
-          .from('zoonl_live_active_styles')
-          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      if (!mounted) return;
-      setState(() {
-        _isStoreOwner = owner;
-        store.cosmeticsCatalog = (catalog as List)
-            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.primeTiers = (tiers as List)
-            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.userBaggage = (inventory as List)
-            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.memberships = (prime as List)
-            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.userTrial = trial == null
-            ? <String, dynamic>{}
-            : Map<String, dynamic>.from(trial);
-        if (activeStyle != null) {
-          store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
-          store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
-          store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
-          store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
-          store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
-        }
-        if (wallet != null) {
-          store.currentUser['coins'] = (wallet['coins'] as num?)?.toInt() ?? 0;
-          store.currentUser['diamonds'] = (wallet['diamonds'] as num?)?.toInt() ?? 0;
-        }
-      });
-      store.refresh();
-    } catch (error) {
-      _showMessage('VIP Store data could not load: $error');
-    }
-  }
-
-  Future<void> _editCosmeticPrice(String itemCode, String itemName, int currentPrice) async {
-    if (!_isStoreOwner) return;
-    final controller = TextEditingController(text: currentPrice.toString());
-    try {
-      final price = await showDialog<int>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text('Set price • $itemName'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Coin price', helperText: 'Set 0 to make this item free'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            FilledButton(onPressed: () {
-              final value = int.tryParse(controller.text.trim());
-              if (value == null || value < 0 || value > 1000000000) return;
-              Navigator.pop(dialogContext, value);
-            }, child: const Text('Save price')),
-          ],
-        ),
-      );
-      if (price == null) return;
-      await Backend.client.rpc('owner_set_zoonl_cosmetic_price', params: {
-        'p_item_code': itemCode,
-        'p_coin_price': price,
-      });
-      await _loadVipStoreData();
-      _showMessage('$itemName price updated to $price coins.');
-    } catch (error) {
-      _showMessage('Price update failed: $error');
-    } finally {
-      controller.dispose();
-    }
-  }
-
-  Future<void> _editPrimeTierPrice(int tierId, String tierName, int currentPrice, int currentDays) async {
-    if (!_isStoreOwner) return;
-    final priceController = TextEditingController(text: currentPrice.toString());
-    final daysController = TextEditingController(text: currentDays.toString());
-    try {
-      final values = await showDialog<List<int>>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text('Configure $tierName'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: priceController, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Coin price')),
-            TextField(controller: daysController, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Duration in days')),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            FilledButton(onPressed: () {
-              final price = int.tryParse(priceController.text.trim());
-              final days = int.tryParse(daysController.text.trim());
-              if (price == null || days == null || price < 0 || price > 1000000000 || days < 1 || days > 3650) return;
-              Navigator.pop(dialogContext, [price, days]);
-            }, child: const Text('Save')),
-          ],
-        ),
-      );
-      if (values == null) return;
-      await Backend.client.rpc('owner_set_prime_tier_price', params: {
-        'p_tier_id': tierId,
-        'p_coin_price': values[0],
-        'p_duration_days': values[1],
-      });
-      await _loadVipStoreData();
-      _showMessage('$tierName pricing saved.');
-    } catch (error) {
-      _showMessage('Prime price update failed: $error');
-    } finally {
-      priceController.dispose();
-      daysController.dispose();
-    }
-  }
-
-  Future<void> _buyPrimeTier(int tierId, String tierName) async {
-    try {
-      await Backend.client.rpc('buy_zoonl_prime_tier', params: {'p_tier_id': tierId});
-      await _loadVipStoreData();
-      _showMessage('$tierName activated on this account.');
-    } catch (error) {
-      _showMessage('Prime purchase failed: $error');
-    }
   }
 
   @override
@@ -1655,6 +1487,9 @@ class ZoonlCompleteBody extends StatefulWidget {
 class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   final ZoonlStore store = ZoonlStore.instance;
 
+  bool _isStoreOwner = false;
+  String _storeFilter = 'ALL';
+
   String selectedVideoFilter = 'VIP Velvet Glow';
   bool recordingShort = false;
 
@@ -1756,6 +1591,172 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   void initState() {
     super.initState();
     _starSummaryFuture = _loadStarSummary();
+    unawaited(_loadVipStoreData());
+  }
+
+  Future<void> _loadVipStoreData() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) return;
+    try {
+      final client = Backend.client;
+      final owner = await Backend.isZoonlOwner();
+      final catalog = await client
+          .from('zoonl_live_cosmetics')
+          .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('is_active', true)
+          .order('sort_order');
+      final tiers = await client
+          .from('prime_tiers')
+          .select('id,tier_name,benefits,is_active,coin_price,duration_days')
+          .eq('is_active', true)
+          .order('id');
+      final inventory = await client
+          .from('zoonl_live_user_baggage')
+          .select('id,zoonl_item_code,item_type,is_equipped,acquired_via,expires_at,created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      final prime = await client
+          .from('user_prime_memberships')
+          .select('id,prime_tier_id,started_at,expires_at,is_active')
+          .eq('user_id', userId)
+          .eq('is_active', true);
+      final wallet = await client
+          .from('wallets')
+          .select('coins,diamonds')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final trial = await client
+          .from('zoonl_user_trials')
+          .select('started_at,expires_at,trial_status,svip_active')
+          .eq('user_id', userId)
+          .maybeSingle();
+      final activeStyle = await client
+          .from('zoonl_live_active_styles')
+          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (!mounted) return;
+      setState(() {
+        _isStoreOwner = owner;
+        store.cosmeticsCatalog = (catalog as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.primeTiers = (tiers as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.userBaggage = (inventory as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.memberships = (prime as List)
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.userTrial = trial == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(trial);
+        if (activeStyle != null) {
+          store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
+          store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
+          store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
+          store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
+          store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
+        }
+        if (wallet != null) {
+          store.currentUser['coins'] = (wallet['coins'] as num?)?.toInt() ?? 0;
+          store.currentUser['diamonds'] = (wallet['diamonds'] as num?)?.toInt() ?? 0;
+        }
+      });
+      store.refresh();
+    } catch (error) {
+      _showMessage('VIP Store data could not load: $error');
+    }
+  }
+
+  Future<void> _editCosmeticPrice(String itemCode, String itemName, int currentPrice) async {
+    if (!_isStoreOwner) return;
+    final controller = TextEditingController(text: currentPrice.toString());
+    try {
+      final price = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Set price • $itemName'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Coin price', helperText: 'Set 0 to make this item free'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null || value < 0 || value > 1000000000) return;
+              Navigator.pop(dialogContext, value);
+            }, child: const Text('Save price')),
+          ],
+        ),
+      );
+      if (price == null) return;
+      await Backend.client.rpc('owner_set_zoonl_cosmetic_price', params: {
+        'p_item_code': itemCode,
+        'p_coin_price': price,
+      });
+      await _loadVipStoreData();
+      _showMessage('$itemName price updated to $price coins.');
+    } catch (error) {
+      _showMessage('Price update failed: $error');
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _editPrimeTierPrice(int tierId, String tierName, int currentPrice, int currentDays) async {
+    if (!_isStoreOwner) return;
+    final priceController = TextEditingController(text: currentPrice.toString());
+    final daysController = TextEditingController(text: currentDays.toString());
+    try {
+      final values = await showDialog<List<int>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Configure $tierName'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: priceController, keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Coin price')),
+            TextField(controller: daysController, keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Duration in days')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(onPressed: () {
+              final price = int.tryParse(priceController.text.trim());
+              final days = int.tryParse(daysController.text.trim());
+              if (price == null || days == null || price < 0 || price > 1000000000 || days < 1 || days > 3650) return;
+              Navigator.pop(dialogContext, [price, days]);
+            }, child: const Text('Save')),
+          ],
+        ),
+      );
+      if (values == null) return;
+      await Backend.client.rpc('owner_set_prime_tier_price', params: {
+        'p_tier_id': tierId,
+        'p_coin_price': values[0],
+        'p_duration_days': values[1],
+      });
+      await _loadVipStoreData();
+      _showMessage('$tierName pricing saved.');
+    } catch (error) {
+      _showMessage('Prime price update failed: $error');
+    } finally {
+      priceController.dispose();
+      daysController.dispose();
+    }
+  }
+
+  Future<void> _buyPrimeTier(int tierId, String tierName) async {
+    try {
+      await Backend.client.rpc('buy_zoonl_prime_tier', params: {'p_tier_id': tierId});
+      await _loadVipStoreData();
+      _showMessage('$tierName activated on this account.');
+    } catch (error) {
+      _showMessage('Prime purchase failed: $error');
+    }
   }
 
   Future<Map<String, dynamic>?> _loadStarSummary() async {
