@@ -1,6 +1,4 @@
 
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -110,7 +108,7 @@ class ZoonlAuthGate extends StatelessWidget {
                 // Owner's canonical ZOONL ID is 10001, but the Owner role
                 // itself comes only from the trusted Supabase RPC.
                 final String profileUserId =
-                    (profile['username'] ?? '').toString().trim();
+                    (profile['zoonl_id'] ?? '').toString().trim();
                 final String userId = isOwner ? '10001' : profileUserId;
 
                 if (userId.isEmpty) {
@@ -247,22 +245,10 @@ class ZoonlAuthGate extends StatelessWidget {
       'id, username, display_name, avatar_url, country, '
       'language, bio, is_verified, user_level';
 
-  String _newZoonlId() {
-    // Numeric public ID only. This value never grants Owner/Admin access.
-    return (Random.secure().nextInt(90000000) + 10000000).toString();
-  }
-
   Future<Map<String, dynamic>?> _loadProfile(
     String authUserId,
   ) async {
     final client = Backend.client;
-
-    var trustedOwner = false;
-    try {
-      trustedOwner = await client.rpc('is_zoonl_owner') == true;
-    } catch (_) {
-      // Fail closed. A public ID never substitutes for the Owner RPC.
-    }
 
     Map<String, dynamic>? profile = await client
         .from('profiles')
@@ -270,81 +256,52 @@ class ZoonlAuthGate extends StatelessWidget {
         .eq('id', authUserId)
         .maybeSingle();
 
-    // A profile trigger may not have created the row. Try creating only
-    // this authenticated user's own profile, without changing DB policies.
     if (profile == null) {
-      if (trustedOwner) {
-        throw StateError('Owner profile row is missing.');
-      }
-      final String candidateId = _newZoonlId();
       final metadataName =
-          Backend.currentUser?.userMetadata?['display_name']?.toString() ??
-              '';
-
+          Backend.currentUser?.userMetadata?['display_name']?.toString() ?? '';
       try {
         profile = await client
             .from('profiles')
             .insert({
               'id': authUserId,
-              'username': candidateId,
               'display_name': metadataName,
             })
             .select(_profileColumns)
             .maybeSingle();
       } on PostgrestException {
-        // If an Auth trigger created the row at the same time, read it again.
+        // An auth trigger may have inserted the row concurrently.
         profile = await client
             .from('profiles')
             .select(_profileColumns)
             .eq('id', authUserId)
             .maybeSingle();
-
         if (profile == null) rethrow;
       }
     }
 
     if (profile == null) {
+      throw StateError('Profile row create/read failed. Check profiles RLS.');
+    }
+
+    // The numeric public ZOONL ID belongs to user_public_profiles. Never
+    // mint a random ID into profiles.username or use it as authorization.
+    final publicProfile = await client
+        .from('user_public_profiles')
+        .select('zoonl_id')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+
+    final zoonlId = publicProfile?['zoonl_id']?.toString().trim() ?? '';
+    if (zoonlId.isEmpty) {
       throw StateError(
-        'Profile row create/read failed. Check the profiles table policy.',
+        'ZOONL ID is missing from user_public_profiles for this account.',
       );
     }
 
-    // Keep the Owner's canonical public ID (10001) unchanged.
-    if (trustedOwner) return profile;
-
-    final existingId = profile['username']?.toString().trim() ?? '';
-    if (existingId.isNotEmpty) return profile;
-
-    // Existing accounts with an empty username receive a numeric ZOONL ID.
-    // A unique-constraint collision is retried with another candidate.
-    for (var attempt = 0; attempt < 8; attempt++) {
-      final candidateId = _newZoonlId();
-
-      try {
-        final updated = await client
-            .from('profiles')
-            .update({'username': candidateId})
-            .eq('id', authUserId)
-            .select(_profileColumns)
-            .maybeSingle();
-
-        if (updated != null &&
-            (updated['username']?.toString().trim().isNotEmpty ?? false)) {
-          return updated;
-        }
-
-        throw StateError(
-          'ZOONL ID update returned no profile row. Check profile update policy.',
-        );
-      } on PostgrestException catch (error) {
-        if (error.code == '23505') continue;
-        rethrow;
-      }
-    }
-
-    throw StateError(
-      'Unique ZOONL ID could not be assigned after several attempts.',
-    );
+    return <String, dynamic>{
+      ...profile,
+      'zoonl_id': zoonlId,
+    };
   }
 }
 
