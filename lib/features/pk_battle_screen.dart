@@ -99,7 +99,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
       }
       if (!mounted) return;
       setState(() { battle = Map<String,dynamic>.from(raw); players = list; });
-      if (battle?['battle_status'] == 'active' && remaining == 0 && creator) {
+      if (battle?['battle_status'] == 'active' && remaining == 0 && players.any((p) => p['is_me'] == true)) {
         await finishBattle();
       }
     } catch (e) { if (mounted) setState(() => statusMessage = 'PK refresh failed: $e'); }
@@ -175,7 +175,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
   });
 
   Future<void> finishBattle() async {
-    if (battleId == null || !creator) return;
+    if (battleId == null) return;
     try {
       final result = await db.rpc('pk_finish_battle', params: {'p_battle_id': battleId});
       if (mounted) setState(() => statusMessage = result.toString());
