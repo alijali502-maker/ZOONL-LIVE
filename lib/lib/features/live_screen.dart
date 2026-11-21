@@ -347,6 +347,8 @@ class _LiveScreenState extends State<LiveScreen> {
             'is_private': _privateRoom,
             'is_locked': _lockedRoom || _privateRoom,
             'is_live': true,
+            'video_filter_code': _selectedRoomType == 'video' ? _previewFilter : 'Natural',
+            'video_filter_strength': _selectedRoomType == 'video' ? _filterStrength : 0.35,
           })
           .select('id')
           .single();
@@ -400,7 +402,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
       final room = await _supabase
           .from('live_rooms')
-          .select('room_name, owner_id, is_live, room_type, is_private, is_locked')
+          .select('room_name, owner_id, is_live, room_type, is_private, is_locked, video_filter_code, video_filter_strength')
           .eq('id', roomId)
           .maybeSingle();
 
@@ -414,6 +416,12 @@ class _LiveScreenState extends State<LiveScreen> {
       _selectedRoomType = (room['room_type'] ?? 'video').toString().toLowerCase();
       _privateRoom = room['is_private'] == true;
       _lockedRoom = room['is_locked'] == true;
+      _previewFilter = _previewFilters.contains(room['video_filter_code']?.toString())
+          ? room['video_filter_code'].toString()
+          : 'Natural';
+      _filterStrength = ((room['video_filter_strength'] as num?)?.toDouble() ?? 0.35)
+          .clamp(0.0, 1.0).toDouble();
+      _filterConfirmed = true;
       final hostProfile = await _supabase.from('profiles')
           .select('user_level').eq('id', _roomOwnerId!).maybeSingle();
       _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
@@ -1793,8 +1801,8 @@ class _LiveScreenState extends State<LiveScreen> {
               const SizedBox(width: 8),
               Expanded(child: Text(
                 _filterConfirmed
-                  ? 'Preview filter selected: $_previewFilter. This colour effect is currently local preview only; it is not yet encoded into the outgoing LiveKit video for viewers.'
-                  : 'Choose one preview filter above before starting the video room.',
+                  ? '$_previewFilter is saved on this room and rendered for everyone using ZOONL LIVE. It is a display-side colour effect, not baked into the source video. Face retouch still needs a dedicated video-effects engine.'
+                  : 'Choose one filter above before starting the video room.',
                 style: const TextStyle(color: Colors.white70, fontSize: 11),
               )),
             ]),
@@ -1962,7 +1970,10 @@ class _LiveScreenState extends State<LiveScreen> {
     final track = _activeVideoTrack();
 
     if (track != null) {
-      return VideoTrackRenderer(track);
+      return ColorFiltered(
+        colorFilter: _selectedPreviewColorFilter,
+        child: VideoTrackRenderer(track),
+      );
     }
 
     return Center(
