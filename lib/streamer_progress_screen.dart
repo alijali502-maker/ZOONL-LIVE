@@ -72,7 +72,7 @@ class _StreamerProgressScreenState extends State<StreamerProgressScreen> {
   Widget build(BuildContext context) {
     final next = _starThresholds.firstWhere((value) => _dailyCoins < value, orElse: () => _starThresholds.last);
     final previous = _currentStars == 0 ? 0 : _starThresholds[_currentStars - 1];
-    final progress = _currentStars == 5 ? 1.0 : ((_dailyCoins - previous) / (next - previous)).clamp(0.0, 1.0);
+    final progress = _currentStars == 5 ? 1.0 : ((_dailyCoins - previous) / (next - previous)).clamp(0.0, 1.0).toDouble();
     return Scaffold(
       appBar: AppBar(title: const Text('STREAMER PROGRESS'),
         actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh))]),
