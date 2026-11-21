@@ -1521,6 +1521,18 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   String? kycMessage;
   final ImagePicker _kycPicker = ImagePicker();
 
+  bool get _isAdultForKyc {
+    final dob = DateTime.tryParse(kycDob);
+    if (dob == null) return false;
+    final today = DateTime.now();
+    var age = today.year - dob.year;
+    if (today.month < dob.month ||
+        (today.month == dob.month && today.day < dob.day)) {
+      age--;
+    }
+    return age >= 18;
+  }
+
   final TextEditingController payoutAccountCtrl =
       TextEditingController();
 
@@ -2649,6 +2661,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
 
   Future<void> _pickKycDocument(String kind) async {
     if (registrationSubmitted || kycUploading) return;
+    if (!_isAdultForKyc) {
+      _showMessage('Host verification documents are available only after adult eligibility is confirmed.');
+      return;
+    }
     try {
       final picked = await _kycPicker.pickImage(
         source: ImageSource.gallery,
@@ -2751,14 +2767,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   Future<void> _submitKyc() async {
     if (registrationSubmitted || kycSubmitting) return;
     final dob = DateTime.tryParse(kycDob);
-    final now = DateTime.now();
-    final age = dob == null ? 0 : now.year - dob.year - ((now.month < dob.month || (now.month == dob.month && now.day < dob.day)) ? 1 : 0);
-    if (kycLegalNameCtrl.text.trim().length < 3 || dob == null) {
-      _showMessage('Enter your legal name and real date of birth first.');
+    if (!_isAdultForKyc || dob == null) {
+      _showMessage('Host verification is only available to adults aged 18 or above.');
       return;
     }
-    if (age < 18) {
-      _showMessage('Host verification is only available to adults aged 18 or above.');
+    if (kycLegalNameCtrl.text.trim().length < 3) {
+      _showMessage('Enter your legal name and real date of birth first.');
       return;
     }
     if (kycFrontPath == null || kycBackPath == null || kycSelfiePath == null) {
@@ -2889,12 +2903,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              TextField(
-                controller: kycLegalNameCtrl,
-                enabled: !registrationSubmitted,
-                decoration: const InputDecoration(labelText: 'Legal name as shown on ID'),
-              ),
-              const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: registrationSubmitted ? null : _pickKycDateOfBirth,
                 icon: const Icon(Icons.calendar_month),
@@ -2902,55 +2910,78 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Host verification and creator payouts are for adults aged 18+. Enter your real date of birth. Under-18 accounts cannot submit this application.',
+                'Host verification and creator payouts are strictly for adults aged 18+. Document upload stays locked until adult eligibility is confirmed.',
                 style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
               ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: kycCountry,
-                items: const <String>[
-                  'United Arab Emirates',
-                  'Saudi Arabia',
-                  'Qatar',
-                  'Kuwait',
-                  'Bahrain',
-                  'Oman',
-                  'Pakistan',
-                  'India',
-                  'Bangladesh',
-                  'United Kingdom',
-                  'United States',
-                  'Other',
-                ].map((String country) => DropdownMenuItem<String>(
-                  value: country, child: Text(country),
-                )).toList(),
-                onChanged: (String? value) => setState(() => kycCountry = value ?? 'United Arab Emirates'),
-                decoration: const InputDecoration(labelText: 'Country'),
-              ),
-              const SizedBox(height: 12),
-              const Text('DOCUMENT PHOTO GUIDE', style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
-              const SizedBox(height: 7),
-              _kycDocumentCard(
-                title: '1. ID Front Side',
-                guidance: 'Keep the full front side visible, sharp and without glare.',
-                icon: Icons.credit_card,
-                uploaded: kycFrontUploaded,
-                onTap: () => _pickKycDocument('id-front'),
-              ),
-              _kycDocumentCard(
-                title: '2. ID Back Side',
-                guidance: 'Show the complete reverse side and all readable details.',
-                icon: Icons.badge_outlined,
-                uploaded: kycBackUploaded,
-                onTap: () => _pickKycDocument('id-back'),
-              ),
-              _kycDocumentCard(
-                title: '3. Selfie With ID',
-                guidance: 'Face and ID should both be clearly visible in one photo.',
-                icon: Icons.face_retouching_natural,
-                uploaded: kycCardSelfieUploaded,
-                onTap: () => _pickKycDocument('selfie-with-id'),
-              ),
+              if (_isAdultForKyc) ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: kycLegalNameCtrl,
+                  enabled: !registrationSubmitted,
+                  decoration: const InputDecoration(labelText: 'Legal name as shown on ID'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: kycCountry,
+                  items: const <String>[
+                    'United Arab Emirates',
+                    'Saudi Arabia',
+                    'Qatar',
+                    'Kuwait',
+                    'Bahrain',
+                    'Oman',
+                    'Pakistan',
+                    'India',
+                    'Bangladesh',
+                    'United Kingdom',
+                    'United States',
+                    'Other',
+                  ].map((String country) => DropdownMenuItem<String>(
+                    value: country, child: Text(country),
+                  )).toList(),
+                  onChanged: (String? value) => setState(() => kycCountry = value ?? 'United Arab Emirates'),
+                  decoration: const InputDecoration(labelText: 'Country'),
+                ),
+                const SizedBox(height: 12),
+                const Text('DOCUMENT PHOTO GUIDE', style: TextStyle(color: Color(0xFFD6B46A), fontWeight: FontWeight.bold)),
+                const SizedBox(height: 7),
+                _kycDocumentCard(
+                  title: '1. ID Front Side',
+                  guidance: 'Keep the full front side visible, sharp and without glare.',
+                  icon: Icons.credit_card,
+                  uploaded: kycFrontUploaded,
+                  onTap: () => _pickKycDocument('id-front'),
+                ),
+                _kycDocumentCard(
+                  title: '2. ID Back Side',
+                  guidance: 'Show the complete reverse side and all readable details.',
+                  icon: Icons.badge_outlined,
+                  uploaded: kycBackUploaded,
+                  onTap: () => _pickKycDocument('id-back'),
+                ),
+                _kycDocumentCard(
+                  title: '3. Selfie With ID',
+                  guidance: 'Face and ID should both be clearly visible in one photo.',
+                  icon: Icons.face_retouching_natural,
+                  uploaded: kycCardSelfieUploaded,
+                  onTap: () => _pickKycDocument('selfie-with-id'),
+                ),
+              ] else
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF211735),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: const Color(0xFF6C4A82)),
+                  ),
+                  child: Text(
+                    kycDob.isEmpty
+                        ? 'Select your date of birth to check eligibility. No identity documents are requested at this stage.'
+                        : 'This feature is available only to adults aged 18 or above. Identity document uploads are unavailable for under-18 accounts.',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
               if (kycMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
