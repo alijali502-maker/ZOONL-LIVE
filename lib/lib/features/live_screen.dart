@@ -159,6 +159,8 @@ class _LiveScreenState extends State<LiveScreen> {
   Timer? _giftBannerTimer;
   AudioPlayer? _giftAudioPlayer;
   int _hostLevel = 1;
+  bool _isTrustedOwner = false;
+  bool get _canUsePrivateRooms => _isTrustedOwner || _hostLevel >= 10;
 
   final TextEditingController _titleController =
       TextEditingController();
@@ -189,12 +191,29 @@ class _LiveScreenState extends State<LiveScreen> {
     } else if (_selectedRoomType == 'video') {
       unawaited(_initializePreviewCamera());
     }
+    if (_isHost) unawaited(_loadMyLevel());
     _guestPoller = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _refreshGuestState(),
     );
   }
 
+
+
+  Future<void> _loadMyLevel() async {
+    final userId = _myId;
+    if (userId == null) return;
+    try {
+      final profile = await _supabase.from('profiles')
+          .select('user_level').eq('id', userId).maybeSingle();
+      final owner = await _supabase.rpc('is_zoonl_owner') == true;
+      if (!mounted) return;
+      setState(() {
+        _hostLevel = (profile?['user_level'] as num?)?.toInt() ?? 1;
+        _isTrustedOwner = owner;
+      });
+    } catch (_) {}
+  }
 
   Future<void> _initializePreviewCamera() async {
     if (!mounted || !_isHost || _isLive || _busy || _selectedRoomType != 'video' || _previewLoading) return;
@@ -271,6 +290,10 @@ class _LiveScreenState extends State<LiveScreen> {
 
     if (title.isEmpty) {
       _showMessage('Please enter a live room title.');
+      return;
+    }
+    if ((_privateRoom || _lockedRoom) && !_canUsePrivateRooms) {
+      _showMessage('Private and locked rooms unlock at Level 10.');
       return;
     }
 
@@ -1569,17 +1592,17 @@ class _LiveScreenState extends State<LiveScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Private Room', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Only invited members and approved guest seats can enter.', style: TextStyle(color: Colors.white60, fontSize: 11)),
+              subtitle: Text(_canUsePrivateRooms ? 'Only invited members and approved guest seats can enter.' : 'Unlocks at Level 10. Current level: $_hostLevel.', style: const TextStyle(color: Colors.white60, fontSize: 11)),
               value: _privateRoom,
               activeColor: const Color(0xFFE5BD70),
-              onChanged: _busy ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
+              onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() { _privateRoom = v; if (v) _lockedRoom = true; }),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Lock Room', style: TextStyle(color: Colors.white)),
               value: _lockedRoom,
               activeColor: const Color(0xFFE5BD70),
-              onChanged: _busy ? null : (v) => setState(() => _lockedRoom = v),
+              onChanged: _busy || !_canUsePrivateRooms ? null : (v) => setState(() => _lockedRoom = v),
             ),
           ]),
         ),
