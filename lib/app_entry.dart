@@ -180,11 +180,13 @@ class ZoonlAuthGate extends StatelessWidget {
                     appStore.primeTiers = home.primeTiers;
                     appStore.userBaggage = home.baggage;
                     appStore.userTrial = home.userTrial;
-                    appStore.backupStore = home.baggage.where((item) {
-                      final expiry = DateTime.tryParse(item['expires_at']?.toString() ?? '');
-                      return item['acquired_via'] == 'NEW_ID_TRIAL' &&
-                          expiry != null && expiry.isBefore(DateTime.now());
-                    }).toList();
+                    appStore.backupStore
+                      ..clear()
+                      ..addAll(home.baggage.where((item) {
+                        final expiry = DateTime.tryParse(item['expires_at']?.toString() ?? '');
+                        return item['acquired_via'] == 'NEW_ID_TRIAL' &&
+                            expiry != null && expiry.isBefore(DateTime.now());
+                      }));
                     appStore.streamers
                       ..clear()
                       ..addAll(home.rooms.map((room) => <String, dynamic>{
