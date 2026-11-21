@@ -219,9 +219,6 @@ class _EmblemPainter extends CustomPainter{
     canvas.drawPath(p.shift(const Offset(0,5)),side);
     canvas.drawPath(p,Paint()..shader=LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,
       colors:[colors[1],colors[0],colors.last,const Color(0xFF090D18)],stops:const[0,.28,.68,1]).createShader(Offset.zero&s));
-    final inner=Path()..addPath(p,Offset.zero);inner.scale(.86,.86,Offset(cx,h*.5));
-    canvas.drawPath(inner,Paint()..style=PaintingStyle.stroke..strokeWidth=1.5
-      ..shader=LinearGradient(colors:[Colors.white,colors[1],colors.last]).createShader(Offset.zero&s));
     canvas.drawPath(p,Paint()..style=PaintingStyle.stroke..strokeWidth=owner?3:2
       ..shader=LinearGradient(colors:[Colors.white,colors[1],colors.last,colors[0]]).createShader(Offset.zero&s));
     final sheen=Rect.fromLTWH(w*(shine*1.5-.25),0,w*.2,h);canvas.save();canvas.clipPath(p);
