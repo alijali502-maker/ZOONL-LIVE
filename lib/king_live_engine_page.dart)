@@ -867,6 +867,13 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
         .subscribe();
   }
 
+  String _rankTitle(int level) {
+    if (level >= 100) return 'SOVEREIGN OWNER';
+    const names = ['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
+    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
+    return names[tier];
+  }
+
   Color _rankColor(int level) {
     if (level >= 100) return const Color(0xFFFFD98B);
     const palette = [
@@ -2147,7 +2154,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
                 return Container(
                   margin: const EdgeInsets.only(bottom: 5, left: 2, right: 3),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(m.level <= 5 ? 7 : m.level <= 10 ? 10 : m.level <= 20 ? 14 : m.level <= 50 ? 9 : 16),
                     gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
                       colors: [rank.withOpacity(.95), m.ribbonColor.withOpacity(.78), const Color(0xFF10121C)]),
                     border: Border.all(color: rank.withOpacity(.85), width: 1),
@@ -2174,7 +2181,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
                         )),
                         const SizedBox(width: 7),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('${m.sender}  •  ${m.userId}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                          Text('LV.${m.level} ${_rankTitle(m.level)}  •  ${m.sender}  •  ${m.userId}', maxLines: 1, overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 2),
                           Text(m.text, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
