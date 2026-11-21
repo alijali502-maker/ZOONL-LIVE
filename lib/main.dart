@@ -1570,11 +1570,11 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       case 0:
         return const FeatureHubScreen();
       case 1:
-        return _buildLiveSection();
+        return const FeatureHubScreen(roomTypeFilter: 'video');
       case 2:
         return _buildPkSection();
       case 3:
-        return _buildAudioSection();
+        return const FeatureHubScreen(roomTypeFilter: 'audio');
       default:
         return _buildVipHubSection();
     }
