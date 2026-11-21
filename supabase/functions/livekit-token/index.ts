@@ -72,7 +72,25 @@ Deno.serve(async (req: Request) => {
       .select("active_entry_code")
       .eq("user_id", userId)
       .maybeSingle();
-    const entryCode = activeStyle?.active_entry_code ?? null;
+    const candidateEntryCode = activeStyle?.active_entry_code ?? null;
+    let entryCode: string | null = null;
+    if (candidateEntryCode) {
+      const { data: equippedEntry } = await admin
+        .from("zoonl_live_user_baggage")
+        .select("expires_at")
+        .eq("project_name", "ZOONL LIVE")
+        .eq("user_id", userId)
+        .eq("zoonl_item_code", candidateEntryCode)
+        .eq("item_type", "ENTRY_EFFECT")
+        .eq("is_equipped", true)
+        .maybeSingle();
+      const expiresAt = equippedEntry?.expires_at
+        ? new Date(equippedEntry.expires_at).getTime()
+        : null;
+      if (equippedEntry && (expiresAt === null || expiresAt > Date.now())) {
+        entryCode = candidateEntryCode;
+      }
+    }
     const { error: entryError } = await admin
       .from("live_room_entry_events")
       .insert({
