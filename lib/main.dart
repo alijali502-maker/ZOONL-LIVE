@@ -2611,7 +2611,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           ),
         ),
         _luxuryCard(
-          title: 'VIP Top-Up & Backup Store',
+          title: 'VIP INVENTORY & BACKUP STORE',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
