@@ -167,6 +167,7 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() => _busy = true);
 
     try {
+      if (_selectedRoomType == 'video') await _disposePreviewCamera();
       // Close any old room of mine that is stuck as live.
       await _supabase
           .from('live_rooms')
@@ -209,7 +210,12 @@ class _LiveScreenState extends State<LiveScreen> {
       await _disconnectLiveKit();
       _showMessage('Live शुरू नहीं हुआ: ${_readable(error)}');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        if (!_isLive && _selectedRoomType == 'video') {
+          unawaited(_initializePreviewCamera());
+        }
+      }
     }
   }
 
@@ -283,7 +289,7 @@ class _LiveScreenState extends State<LiveScreen> {
     );
 
     if (_isHost) {
-      await room.localParticipant?.setMicrophoneEnabled(true);
+      await room.localParticipant?.setMicrophoneEnabled(_microphoneEnabled);
       if (_selectedRoomType == 'video') {
         await room.localParticipant?.setCameraEnabled(true);
       }
@@ -557,6 +563,10 @@ class _LiveScreenState extends State<LiveScreen> {
 
     unawaited(_closeChannel());
     unawaited(_disconnectLiveKit());
+
+    final preview = _previewCamera;
+    _previewCamera = null;
+    if (preview != null) unawaited(preview.dispose());
 
     _titleController.dispose();
     _messageController.dispose();
