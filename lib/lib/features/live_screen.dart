@@ -78,6 +78,65 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+
+  Future<void> _initializePreviewCamera() async {
+    if (!mounted || !_isHost || _isLive || _selectedRoomType != 'video' || _previewLoading) return;
+    setState(() { _previewLoading = true; _previewError = null; });
+    CameraController? next;
+    try {
+      final permission = await Permission.camera.request();
+      if (!permission.isGranted) throw StateError('Camera permission is required.');
+      _availableCameras = await availableCameras();
+      if (_availableCameras.isEmpty) throw StateError('No camera found.');
+      final direction = _frontCamera ? CameraLensDirection.front : CameraLensDirection.back;
+      final description = _availableCameras.firstWhere(
+        (item) => item.lensDirection == direction,
+        orElse: () => _availableCameras.first,
+      );
+      next = CameraController(description, ResolutionPreset.high, enableAudio: false);
+      await next.initialize();
+      if (!mounted) { await next.dispose(); return; }
+      final old = _previewCamera;
+      _previewCamera = next;
+      next = null;
+      await old?.dispose();
+    } catch (error) {
+      await next?.dispose();
+      if (mounted) _previewError = error.toString();
+    } finally {
+      if (mounted) setState(() => _previewLoading = false);
+    }
+  }
+
+  Future<void> _disposePreviewCamera() async {
+    final old = _previewCamera;
+    _previewCamera = null;
+    if (old != null) {
+      try { await old.dispose(); } catch (_) {}
+    }
+  }
+
+  Future<void> _flipPreviewCamera() async {
+    if (_availableCameras.length < 2) {
+      _showMessage('इस डिवाइस पर दूसरा Camera उपलब्ध नहीं है।');
+      return;
+    }
+    setState(() => _frontCamera = !_frontCamera);
+    await _disposePreviewCamera();
+    await _initializePreviewCamera();
+  }
+
+  ColorFilter get _selectedPreviewColorFilter {
+    if (_previewFilter == 'Mono') {
+      return const ColorFilter.mode(Colors.white, BlendMode.saturation);
+    }
+    Color tint = Colors.transparent;
+    if (_previewFilter == 'Warm') tint = const Color(0xFFFFA45B);
+    if (_previewFilter == 'Cool') tint = const Color(0xFF73B9FF);
+    if (_previewFilter == 'Rose') tint = const Color(0xFFFF78B7);
+    return ColorFilter.mode(tint.withOpacity(_filterStrength * 0.30), BlendMode.softLight);
+  }
+
   // ---------- Host: go live ----------
   Future<void> _startLive() async {
     if (_busy) return;
