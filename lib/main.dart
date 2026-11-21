@@ -1765,11 +1765,12 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
   }
 
   Widget _buildGiftControls(Map<String, dynamic> streamer) {
+    final gifts = store.giftCatalog;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const Text(
-          'Original Gift System',
+          'Original Supabase Gift Catalog',
           style: TextStyle(
             color: Color(0xFFD6B46A),
             fontWeight: FontWeight.bold,
@@ -1778,21 +1779,52 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         const SizedBox(height: 8),
         Text('Available Coins: ${store.currentUser['coins'] ?? 0}'),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            _giftButton(streamer, 'Golden Rose', 100),
-            _giftButton(streamer, 'Golden Heart', 300),
-            _giftButton(streamer, 'Diamond Heart', 1500),
-            _giftButton(streamer, 'Royal Castle', 85000),
-          ],
-        ),
+        if (gifts.isEmpty)
+          const Text(
+            'Active gift catalog is unavailable. Gift sending remains enabled when the server catalog is reachable.',
+            style: TextStyle(color: Colors.orangeAccent, fontSize: 12),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: gifts.map((gift) {
+              final name = (gift['gift_name'] ?? '').toString();
+              final price = (gift['coin_price'] as num?)?.toInt() ?? 0;
+              final image = (gift['image_url'] ?? gift['preview_url'] ?? '')
+                  .toString();
+              return OutlinedButton(
+                onPressed: name.isEmpty || price <= 0
+                    ? null
+                    : () => _giftButton(streamer, name, price),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (image.startsWith('https://'))
+                      Image.network(
+                        image,
+                        width: 34,
+                        height: 34,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.card_giftcard, size: 22),
+                      )
+                    else
+                      const Icon(Icons.card_giftcard, size: 22),
+                    const SizedBox(height: 3),
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('$price coins',
+                        style: const TextStyle(fontSize: 10)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         if (store.isLiveMode)
           const Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
-              'LIVE MODE: Gifts require a verified server transaction. No local balance will be changed.',
+              'Gift transactions are processed by the Supabase wallet RPC. Client balances are never edited locally.',
               style: TextStyle(
                 color: Colors.orangeAccent,
                 fontSize: 11,
