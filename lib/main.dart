@@ -779,6 +779,11 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           .select('started_at,expires_at,trial_status,svip_active')
           .eq('user_id', userId)
           .maybeSingle();
+      final activeStyle = await client
+          .from('zoonl_live_active_styles')
+          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+          .eq('user_id', userId)
+          .maybeSingle();
 
       if (!mounted) return;
       setState(() {
@@ -794,6 +799,13 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         store.userTrial = trial == null
             ? <String, dynamic>{}
             : Map<String, dynamic>.from(trial);
+        if (activeStyle != null) {
+          store.currentUser['activeProfileBgCode'] = activeStyle['active_profile_bg_code'];
+          store.currentUser['activeFrameCode'] = activeStyle['active_frame_code'];
+          store.currentUser['activeEntryCode'] = activeStyle['active_entry_code'];
+          store.currentUser['activeBadgeCode'] = activeStyle['active_badge_code'];
+          store.currentUser['activeChatBubbleCode'] = activeStyle['active_chat_bubble_code'];
+        }
         if (wallet != null) {
           store.currentUser['coins'] = (wallet['coins'] as num?)?.toInt() ?? 0;
           store.currentUser['diamonds'] = (wallet['diamonds'] as num?)?.toInt() ?? 0;
@@ -3419,6 +3431,32 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   ),
                 ),
               ),
+              if (store.currentUser['activeBadgeCode']?.toString() == 'ZOONL_LUCKY_ID_01')
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF29365E), Color(0xFF34245B), Color(0xFF153E4C)]),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF8CEBFF), width: 1.2),
+                    boxShadow: [BoxShadow(color: const Color(0xFF8CEBFF).withOpacity(.12), blurRadius: 12)],
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF)),
+                    const SizedBox(width: 9),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('ZOONL LUCKY ID', style: TextStyle(color: Color(0xFF8CEBFF), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
+                      Text(userId.isEmpty ? 'ID pending' : userId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.2)),
+                    ])),
+                    const Icon(Icons.verified, color: Color(0xFF8CEBFF)),
+                  ]),
+                ),
+              if ((store.currentUser['activeEntryCode'] ?? '').toString().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 4),
+                  child: Text('Room entry equipped: ${store.currentUser['activeEntryCode']}',
+                    style: const TextStyle(color: Color(0xFFB9AEFF), fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
               _profileInfoRow(Icons.flag_outlined, 'Country', country),
               _profileInfoRow(Icons.info_outline, 'Bio',
                   bio.isEmpty ? 'Add a short introduction' : bio),
