@@ -80,7 +80,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
 
   Future<void> _initializePreviewCamera() async {
-    if (!mounted || !_isHost || _isLive || _selectedRoomType != 'video' || _previewLoading) return;
+    if (!mounted || !_isHost || _isLive || _busy || _selectedRoomType != 'video' || _previewLoading) return;
     setState(() { _previewLoading = true; _previewError = null; });
     CameraController? next;
     try {
@@ -95,7 +95,10 @@ class _LiveScreenState extends State<LiveScreen> {
       );
       next = CameraController(description, ResolutionPreset.high, enableAudio: false);
       await next.initialize();
-      if (!mounted) { await next.dispose(); return; }
+      if (!mounted || _busy || _isLive || _selectedRoomType != 'video') {
+        await next.dispose();
+        return;
+      }
       final old = _previewCamera;
       _previewCamera = next;
       next = null;
@@ -470,6 +473,7 @@ class _LiveScreenState extends State<LiveScreen> {
       _messageController.clear();
     });
     _showMessage('Live session ended.');
+    if (_selectedRoomType == 'video') unawaited(_initializePreviewCamera());
   }
 
   Future<void> _leaveViewer() async {
