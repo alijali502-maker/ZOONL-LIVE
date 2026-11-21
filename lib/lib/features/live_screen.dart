@@ -1159,7 +1159,9 @@ class _LiveScreenState extends State<LiveScreen> {
                   itemBuilder: (context, index) {
                     final gift = visible[index];
                     final imageUrl = (gift['image_url'] ?? gift['preview_url'] ?? '').toString();
-                    final mediaUrl = (gift['animation_3d_url'] ?? gift['animation_url'] ?? imageUrl).toString();
+                    final animation3d = (gift['animation_3d_url'] ?? '').toString().trim();
+                    final animation = (gift['animation_url'] ?? '').toString().trim();
+                    final mediaUrl = animation3d.isNotEmpty ? animation3d : animation.isNotEmpty ? animation : imageUrl;
                     return InkWell(
                       onTap: sending || _isHost ? null : () async {
                         setSheetState(() => sending = true);
@@ -1188,7 +1190,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         child: Column(children: [
                           Expanded(child: mediaUrl.isEmpty
                             ? const Icon(Icons.card_giftcard, size: 42, color: Color(0xFFE5BD70))
-                            : _LiveGiftMedia(url: mediaUrl, size: 90)),
+                            : _LiveGiftMedia(url: imageUrl.isEmpty ? mediaUrl : imageUrl, size: 90)),
                           Text((gift['gift_name'] ?? 'Gift').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white, fontSize: 11)),
                           const SizedBox(height: 3),
@@ -1229,7 +1231,7 @@ class _LiveScreenState extends State<LiveScreen> {
       _playGiftSound((gift['sound_url'] ?? '').toString());
       _setGiftBanner({
         'gift_name': gift['gift_name'], 'image_url': gift['image_url'],
-        'media_url': gift['animation_3d_url'] ?? gift['animation_url'] ?? gift['image_url'],
+        'media_url': ((gift['animation_3d_url'] ?? '').toString().trim().isNotEmpty ? gift['animation_3d_url'] : ((gift['animation_url'] ?? '').toString().trim().isNotEmpty ? gift['animation_url'] : gift['image_url'])),
         'sound_url': gift['sound_url'],
         'sender_name': sender?['display_name'] ?? 'Viewer', 'quantity': row['quantity'] ?? 1,
         'total_coins': row['total_coins'] ?? gift['coin_price'] ?? 0,
