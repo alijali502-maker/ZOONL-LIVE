@@ -7,7 +7,7 @@ import '../../event_control_screen.dart';
 import '../../streamer_progress_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
-    show Room, RoomOptions, VideoTrack, VideoTrackRenderer;
+    show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, CameraPosition;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
@@ -255,6 +255,7 @@ class _LiveScreenState extends State<LiveScreen> {
   bool _busy = false;
   bool _microphoneEnabled = true;
   bool _cameraEnabled = true;
+  bool _frontLiveCamera = true;
   bool _chatEnabled = true;
   bool _hostSeen = false;
   late String _selectedRoomType = widget.roomType;
@@ -2169,6 +2170,27 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  Future<void> _flipLiveCamera() async {
+    if (!_isLive || _selectedRoomType != 'video' || (!_isHost && !_isGuest)) return;
+    final room = _lk;
+    if (room == null) return;
+    try {
+      final publications = room.localParticipant?.videoTrackPublications ?? const [];
+      for (final publication in publications) {
+        final track = publication.track;
+        if (track is LocalVideoTrack) {
+          final next = _frontLiveCamera ? CameraPosition.back : CameraPosition.front;
+          await track.setCameraPosition(next);
+          if (mounted) setState(() => _frontLiveCamera = !_frontLiveCamera);
+          return;
+        }
+      }
+      _showMessage('Active camera track not found.');
+    } catch (error) {
+      _showMessage('Camera switch failed: \${_readable(error)}');
+    }
+  }
+
   Future<void> _toggleCamera() async {
     final next = !_cameraEnabled;
     try {
@@ -2832,6 +2854,7 @@ class _LiveScreenState extends State<LiveScreen> {
         label: 'Microphone',
         onTap: _toggleMicrophone,
       ),
+      if (_selectedRoomType == 'video') _control(icon: Icons.flip_camera_android, label: 'Flip Camera', onTap: _flipLiveCamera),
       if (_selectedRoomType == 'video') _control(
         icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
         label: 'Camera',
@@ -2871,6 +2894,8 @@ class _LiveScreenState extends State<LiveScreen> {
           label: 'Mic',
           onTap: _toggleMicrophone,
         ),
+        if (_selectedRoomType == 'video' && _guestVideoAllowed)
+          _control(icon: Icons.flip_camera_android, label: 'Flip', onTap: _flipLiveCamera),
         if (_selectedRoomType == 'video' && _guestVideoAllowed)
           _control(
             icon: _cameraEnabled ? Icons.videocam : Icons.videocam_off,
