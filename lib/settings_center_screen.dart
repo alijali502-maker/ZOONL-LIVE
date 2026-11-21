@@ -345,7 +345,7 @@ class _MessagePrivacyScreenState extends State<MessagePrivacyScreen> {
     backgroundColor: const Color(0xFF080D14),
     body: _loading ? const Center(child: CircularProgressIndicator())
       : ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('WHO CAN MESSAGE YOU?', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+        const Text('WHO CAN MESSAGE YOU?', style: TextStyle(color: const Color(0xFFD6B46A), fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         RadioListTile<String>(
           value: 'everyone', groupValue: _value, onChanged: _saving ? null : (v) { if (v != null) _save(v); },
@@ -357,7 +357,7 @@ class _MessagePrivacyScreenState extends State<MessagePrivacyScreen> {
         ),
         if (_saving) const LinearProgressIndicator(),
         if (_error != null) Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-        const Text('This setting is saved to your account messaging preferences.', style: TextStyle(color: _muted, fontSize: 12)),
+        const Text('This setting is saved to your account messaging preferences.', style: TextStyle(color: const Color(0xFFAAB5BE), fontSize: 12)),
       ]),
   );
 }
@@ -414,7 +414,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
     backgroundColor: const Color(0xFF080D14),
     body: _loading ? const Center(child: CircularProgressIndicator())
       : _error != null ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
-      : _rows.isEmpty ? const Center(child: Text('You have not blocked anyone.', style: TextStyle(color: _muted)))
+      : _rows.isEmpty ? const Center(child: Text('You have not blocked anyone.', style: TextStyle(color: const Color(0xFFAAB5BE))))
       : ListView.builder(itemCount: _rows.length, itemBuilder: (context, i) {
         final row = _rows[i];
         final profile = row['profile'] as Map<String, dynamic>? ?? {};
@@ -425,7 +425,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
             child: (profile['avatar_url'] ?? '').toString().isEmpty ? const Icon(Icons.person) : null,
           ),
           title: Text((profile['display_name'] ?? 'ZOONL User').toString()),
-          subtitle: Text(row['blocked_id'].toString(), style: const TextStyle(color: _muted, fontSize: 10)),
+          subtitle: Text(row['blocked_id'].toString(), style: const TextStyle(color: const Color(0xFFAAB5BE), fontSize: 10)),
           trailing: TextButton(onPressed: () => _unblock(row), child: const Text('UNBLOCK')),
         );
       }),
@@ -481,14 +481,14 @@ class _InAppNotificationsScreenState extends State<InAppNotificationsScreen> {
     backgroundColor: const Color(0xFF080D14),
     body: _loading ? const Center(child: CircularProgressIndicator())
       : _error != null ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
-      : _rows.isEmpty ? const Center(child: Text('No notifications yet.', style: TextStyle(color: _muted)))
+      : _rows.isEmpty ? const Center(child: Text('No notifications yet.', style: TextStyle(color: const Color(0xFFAAB5BE))))
       : RefreshIndicator(onRefresh: _load, child: ListView.builder(
         itemCount: _rows.length,
         itemBuilder: (context, i) {
           final row = _rows[i];
           final read = row['is_read'] == true;
           return ListTile(
-            leading: Icon(read ? Icons.notifications_none : Icons.notifications_active, color: read ? _muted : _gold),
+            leading: Icon(read ? Icons.notifications_none : Icons.notifications_active, color: read ? const Color(0xFFAAB5BE) : const Color(0xFFD6B46A)),
             title: Text((row['title'] ?? 'ZOONL LIVE').toString()),
             subtitle: Text((row['body'] ?? '').toString(), maxLines: 3, overflow: TextOverflow.ellipsis),
             trailing: read ? null : TextButton(onPressed: () => _markRead(row), child: const Text('READ')),
