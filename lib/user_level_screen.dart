@@ -49,11 +49,16 @@ class _UserLevelScreenState extends State<UserLevelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final current = _levels.where((row) => (row['level'] as num).toInt() == _level).firstOrNull;
-    final next = _levels.where((row) => (row['level'] as num).toInt() > _level).firstOrNull;
+    Map<String, dynamic>? current;
+    Map<String, dynamic>? next;
+    for (final row in _levels) {
+      final rowLevel = (row['level'] as num).toInt();
+      if (rowLevel == _level) current = row;
+      if (rowLevel > _level && next == null) next = row;
+    }
     final currentExp = (current?['required_exp'] as num?)?.toInt() ?? 0;
     final nextExp = (next?['required_exp'] as num?)?.toInt() ?? currentExp;
-    final progress = next == null ? 1.0 : ((_sentCoins - currentExp) / (nextExp - currentExp).clamp(1, 1 << 30)).clamp(0.0, 1.0);
+    final progress = next == null ? 1.0 : ((_sentCoins - currentExp) / (nextExp - currentExp).clamp(1, 1 << 30)).clamp(0.0, 1.0).toDouble();
     return Scaffold(
       appBar: AppBar(title: const Text('ACCOUNT LEVEL')),
       body: _loading ? const Center(child: CircularProgressIndicator())
