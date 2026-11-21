@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/backend.dart';
 
 const Color _bg = Color(0xFF080D14);
@@ -627,6 +631,161 @@ class _CoinAdjustmentScreenState extends State<CoinAdjustmentScreen> {
   );
 }
 
+class AgencyApplicationFormScreen extends StatefulWidget {
+  const AgencyApplicationFormScreen({super.key});
+  @override
+  State<AgencyApplicationFormScreen> createState() => _AgencyApplicationFormScreenState();
+}
+
+class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScreen> {
+  final SupabaseClient _db = Backend.client;
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _phone = TextEditingController();
+  final TextEditingController _depositReference = TextEditingController();
+  String _agencyType = 'streamer';
+  XFile? _receipt;
+  bool _uploading = false;
+  bool _submitting = false;
+  String? _receiptPath;
+  String? _error;
+
+  Future<void> _pickReceipt() async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
+      if (file == null) return;
+      setState(() { _receipt = file; _receiptPath = null; _error = null; });
+    } catch (error) {
+      setState(() => _error = 'Receipt image could not be selected: $error');
+    }
+  }
+
+  Future<void> _uploadReceipt() async {
+    final file = _receipt;
+    final userId = _db.auth.currentUser?.id;
+    if (file == null || userId == null) return;
+    setState(() { _uploading = true; _error = null; });
+    try {
+      final path = '$userId/agency-receipts/${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await _db.storage.from('agency-documents-private').upload(
+        path,
+        File(file.path),
+        fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+      );
+      if (mounted) setState(() => _receiptPath = path);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Receipt upload failed: $error');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty ||
+        _email.text.trim().isEmpty ||
+        _phone.text.trim().isEmpty ||
+        _depositReference.text.trim().isEmpty ||
+        _receiptPath == null) {
+      setState(() => _error = 'Complete the contact details and upload the $300 deposit receipt.');
+      return;
+    }
+    setState(() { _submitting = true; _error = null; });
+    try {
+      await _db.rpc(
+        'submit_agency_application',
+        params: <String, dynamic>{
+          'p_proposed_name': _name.text.trim(),
+          'p_agency_type': _agencyType,
+          'p_contact_details': <String, dynamic>{
+            'email': _email.text.trim(),
+            'phone': _phone.text.trim(),
+          },
+          'p_deposit_reference': _depositReference.text.trim(),
+          'p_deposit_receipt_path': _receiptPath,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agency application submitted for Owner review.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _depositReference.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Agency Application')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      _portalCard('AGENCY DEPOSIT', 'Required deposit: USD 300. Upload the receipt for manual verification. This form does not charge a card or process a payment.', Icons.receipt_long),
+      const SizedBox(height: 12),
+      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Proposed agency name')),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        value: _agencyType,
+        decoration: const InputDecoration(labelText: 'Agency type'),
+        items: const [
+          DropdownMenuItem(value: 'streamer', child: Text('Streamer Agency')),
+          DropdownMenuItem(value: 'topup', child: Text('Top-up Agency')),
+          DropdownMenuItem(value: 'both', child: Text('Both')),
+        ],
+        onChanged: (value) => setState(() => _agencyType = value ?? 'streamer'),
+      ),
+      const SizedBox(height: 8),
+      TextField(controller: _email, keyboardType: TextInputType.emailAddress,
+        decoration: const InputDecoration(labelText: 'Contact email')),
+      const SizedBox(height: 8),
+      TextField(controller: _phone, keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(labelText: 'Contact phone / WhatsApp')),
+      const SizedBox(height: 8),
+      TextField(controller: _depositReference,
+        decoration: const InputDecoration(labelText: 'Deposit reference')),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: _uploading ? null : _pickReceipt,
+        icon: const Icon(Icons.image),
+        label: Text(_receipt == null ? 'SELECT DEPOSIT RECEIPT' : 'RECEIPT SELECTED'),
+      ),
+      if (_receipt != null)
+        Text(_receiptPath == null ? 'Selected: ${_receipt!.name}' : 'Receipt securely uploaded.',
+          style: const TextStyle(color: _teal, fontSize: 11)),
+      if (_receipt != null && _receiptPath == null)
+        FilledButton(
+          onPressed: _uploading ? null : _uploadReceipt,
+          child: Text(_uploading ? 'Uploading...' : 'UPLOAD RECEIPT SECURELY'),
+        ),
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(_error!, style: const TextStyle(color: Color(0xFFE47777))),
+        ),
+      const SizedBox(height: 12),
+      FilledButton.icon(
+        onPressed: _submitting || _uploading ? null : _submit,
+        icon: const Icon(Icons.send),
+        label: Text(_submitting ? 'Submitting...' : 'SUBMIT FOR OWNER REVIEW'),
+      ),
+    ]),
+  );
+}
+
 class AgencyPortalScreen extends StatefulWidget {
   const AgencyPortalScreen({super.key});
   @override
@@ -662,7 +821,11 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
       const SizedBox(height: 14),
       _portalCard('AGENCY APPLICATIONS', 'Application records below are loaded from the connected agency_applications table. Approval and official agency ID issuance remain Owner-authorized server operations.', Icons.assignment),
       const SizedBox(height: 10),
-      FilledButton.icon(onPressed: () => _agencyApplicationInfo(context), icon: const Icon(Icons.add_business), label: const Text('START AGENCY APPLICATION')),
+      FilledButton.icon(
+        onPressed: _openAgencyApplication,
+        icon: const Icon(Icons.add_business),
+        label: const Text('START AGENCY APPLICATION'),
+      ),
       const SizedBox(height: 14),
       if (loading) const Center(child: CircularProgressIndicator(color: _gold)),
       if (error != null) Text('Agency records could not be loaded: $error', style: const TextStyle(color: Color(0xFFE47777))),
@@ -678,13 +841,11 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
     ]),
   );
 
-  void _agencyApplicationInfo(BuildContext context) {
-    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: _panel,
-      title: const Text('Agency application', style: TextStyle(color: _gold)),
-      content: const Text('Choose Streamer Agency, Top-up Agency or Both in the application flow. The secure submission endpoint and official ID issuance must be enabled in Supabase before this app can submit or approve an application. No local or sample application is created.', style: TextStyle(color: _muted, height: 1.5)),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
-    ));
+  Future<void> _openAgencyApplication() async {
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const AgencyApplicationFormScreen()),
+    );
+    if (submitted == true) await _load();
   }
 }
 
