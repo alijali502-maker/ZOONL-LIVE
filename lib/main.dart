@@ -2456,14 +2456,19 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         .map((item) => item['zoonl_item_code']?.toString() ?? '')
         .toSet();
 
-    final equippedCodes = store.userBaggage
-        .where((item) => item['is_equipped'] == true)
-        .map((item) => item['zoonl_item_code']?.toString() ?? '')
-        .toSet();
+    final equippedCodes = store.userBaggage.where((item) {
+      if (item['is_equipped'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null ||
+          (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    }).map((item) => item['zoonl_item_code']?.toString() ?? '').toSet();
 
-    final activePrime = store.memberships
-        .where((item) => item['is_active'] == true)
-        .toList();
+    final activePrime = store.memberships.where((item) {
+      if (item['is_active'] != true) return false;
+      final expiry = item['expires_at'];
+      return expiry == null ||
+          (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
+    }).toList();
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -2614,13 +2619,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 'Current VIP: ${store.currentUser['vipTier']} • Coins: ${store.currentUser['coins']}',
               ),
               const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () {
-                  _showMessage(
-                    'VIP/SVIP activation requires verified payment and server approval.',
-                  );
-                },
-                child: const Text('VIP / SVIP Top-Up'),
+              const Text(
+                'VIP/SVIP real-money checkout is not enabled. No payment is taken here. Prime tiers above can be purchased only with existing wallet Coins.',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
               ),
               if (store.userBaggage.isEmpty)
                 const Text(
