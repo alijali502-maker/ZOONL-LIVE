@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import '../../event_control_screen.dart';
@@ -323,15 +324,24 @@ class _AudioRoomThemeBackdropState extends State<_AudioRoomThemeBackdrop>
   }
 
   Widget _glassPanel({required Widget child, EdgeInsets padding = const EdgeInsets.all(10)}) {
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: const Color(0xC9140D22),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0x88E6C47A), width: 1),
-        boxShadow: const [BoxShadow(color: Color(0x553A1D68), blurRadius: 24, spreadRadius: 2)],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: const Color(0x99000000),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0x66FFFFFF), width: 1),
+            boxShadow: const [
+              BoxShadow(color: Color(0x44000000), blurRadius: 28, spreadRadius: 1),
+              BoxShadow(color: Color(0x18FFFFFF), blurRadius: 1, offset: Offset(0, 1)),
+            ],
+          ),
+          child: child,
+        ),
       ),
-      child: child,
     );
   }
 
@@ -340,12 +350,11 @@ class _AudioRoomThemeBackdropState extends State<_AudioRoomThemeBackdrop>
       duration: const Duration(milliseconds: 180),
       padding: const EdgeInsets.symmetric(vertical: 11),
       decoration: BoxDecoration(
-        gradient: selected ? const LinearGradient(colors: [Color(0xFFE6C47A), Color(0xFFB98545)]) : null,
-        color: selected ? null : const Color(0x55201630),
+        color: selected ? const Color(0xCCFFFFFF) : const Color(0x33000000),
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: selected ? const Color(0xFFE6C47A) : const Color(0x668F72AC)),
+        border: Border.all(color: selected ? Colors.white : const Color(0x66FFFFFF)),
       ),
-      child: Center(child: Text(label, style: TextStyle(color: selected ? const Color(0xFF160F22) : Colors.white,
+      child: Center(child: Text(label, style: TextStyle(color: selected ? Colors.black : Colors.white,
         fontSize: 10, fontWeight: FontWeight.w900))),
     ));
   }
