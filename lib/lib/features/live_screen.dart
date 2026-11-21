@@ -272,7 +272,7 @@ class _LiveScreenState extends State<LiveScreen> {
   String _previewFilter = 'Natural';
   bool _filterConfirmed = false;
   double _filterStrength = 0.35;
-  static const List<String> _previewFilters = <String>['Natural', 'Warm', 'Cool', 'Mono', 'Rose'];
+  static const List<String> _previewFilters = <String>['Natural', 'Soft Glow', 'Vivid', 'Cinema', 'Warm', 'Sunset', 'Cool', 'Ice', 'Rose', 'Peach', 'Mint', 'Lavender', 'Mono'];
 
   String? _roomId;
   String? _roomOwnerId;
@@ -299,6 +299,9 @@ class _LiveScreenState extends State<LiveScreen> {
   String? _entryBannerMedia;
   AudioPlayer? _giftAudioPlayer;
   int _hostLevel = 1;
+  String _hostDisplayName = '';
+  String _hostZoonlId = '';
+  String? _hostAvatarUrl;
   bool _isTrustedOwner = false;
   bool get _canUsePrivateRooms => _isTrustedOwner || _hostLevel >= 10;
 
@@ -507,6 +510,86 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  Future<void> _loadHostIdentity(String userId) async {
+    try {
+      final profile = await _supabase.from('profiles')
+          .select('display_name,avatar_url').eq('id', userId).maybeSingle();
+      final publicProfile = await _supabase.from('user_public_profiles')
+          .select('zoonl_id').eq('user_id', userId).maybeSingle();
+      if (!mounted) return;
+      setState(() {
+        _hostDisplayName = (profile?['display_name'] ?? widget.userName).toString();
+        _hostAvatarUrl = profile?['avatar_url']?.toString();
+        _hostZoonlId = (publicProfile?['zoonl_id'] ?? widget.userId).toString();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hostDisplayName = widget.userName;
+        _hostZoonlId = widget.userId;
+      });
+    }
+  }
+
+  Widget _hostIdentityGlass() {
+    final name = _hostDisplayName.isEmpty ? widget.userName : _hostDisplayName;
+    final zoonlId = _hostZoonlId.isEmpty ? widget.userId : _hostZoonlId;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 270),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xAA050505),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x77FFFFFF)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 46, height: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: ClipOval(
+                child: (_hostAvatarUrl ?? '').trim().isNotEmpty
+                    ? Image.network(_hostAvatarUrl!, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const ColoredBox(
+                          color: Color(0xFF242424),
+                          child: Icon(Icons.person, color: Colors.white, size: 27),
+                        ))
+                    : const ColoredBox(
+                        color: Color(0xFF242424),
+                        child: Icon(Icons.person, color: Colors.white, size: 27),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 9),
+            Flexible(child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text('ID $zoonlId', maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.circle, color: Color(0xFFFF4545), size: 7),
+                  SizedBox(width: 4),
+                  Text('LIVE NOW', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: .8)),
+                ]),
+              ],
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadMyLevel() async {
     final userId = _myId;
     if (userId == null) return;
@@ -573,6 +656,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   ColorFilter get _selectedPreviewColorFilter {
+    final strength = _filterStrength.clamp(0.0, 1.0);
     if (_previewFilter == 'Mono') {
       return ColorFilter.matrix(<double>[
         0.2126, 0.7152, 0.0722, 0, 0,
@@ -581,11 +665,23 @@ class _LiveScreenState extends State<LiveScreen> {
         0, 0, 0, 1, 0,
       ]);
     }
-    Color tint = Colors.transparent;
-    if (_previewFilter == 'Warm') tint = const Color(0xFFFFA45B);
-    if (_previewFilter == 'Cool') tint = const Color(0xFF73B9FF);
-    if (_previewFilter == 'Rose') tint = const Color(0xFFFF78B7);
-    return ColorFilter.mode(tint.withOpacity(_filterStrength * 0.30), BlendMode.softLight);
+    final presets = <String, Color>{
+      'Soft Glow': const Color(0xFFFFE7D6),
+      'Vivid': const Color(0xFFFF4D65),
+      'Cinema': const Color(0xFF526B82),
+      'Warm': const Color(0xFFFFA45B),
+      'Sunset': const Color(0xFFFF6A45),
+      'Cool': const Color(0xFF73B9FF),
+      'Ice': const Color(0xFF9BE8FF),
+      'Rose': const Color(0xFFFF78B7),
+      'Peach': const Color(0xFFFFB58F),
+      'Mint': const Color(0xFF79E2C3),
+      'Lavender': const Color(0xFFB79AFF),
+    };
+    final tint = presets[_previewFilter];
+    if (tint == null || strength <= 0) return const ColorFilter.mode(Colors.transparent, BlendMode.srcOver);
+    final opacity = (strength * (_previewFilter == 'Soft Glow' ? .24 : .38)).clamp(0.0, .38);
+    return ColorFilter.mode(tint.withOpacity(opacity), BlendMode.softLight);
   }
 
   // ---------- Host: go live ----------
@@ -659,6 +755,7 @@ class _LiveScreenState extends State<LiveScreen> {
       final roomId = row['id'] as String;
       _roomId = roomId;
       _roomOwnerId = myId;
+      unawaited(_loadHostIdentity(myId));
       final hostProfile = await _supabase.from('profiles')
           .select('user_level').eq('id', myId).maybeSingle();
       _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
@@ -715,6 +812,7 @@ class _LiveScreenState extends State<LiveScreen> {
       }
 
       _roomOwnerId = room['owner_id'] as String?;
+      if (_roomOwnerId != null) unawaited(_loadHostIdentity(_roomOwnerId!));
       _roomName = (room['room_name'] ?? '').toString();
       _audioThemeCode = (room['audio_theme_code'] ?? 'aurora').toString();
       _selectedRoomType = (room['room_type'] ?? 'video').toString().toLowerCase();
@@ -2452,73 +2550,7 @@ class _LiveScreenState extends State<LiveScreen> {
               Positioned(
                 top: 14,
                 left: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF542CA0), Color(0xFF211735)]),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE6C47A), width: 1),
-                    boxShadow: const [BoxShadow(color: Color(0x559360F5), blurRadius: 14)],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 27,
-                        height: 27,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFE6C47A), Color(0xFF9360F5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(color: Colors.white70, width: 1),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x669360F5), blurRadius: 9),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$_hostLevel',
-                            style: const TextStyle(
-                              color: Color(0xFF160F22),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _privateRoom || _lockedRoom ? 'PRIVATE LIVE' : 'LIVE NOW',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: .7,
-                            ),
-                          ),
-                          Text(
-                            '$_liveLevelSticker  •  LEVEL $_hostLevel',
-                            style: const TextStyle(
-                              color: Color(0xFFE6C47A),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                child: _hostIdentityGlass(),
               ),
               Positioned(
                 top: 14,
