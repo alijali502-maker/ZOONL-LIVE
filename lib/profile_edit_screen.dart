@@ -18,6 +18,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _nameController = TextEditingController();
   final _bioController = TextEditingController();
   final _countryController = TextEditingController();
+  final _idController = TextEditingController();
   final SupabaseClient supabase = Supabase.instance.client;
   final ImagePicker _picker = ImagePicker();
 
@@ -57,6 +58,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           .select('zoonl_id').eq('user_id', user.id).maybeSingle();
 
       _userId = publicProfile?['zoonl_id']?.toString() ?? 'Not available';
+      _idController.text = _userId;
       _nameController.text = profile['display_name']?.toString() ?? '';
       _bioController.text = profile['bio']?.toString() ?? '';
       _countryController.text = profile['country']?.toString() ?? '';
@@ -260,6 +262,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _nameController.dispose();
     _bioController.dispose();
     _countryController.dispose();
+    _idController.dispose();
     super.dispose();
   }
 
@@ -302,7 +305,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 circular: false,
               ),
               const SizedBox(height: 20),
-              _field(label: 'ZOONL User ID', controller: TextEditingController(text: _userId)),
+              _field(label: 'ZOONL User ID', controller: _idController),
               const SizedBox(height: 14),
               _field(
                 label: 'Display Name',
