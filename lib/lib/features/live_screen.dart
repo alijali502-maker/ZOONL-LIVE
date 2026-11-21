@@ -366,8 +366,13 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _chooseAudioTheme(String code) async {
-    final theme = _audioThemeCatalog.where((item) => item['theme_code'] == code)
-        .cast<Map<String, dynamic>?>().firstOrNull;
+    Map<String, dynamic>? theme;
+    for (final item in _audioThemeCatalog) {
+      if (item['theme_code'] == code) {
+        theme = item;
+        break;
+      }
+    }
     if (theme == null) {
       _showMessage('This audio theme is not available yet.');
       return;
@@ -1259,11 +1264,7 @@ class _LiveScreenState extends State<LiveScreen> {
             if (!_isHost) {
               if (_selectedRoomType == 'audio') {
                 final theme = row['audio_theme_code']?.toString() ?? 'aurora';
-                if (mounted && _audioThemeCatalog.any((item) => item['theme_code'] == theme)) {
-                  setState(() => _audioThemeCode = theme);
-                } else if (mounted) {
-                  setState(() => _audioThemeCode = theme);
-                }
+                if (mounted) setState(() => _audioThemeCode = theme);
               }
               final code = row['video_filter_code']?.toString() ?? 'Natural';
               final strength = (row['video_filter_strength'] as num?)?.toDouble() ?? 0.35;
