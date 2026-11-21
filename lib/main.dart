@@ -2486,9 +2486,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   style: TextStyle(color: Colors.white60))
               : Column(
                   children: store.walletTransactions.take(20).map((tx) {
-                    final amount = (tx['amount'] as num?)?.toInt() ?? 0;
-                    final currency = (tx['currency'] ?? '').toString().toUpperCase();
+                    final rawAmount = (tx['amount'] as num?)?.toInt() ?? 0;
                     final type = (tx['transaction_type'] ?? 'transaction').toString();
+                    final outgoing = type.contains('sent') ||
+                        type.contains('purchase') ||
+                        type.contains('withdrawal') ||
+                        type.contains('spend');
+                    final amount = outgoing ? -rawAmount.abs() : rawAmount.abs();
+                    final currency = (tx['currency'] ?? '').toString().toUpperCase();
                     final description = (tx['description'] ?? '').toString();
                     final created = (tx['created_at'] ?? '').toString();
                     return ListTile(
