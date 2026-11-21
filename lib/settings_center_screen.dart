@@ -386,9 +386,16 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       final rows = (raw as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
       final ids = rows.map((e) => e['blocked_id'].toString()).toSet().toList();
       if (ids.isNotEmpty) {
-        final profiles = await _db.from('profiles').select('id,display_name,avatar_url').inFilter('id', ids);
-        final byId = {for (final p in profiles as List) p['id'].toString(): Map<String,dynamic>.from(p as Map)};
-        for (final row in rows) { row['profile'] = byId[row['blocked_id'].toString()] ?? {}; }
+        final profiles = await _db.from('user_public_profiles')
+            .select('user_id,username,avatar_url,zoonl_id')
+            .inFilter('user_id', ids);
+        final byId = {
+          for (final p in profiles as List)
+            p['user_id'].toString(): Map<String, dynamic>.from(p as Map),
+        };
+        for (final row in rows) {
+          row['profile'] = byId[row['blocked_id'].toString()] ?? {};
+        }
       }
       if (mounted) setState(() { _rows = rows; _loading = false; });
     } catch (e) {
@@ -424,8 +431,11 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
                 ? NetworkImage(profile['avatar_url'].toString()) : null,
             child: (profile['avatar_url'] ?? '').toString().isEmpty ? const Icon(Icons.person) : null,
           ),
-          title: Text((profile['display_name'] ?? 'ZOONL User').toString()),
-          subtitle: Text(row['blocked_id'].toString(), style: const TextStyle(color: const Color(0xFFAAB5BE), fontSize: 10)),
+          title: Text((profile['username'] ?? 'ZOONL User').toString()),
+          subtitle: Text(
+            'ZOONL ID ${profile['zoonl_id'] ?? 'Unavailable'}',
+            style: const TextStyle(color: Color(0xFFAAB5BE), fontSize: 10),
+          ),
           trailing: TextButton(onPressed: () => _unblock(row), child: const Text('UNBLOCK')),
         );
       }),
