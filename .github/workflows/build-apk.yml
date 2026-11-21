@@ -45,6 +45,26 @@ jobs:
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
 
+      - name: Set Android minimum SDK for native video filters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          target = next((p for p in candidates if p.exists()), None)
+          if target is None:
+              raise SystemExit("Android app Gradle file was not generated.")
+          source = target.read_text()
+          if target.suffix == ".kts":
+              source = source.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+          else:
+              source = source.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
+          target.write_text(source)
+          if "minSdk = 24" not in source and "minSdkVersion 24" not in source:
+              raise SystemExit("Could not set Android minSdkVersion to 24.")
+          print(f"Android minSdkVersion set to 24 in {target}")
+          PY
+
       - name: Add Android Internet Permission
         run: |
           python3 - <<'PY'
