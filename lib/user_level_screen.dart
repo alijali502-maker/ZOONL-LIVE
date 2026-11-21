@@ -31,7 +31,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     [Color(0xFF8B3D77),Color(0xFFFFB7EA),Color(0xFF4B1B4B)],
     [Color(0xFFB57A20),Color(0xFFFFF0AE),Color(0xFF62400C)],
   ];
-  int _tier(int n) => n >= 100 ? 9 : n <= 10 ? n-1 : ((n-1) ~/ 10).clamp(1,9);
+  int _tier(int n) => n >= 100 ? 9 : n <= 10 ? n-1 : ((n-1) ~/ 10).clamp(1,9).toInt();
   List<Color> _colors(int n) => n >= 100
       ? const [Color(0xFFFFE6A1),Color(0xFFFFFFFF),Color(0xFFB77A22),Color(0xFF57320D)]
       : _palettes[_tier(n)];
@@ -67,7 +67,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
       final entries=inventory.where((e)=>e['item_type']=='ENTRY_EFFECT'&&valid(Map<String,dynamic>.from(e))).toList();
       if(!mounted)return;
       setState((){
-        _level=(r[0] as num?)?.toInt()??1;
+        _level=((r[0] as num?)?.toInt()??1).clamp(1,100).toInt();
         _exp=(r[1] as num?)?.toInt()??0;
         _levels=(r[2] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
         _owner=r[3]==true;
@@ -144,7 +144,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     for(final r in _levels){final n=(r['level'] as num).toInt();if(n==_level)current=r;if(n>_level&&next==null)next=r;}
     final start=(current?['required_exp'] as num?)?.toInt()??0;
     final target=(next?['required_exp'] as num?)?.toInt()??start;
-    final remain=(target-_exp).clamp(0,target);
+    final remain=(target-_exp).clamp(0,target).toInt();
     final progress=next==null?1.0:((_exp-start)/(target-start).clamp(1,1<<62)).clamp(0.0,1.0).toDouble();
     final c=_colors(_level);
     return Scaffold(backgroundColor:const Color(0xFF070A12),appBar:AppBar(
