@@ -430,3 +430,4 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
       ]),
     );
   }
+}
