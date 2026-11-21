@@ -277,9 +277,9 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFD6B46A)),
+      prefixIcon: Icon(icon, color: const Color(0xFF9B8CFF)),
       filled: true,
-      fillColor: const Color(0xFF101923),
+      fillColor: const Color(0xFF0D1426),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
@@ -291,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(
-          color: Color(0xFF4BC2B0),
+          color: Color(0xFF58D6CE),
           width: 1.4,
         ),
       ),
@@ -309,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
       label: Text(title),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
-        side: const BorderSide(color: Color(0xFF354653)),
+        side: const BorderSide(color: Color(0xFF2C3B59)),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
@@ -327,18 +327,18 @@ class _LoginScreenState extends State<LoginScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF263746),
-            Color(0xFF101923),
-            Color(0xFF080D14),
+            Color(0xFF1B2A4A),
+            Color(0xFF0D1426),
+            Color(0xFF070B17),
           ],
         ),
         border: Border.all(
-          color: const Color(0xFFD6B46A).withOpacity(0.65),
+          color: const Color(0xFF9B8CFF).withOpacity(0.65),
           width: 1.3,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF4BC2B0).withOpacity(0.3),
+            color: const Color(0xFF58D6CE).withOpacity(0.3),
             blurRadius: 26,
             offset: const Offset(0, 9),
           ),
@@ -350,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _tag('● LIVE STAGE', const Color(0xFFFF2E63)),
               const Spacer(),
-              _tag('CREATOR VIP', const Color(0xFFD6B46A)),
+              _tag('CREATOR VIP', const Color(0xFF9B8CFF)),
             ],
           ),
           const SizedBox(height: 10),
@@ -368,13 +368,13 @@ class _LoginScreenState extends State<LoginScreen> {
           const Text(
             'ZOONL LIVE',
             style: TextStyle(
-              color: Color(0xFFFFE6A8),
+              color: Color(0xFFE4E8FF),
               fontSize: 25,
               fontWeight: FontWeight.w900,
               letterSpacing: 3,
               shadows: [
                 Shadow(
-                  color: Color(0xFF4BC2B0),
+                  color: Color(0xFF58D6CE),
                   blurRadius: 16,
                 ),
               ],
@@ -385,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen> {
             'Welcome to Live Streamer & Creator Arena',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFD6B46A),
+              color: Color(0xFF9B8CFF),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -592,7 +592,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: _loading ? null : action,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF4BC2B0),
+          backgroundColor: const Color(0xFF58D6CE),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
@@ -627,12 +627,12 @@ class _LoginScreenState extends State<LoginScreen> {
       onPressed: _loading ? null : onTap,
       style: OutlinedButton.styleFrom(
         backgroundColor: selected
-            ? const Color(0xFF263746)
-            : const Color(0xFF101923),
+            ? const Color(0xFF1B2A4A)
+            : const Color(0xFF0D1426),
         foregroundColor: Colors.white,
         side: BorderSide(
           color: selected
-              ? const Color(0xFF4BC2B0)
+              ? const Color(0xFF58D6CE)
               : const Color(0xFF17232E),
         ),
         padding: const EdgeInsets.symmetric(vertical: 13),
@@ -658,7 +658,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080D14),
+      backgroundColor: const Color(0xFF070B17),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -666,8 +666,8 @@ class _LoginScreenState extends State<LoginScreen> {
             end: Alignment.bottomCenter,
             colors: [
               Color(0xFF17232E),
-              Color(0xFF080D14),
-              Color(0xFF080D14),
+              Color(0xFF070B17),
+              Color(0xFF070B17),
             ],
           ),
         ),
@@ -731,7 +731,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : 'New user? Create an account',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFFE8D29A),
+                        color: Color(0xFFD2CEFF),
                       ),
                     ),
                   ),
@@ -739,7 +739,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Row(
                     children: [
                       Expanded(
-                        child: Divider(color: Color(0xFF354653)),
+                        child: Divider(color: Color(0xFF2C3B59)),
                       ),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12),
@@ -752,7 +752,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       Expanded(
-                        child: Divider(color: Color(0xFF354653)),
+                        child: Divider(color: Color(0xFF2C3B59)),
                       ),
                     ],
                   ),
@@ -793,173 +793,94 @@ class ZoonlLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    const gold = Color(0xFFFFD982);
-    const purple = Color(0xFF4BC2B0);
-    const pink = Color(0xFF4BC2B0);
+    final scale = size.shortestSide / 220.0;
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scale);
+    canvas.translate(-center.dx, -center.dy);
 
     final glow = Paint()
-      ..color = purple.withOpacity(0.24)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28);
-
+      ..color = const Color(0xFF786BFF).withOpacity(.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26);
     canvas.drawCircle(center, 82, glow);
 
     final outer = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFFFFE7A5),
-          Color(0xFF4BC2B0),
-          Color(0xFF4BC2B0),
-          Color(0xFFFFE7A5),
-        ],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: 78),
-      );
-
+      ..strokeWidth = 3
+      ..shader = const SweepGradient(colors: [
+        Color(0xFF8CEBFF), Color(0xFF8F7BFF), Color(0xFFE4E8FF),
+        Color(0xFF58D6CE), Color(0xFF8CEBFF),
+      ]).createShader(Rect.fromCircle(center: center, radius: 78));
     canvas.drawCircle(center, 77, outer);
 
-    final inner = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = gold.withOpacity(0.7);
-
-    canvas.drawCircle(center, 68, inner);
-
-    // Crown above the Z.
-    final crownPath = Path()
-      ..moveTo(center.dx - 38, center.dy - 53)
-      ..lineTo(center.dx - 43, center.dy - 78)
-      ..lineTo(center.dx - 20, center.dy - 64)
-      ..lineTo(center.dx, center.dy - 88)
-      ..lineTo(center.dx + 20, center.dy - 64)
-      ..lineTo(center.dx + 43, center.dy - 78)
-      ..lineTo(center.dx + 38, center.dy - 53)
+    final shield = Path()
+      ..moveTo(center.dx, center.dy - 63)
+      ..lineTo(center.dx + 53, center.dy - 38)
+      ..lineTo(center.dx + 47, center.dy + 26)
+      ..quadraticBezierTo(center.dx + 27, center.dy + 58, center.dx, center.dy + 67)
+      ..quadraticBezierTo(center.dx - 27, center.dy + 58, center.dx - 47, center.dy + 26)
+      ..lineTo(center.dx - 53, center.dy - 38)
       ..close();
-
-    final crownPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFFFFF0B5),
-          Color(0xFFE6B957),
-          Color(0xFF9D5B19),
-        ],
-      ).createShader(
-        Rect.fromLTWH(
-          center.dx - 45,
-          center.dy - 90,
-          90,
-          40,
-        ),
-      );
-
-    canvas.drawPath(crownPath, crownPaint);
-
-    final crownLine = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = const Color(0xFFFFF0C0);
-
-    canvas.drawPath(crownPath, crownLine);
-
-    // Large stylized Z.
-    final zPath = Path()
-      ..moveTo(center.dx - 36, center.dy - 35)
-      ..lineTo(center.dx + 35, center.dy - 35)
-      ..lineTo(center.dx - 32, center.dy + 31)
-      ..lineTo(center.dx + 37, center.dy + 31);
-
-    final zPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 13
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
+    final shieldPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          Color(0xFFFFF0B5),
-          Color(0xFFFFD05A),
-          Color(0xFF4BC2B0),
-          Color(0xFF4BC2B0),
-        ],
-      ).createShader(
-        Rect.fromCenter(
-          center: center,
-          width: 90,
-          height: 90,
-        ),
-      );
+        colors: [Color(0xFF263B68), Color(0xFF151E3C), Color(0xFF10182E)],
+      ).createShader(Rect.fromCenter(center: center, width: 112, height: 140));
+    canvas.drawPath(shield, shieldPaint);
+    canvas.drawPath(shield, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = const Color(0xFFB6B4FF));
 
-    canvas.drawPath(zPath, zPaint);
+    // A broadcast aperture and play core, rather than a single-letter mark.
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = const Color(0xFF69E4DF);
+    canvas.drawCircle(center, 34, ringPaint);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: 46), -2.5, 1.15, false, ringPaint);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: 46), .35, 1.15, false, ringPaint);
 
-    // Broadcast signal arcs.
-    for (int i = 0; i < 3; i++) {
-      final signalPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round
-        ..color = pink.withOpacity(1 - i * 0.22);
+    final play = Path()
+      ..moveTo(center.dx - 10, center.dy - 17)
+      ..quadraticBezierTo(center.dx - 14, center.dy - 20, center.dx - 14, center.dy - 11)
+      ..lineTo(center.dx - 14, center.dy + 15)
+      ..quadraticBezierTo(center.dx - 14, center.dy + 22, center.dx - 7, center.dy + 17)
+      ..lineTo(center.dx + 17, center.dy + 3)
+      ..quadraticBezierTo(center.dx + 24, center.dy - 1, center.dx + 17, center.dy - 6)
+      ..close();
+    canvas.drawPath(play, Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFFE4E8FF), Color(0xFF79E8E0)],
+      ).createShader(Rect.fromCircle(center: center, radius: 30)));
 
-      final radius = 47.0 + i * 10;
-      canvas.drawArc(
-        Rect.fromCircle(
-          center: Offset(center.dx + 47, center.dy - 20),
-          radius: radius,
-        ),
-        -0.8,
-        1.0,
-        false,
-        signalPaint,
-      );
+    final crown = Path()
+      ..moveTo(center.dx - 34, center.dy - 65)
+      ..lineTo(center.dx - 28, center.dy - 82)
+      ..lineTo(center.dx - 10, center.dy - 70)
+      ..lineTo(center.dx, center.dy - 88)
+      ..lineTo(center.dx + 10, center.dy - 70)
+      ..lineTo(center.dx + 28, center.dy - 82)
+      ..lineTo(center.dx + 34, center.dy - 65)
+      ..close();
+    canvas.drawPath(crown, Paint()..color = const Color(0xFFC7C2FF));
+    canvas.drawPath(crown, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = const Color(0xFFE7E9FF));
+
+    final dot = Paint()..color = const Color(0xFF8CEBFF);
+    for (final point in [
+      Offset(center.dx - 59, center.dy - 8),
+      Offset(center.dx + 59, center.dy - 8),
+      Offset(center.dx, center.dy + 82),
+    ]) {
+      canvas.drawCircle(point, 3, dot);
     }
-
-    // Small decorative stars.
-    final starPaint = Paint()..color = gold;
-    final points = [
-      Offset(center.dx - 65, center.dy - 12),
-      Offset(center.dx + 62, center.dy + 43),
-      Offset(center.dx - 50, center.dy + 51),
-      Offset(center.dx + 10, center.dy - 96),
-    ];
-
-    for (final point in points) {
-      canvas.drawCircle(point, 2.5, starPaint);
-      canvas.drawLine(
-        Offset(point.dx - 5, point.dy),
-        Offset(point.dx + 5, point.dy),
-        starPaint,
-      );
-      canvas.drawLine(
-        Offset(point.dx, point.dy - 5),
-        Offset(point.dx, point.dy + 5),
-        starPaint,
-      );
-    }
-
-    // Small central jewel on the crown.
-    final jewel = Paint()
-      ..shader = const RadialGradient(
-        colors: [
-          Color(0xFFFFB5E8),
-          Color(0xFF4BC2B0),
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(center.dx, center.dy - 67),
-          radius: 7,
-        ),
-      );
-
-    canvas.drawCircle(
-      Offset(center.dx, center.dy - 67),
-      6,
-      jewel,
-    );
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant ZoonlLogoPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
