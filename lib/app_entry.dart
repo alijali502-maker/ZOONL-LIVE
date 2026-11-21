@@ -179,6 +179,12 @@ class ZoonlAuthGate extends StatelessWidget {
                     appStore.cosmeticsCatalog = home.cosmetics;
                     appStore.primeTiers = home.primeTiers;
                     appStore.userBaggage = home.baggage;
+                    appStore.userTrial = home.userTrial;
+                    appStore.backupStore = home.baggage.where((item) {
+                      final expiry = DateTime.tryParse(item['expires_at']?.toString() ?? '');
+                      return item['acquired_via'] == 'NEW_ID_TRIAL' &&
+                          expiry != null && expiry.isBefore(DateTime.now());
+                    }).toList();
                     appStore.streamers
                       ..clear()
                       ..addAll(home.rooms.map((room) => <String, dynamic>{
@@ -330,6 +336,7 @@ class ZoonlAuthGate extends StatelessWidget {
       cosmetics: cosmetics,
       primeTiers: primeTiers,
       baggage: baggage,
+      userTrial: userTrial,
     );
   }
 
@@ -417,6 +424,7 @@ class _HomeData {
   final List<Map<String, dynamic>> cosmetics;
   final List<Map<String, dynamic>> primeTiers;
   final List<Map<String, dynamic>> baggage;
+  final Map<String, dynamic> userTrial;
 
   const _HomeData({
     required this.wallet,
@@ -427,6 +435,7 @@ class _HomeData {
     required this.cosmetics,
     required this.primeTiers,
     required this.baggage,
+    required this.userTrial,
   });
 
   factory _HomeData.empty() => const _HomeData(
@@ -438,5 +447,6 @@ class _HomeData {
     cosmetics: <Map<String, dynamic>>[],
     primeTiers: <Map<String, dynamic>>[],
     baggage: <Map<String, dynamic>>[],
+    userTrial: <String, dynamic>{},
   );
 }
