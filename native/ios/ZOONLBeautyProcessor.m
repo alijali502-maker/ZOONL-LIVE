@@ -3,6 +3,7 @@
 #import <flutter_webrtc/FlutterWebRTCPlugin.h>
 #import <flutter_webrtc/LocalVideoTrack.h>
 #import <stdatomic.h>
+#import <math.h>
 #import <string.h>
 
 @interface ZOONLBeautyFrameProcessor : NSObject <ExternalVideoProcessingDelegate>
