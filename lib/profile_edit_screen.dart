@@ -47,12 +47,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Future<void> _loadProfile() async {
     try {
       final user = supabase.auth.currentUser;
-      if (user == null) throw Exception('कृपया पहले Login करें।');
+      if (user == null) throw Exception('Please log in first.');
 
       final profile = await supabase.from('profiles')
           .select('display_name,bio,country,avatar_url,profile_background_url')
           .eq('id', user.id).maybeSingle();
-      if (profile == null) throw Exception('आपकी Profile अभी उपलब्ध नहीं है।');
+      if (profile == null) throw Exception('Your profile is not available yet.');
 
       final publicProfile = await supabase.from('user_public_profiles')
           .select('zoonl_id').eq('user_id', user.id).maybeSingle();
@@ -95,7 +95,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       final file = File(picked.path);
       final size = await file.length();
       if (size > 15 * 1024 * 1024) {
-        throw Exception('Image 15 MB से छोटी होनी चाहिए।');
+        throw Exception('Image must be smaller than 15 MB.');
       }
 
       final extension = picked.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
@@ -119,7 +119,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image upload नहीं हुआ: $e')),
+          SnackBar(content: Text('Image upload failed: $e')),
         );
       }
     } finally {
@@ -160,13 +160,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile सफलतापूर्वक सेव हुई।')),
+        const SnackBar(content: Text('Profile saved successfully.')),
       );
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('सेव नहीं हुआ: $e')),
+        SnackBar(content: Text('Save failed: $e')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -289,7 +289,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             children: [
               _imageCard(
                 title: 'PROFILE PHOTO',
-                subtitle: 'अपने मोबाइल की Gallery से कोई भी उपयुक्त DP चुनें।',
+                subtitle: 'Choose a profile photo from your phone gallery.',
                 url: _avatarUrl,
                 uploading: _avatarUploading,
                 onPick: () => _pickAndUploadImage(background: false),
@@ -298,7 +298,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               const SizedBox(height: 14),
               _imageCard(
                 title: 'PROFILE BACKGROUND',
-                subtitle: 'अपनी Profile के पीछे लगाने के लिए Gallery से Background चुनें।',
+                subtitle: 'Choose an image from your gallery for your profile background.',
                 url: _backgroundUrl,
                 uploading: _backgroundUploading,
                 onPick: () => _pickAndUploadImage(background: true),
@@ -310,9 +310,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               _field(
                 label: 'Display Name',
                 controller: _nameController,
-                hint: 'अपना नाम लिखें',
+                hint: 'Enter your display name',
                 maxLength: 40,
-                validator: (v) => v == null || v.trim().isEmpty ? 'नाम जरूरी है।' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Display name is required.' : null,
               ),
               const SizedBox(height: 14),
               const Text('Country', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -321,7 +321,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 value: _countries.contains(_countryController.text)
                     ? _countryController.text : null,
                 decoration: const InputDecoration(
-                  hintText: 'देश चुनें',
+                  hintText: 'Select country',
                   border: OutlineInputBorder(),
                 ),
                 items: _countries.map((country) => DropdownMenuItem(
@@ -329,7 +329,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 onChanged: (value) {
                   if (value != null) _countryController.text = value;
                 },
-                validator: (v) => (v == null || v.isEmpty) ? 'Country चुनें।' : null,
+                validator: (v) => (v == null || v.isEmpty) ? 'Select a country.' : null,
               ),
               const SizedBox(height: 14),
               _field(label: 'Bio', controller: _bioController,
