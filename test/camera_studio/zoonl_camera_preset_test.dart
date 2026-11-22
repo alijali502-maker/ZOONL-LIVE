@@ -4,7 +4,7 @@ import 'package:zoonl_live/camera_studio/zoonl_camera_preset.dart';
 void main() {
   group('ZOONL camera preset settings', () {
     test('beauty controls stay inside safe supported ranges', () {
-      const settings = ZoonlBeautySettings().copyWith(
+      final settings = const ZoonlBeautySettings().copyWith(
         smoothing: 4,
         glow: -1,
         brightness: 3,
