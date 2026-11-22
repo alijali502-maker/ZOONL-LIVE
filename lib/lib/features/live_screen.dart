@@ -1709,7 +1709,7 @@ class _LiveScreenState extends State<LiveScreen> {
     final level = int.tryParse(item['level'] ?? '') ?? 1;
     final colors = _chatRibbonColors(level);
     final name = item['name'] ?? 'User';
-    final initial = name.isEmpty ? 'U' : name.characters.first.toUpperCase();
+    final initial = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
     final vipColor = badge == 'SVIP'
         ? const Color(0xFFFF657A)
         : const Color(0xFFFFD77E);
