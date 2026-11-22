@@ -353,12 +353,12 @@ jobs:
           if coordinate in source:
               print("WebRTC native dependency already exposed to app compile classpath.")
               raise SystemExit(0)
-          match = re.search(r"dependencies\\s*\\{", source)
+          match = re.search(r"dependencies\s*\{", source)
           if not match:
               raise SystemExit("Android app dependencies block was not found.")
-          line = (f'    implementation("{coordinate}")\\n' if target.suffix == ".kts"
-                  else f"    implementation '{coordinate}'\\n")
-          source = source[:match.end()] + "\\n" + line + source[match.end():]
+          line = (f'    implementation("{coordinate}")\n' if target.suffix == ".kts"
+                  else f"    implementation '{coordinate}'\n")
+          source = source[:match.end()] + "\n" + line + source[match.end():]
           target.write_text(source)
           print(f"Added {coordinate} to {target} so native frame processor can compile.")
           PY
