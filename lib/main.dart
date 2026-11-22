@@ -2543,7 +2543,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         _showMessage('Supported: PNG, JPG, WEBP, GIF, MP4 and WEBM.');
         return;
       }
-      if (file.length() != null && await file.length() > 52428800) {
+      if (await file.length() > 52428800) {
         _showMessage('Media file must be 50 MB or smaller.');
         return;
       }
