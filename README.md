@@ -17,4 +17,4 @@ The app currently includes a dark-themed home screen, sample live rooms, feature
 
 ## Progressive Level Experience
 
-ZOONL LIVE includes server-authoritative lifetime gift EXP, a 1-100 rank ladder, animated metallic profile insignia, owned-item backpack display, and level/VIP ribbons in live chat. The Android release workflow packages the signed release output as a ZIP artifact.
+ZOONL LIVE includes server-authoritative lifetime gift EXP, a 1-100 rank ladder, animated metallic profile insignia, owned-item backpack display, and level/VIP ribbons in live chat. The Android release workflow packages the Android release APK as a ZIP artifact.
