@@ -533,22 +533,42 @@ class _LiveScreenState extends State<LiveScreen> {
     final next = stars >= 5 ? _starThresholds.last : _starThresholds[stars];
     final previous = stars == 0 ? 0 : _starThresholds[stars - 1];
     final progress = stars >= 5 ? 1.0 : ((_hostStarDailyCoins - previous) / (next - previous)).clamp(0.0, 1.0).toDouble();
-    final color = stars == 0 ? _starColors.first : _starColors[stars - 1];
-    return Container(width: 250, margin: const EdgeInsets.only(top: 6), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(gradient: LinearGradient(colors: [const Color(0xD9161A2A), color.withOpacity(.28), const Color(0xE9080B14)]),
-        borderRadius: BorderRadius.circular(13), border: Border.all(color: color.withOpacity(.85)),
-        boxShadow: [BoxShadow(color: color.withOpacity(.24), blurRadius: 12), const BoxShadow(color: Colors.black54, blurRadius: 6, offset: Offset(1,3))]),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [const Text('STREAMER STAR', style: TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w900)), const Spacer(),
-          Text('$stars / 5', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w900))]),
-        Row(children: List.generate(5, (i) => Expanded(child: Icon(i < stars ? Icons.star : Icons.star_border, size: 17,
-          color: i < stars ? _starColors[i] : Colors.white30,
-          shadows: i < stars ? [Shadow(color: _starColors[i].withOpacity(.85), blurRadius: 8)] : null)))),
-        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 4,
-          backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation<Color>(color))),
-        Text(stars >= 5 ? '5-star daily target reached' : '$_hostStarDailyCoins / $next coins today',
-          style: const TextStyle(color: Colors.white70, fontSize: 8)),
-      ]));
+    final color = stars == 0 ? const Color(0xFF9AA6B8) : _starColors[stars - 1];
+    final label = stars == 0 ? '0 STAR' : '$stars STAR';
+    return Container(
+      width: 238,
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xF5101728), color.withOpacity(.34), const Color(0xF50A1020)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(.9), width: 1.2),
+        boxShadow: [BoxShadow(color: color.withOpacity(.28), blurRadius: 16), const BoxShadow(color: Colors.black54, blurRadius: 7, offset: Offset(0, 4))],
+      ),
+      child: Row(children: [
+        Container(
+          width: 43, height: 43,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: [color.withOpacity(.95), const Color(0xFF172033), color.withOpacity(.65)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            border: Border.all(color: Colors.white.withOpacity(.72), width: 1.1),
+            boxShadow: [BoxShadow(color: color.withOpacity(.55), blurRadius: 12)],
+          ),
+          child: Center(child: Text('$stars', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 5, offset: Offset(0, 2))]))),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: .8)), const Spacer(), Text(' / 5', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800))]),
+          const SizedBox(height: 6),
+          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation<Color>(color))),
+          const SizedBox(height: 4),
+          Text(stars >= 5 ? 'Daily star target completed' : '$_hostStarDailyCoins / $next coins today', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 8)),
+        ])),
+      ]),
+    );
   }
 
   Future<void> _loadHostIdentity(String userId) async {
@@ -2770,7 +2790,7 @@ class _LiveScreenState extends State<LiveScreen> {
           Positioned(right:12,top:165,child:_guestMiniOverlay()),
         if (_giftBanner != null) Positioned.fill(child:_liveGiftBanner()),
         if (_chatEnabled) Positioned(left:10,right:10,bottom:8,
-          child: ConstrainedBox(constraints:BoxConstraints(maxHeight:math.min(184,MediaQuery.of(context).size.height*.25)),
+          child: ConstrainedBox(constraints:BoxConstraints(maxHeight:math.min(138,MediaQuery.of(context).size.height*.20)),
             child:Container(padding:const EdgeInsets.fromLTRB(10,7,10,8),
               decoration:BoxDecoration(gradient:const LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,
                 colors:[Color(0xB8181424),Color(0xD9080A12)]),borderRadius:BorderRadius.circular(16),
@@ -2780,7 +2800,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   const Text('LIVE CHAT',style:TextStyle(color:Colors.white70,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:1)),
                   const Spacer(),Text('\${_messages.length} messages',style:const TextStyle(color:Colors.white38,fontSize:8))]),
                 const SizedBox(height:4),
-                SizedBox(height:104,child:ListView.builder(reverse:true,itemCount:_messages.length,itemBuilder:(context,index){
+                SizedBox(height:62,child:ListView.builder(reverse:true,itemCount:_messages.length.clamp(0,4),itemBuilder:(context,index){
                   final item=_messages[_messages.length-1-index];return Padding(padding:const EdgeInsets.symmetric(vertical:2),child:_buildChatLine(item));})),
                 const SizedBox(height:5),
                 Row(children:[
@@ -2804,33 +2824,37 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _audioSeatStage() {
-    final seats=_guestSeats;
-    final shown=seats.take(6).toList();
-    return Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:9),
-      decoration:BoxDecoration(color:const Color(0x99090C18),borderRadius:BorderRadius.circular(18),border:Border.all(color:const Color(0x66E6C47A))),
-      child:Column(mainAxisSize:MainAxisSize.min,children:[
-        const Text('AUDIO BROADCAST SEATS',style:TextStyle(color:Colors.white,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1)),
-        const SizedBox(height:9),
-        Wrap(alignment:WrapAlignment.center,spacing:12,runSpacing:8,children:List.generate(6,(i){
-          final seat=i<shown.length?shown[i]:<String,dynamic>{};
-          final active=seat['seat_status']=='occupied';
-          final name=active?(seat['display_name']??seat['user_name']??'Guest').toString():'Open Seat';
-          final seatNumber=(seat['seat_number'] as num?)?.toInt() ?? (i+1);
-          return SizedBox(width:76,child:InkWell(
-            onTap:_isHost && !active ? () => _showGuestInviteDialog(initialSeatNumber:seatNumber) : null,
-            borderRadius:BorderRadius.circular(14),
-            child:Column(mainAxisSize:MainAxisSize.min,children:[
-              Container(width:43,height:43,decoration:BoxDecoration(shape:BoxShape.circle,
-                gradient:LinearGradient(colors:active?const[Color(0xFFFFD77C),Color(0xFF8A5524)]:const[Color(0xFF39445C),Color(0xFF151B2A)]),
-                border:Border.all(color:active?const Color(0xFFFFE7AE):Colors.white24,width:1.5),
-                boxShadow:active?const[BoxShadow(color:Color(0x66E6C47A),blurRadius:10)]:null),
-                child:Icon(active?Icons.mic:Icons.add,color:Colors.white,size:20)),
-              const SizedBox(height:3),Text(name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w800)),
-              if(_isHost && !active) const Text('INVITE',style:TextStyle(color:Color(0xFFE6C47A),fontSize:7,fontWeight:FontWeight.w900)),
+    final seats = _guestSeats;
+    final shown = seats.take(8).toList();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(color: const Color(0x99090C18), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x66E6C47A))),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('AUDIO BROADCAST • 8 GUEST SEATS', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        const SizedBox(height: 9),
+        Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 9, children: List.generate(8, (i) {
+          final seat = i < shown.length ? shown[i] : <String, dynamic>{};
+          final active = seat['seat_status'] == 'occupied';
+          final name = active ? (seat['display_name'] ?? seat['user_name'] ?? 'Guest').toString() : 'Open Seat';
+          final seatNumber = (seat['seat_number'] as num?)?.toInt() ?? (i + 1);
+          return SizedBox(width: 72, child: InkWell(
+            onTap: _isHost && !active ? () => _showGuestInviteDialog(initialSeatNumber: seatNumber) : null,
+            borderRadius: BorderRadius.circular(14),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 42, height: 42,
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: active ? const [Color(0xFFFFD77C), Color(0xFF8A5524)] : const [Color(0xFF46516B), Color(0xFF151B2A)]),
+                  border: Border.all(color: active ? const Color(0xFFFFE7AE) : Colors.white30, width: 1.4),
+                  boxShadow: active ? const [BoxShadow(color: Color(0x66E6C47A), blurRadius: 10)] : null),
+                child: Icon(active ? Icons.mic : Icons.add, color: Colors.white, size: 20)),
+              const SizedBox(height: 3),
+              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+              Text(active ? 'SEAT $seatNumber' : (_isHost ? 'INVITE' : 'TAP TO JOIN'), style: const TextStyle(color: Color(0xFFE6C47A), fontSize: 7, fontWeight: FontWeight.w900)),
             ]),
           ));
         })),
-      ]));
+      ]),
+    );
   }
 
   List<Widget> _hostControls() {
