@@ -45,6 +45,41 @@ jobs:
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
 
+      - name: Download ZOONL brand logo
+        run: |
+          mkdir -p assets/branding
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://ewzdhminqdldilydrpmk.supabase.co/storage/v1/object/public/avatars/ZOONL%20Streaming%20Logo_20261122_110907_0001.png" \
+            --output assets/branding/zoonl_logo.png
+          file assets/branding/zoonl_logo.png
+          test -s assets/branding/zoonl_logo.png
+
+      - name: Apply ZOONL Android launcher and splash branding
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          mkdir -p android/app/src/main/res/drawable-nodpi
+          cp assets/branding/zoonl_logo.png android/app/src/main/res/drawable-nodpi/zoonl_splash_logo.png
+          for item in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
+            density="${item%%:*}"
+            size="${item##*:}"
+            mkdir -p "android/app/src/main/res/mipmap-${density}"
+            convert assets/branding/zoonl_logo.png -thumbnail "${size}x${size}" \
+              -gravity center -background "#080510" -extent "${size}x${size}" \
+              "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+          done
+          cat > android/app/src/main/res/drawable/launch_background.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/black"/>
+              <item>
+                  <bitmap
+                      android:gravity="center"
+                      android:src="@drawable/zoonl_splash_logo"/>
+              </item>
+          </layer-list>
+          EOF
+
       - name: Ensure Gradle plugin repositories
         run: |
           python3 - <<'PY'
