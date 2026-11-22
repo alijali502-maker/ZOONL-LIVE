@@ -2997,7 +2997,7 @@ class _LiveScreenState extends State<LiveScreen> {
                       Expanded(child: Slider(value: _filterStrength, onChanged: _busy ? null : (v) => setState(() => _filterStrength = v))),
                       Text('${(_filterStrength * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 10)),
                     ]),
-                    const Text('Current filter is a colour look only. Real-time face retouch is not yet connected to the outgoing LiveKit stream.',
+                    const Text('Preview shows the selected colour look. ZOONL Beauty Studio applies smoothing, glow, brightness and tone to the outgoing LiveKit camera after GO LIVE.',
                       style: TextStyle(color: Colors.white70, fontSize: 9)),
                   ] else
                     Align(alignment: Alignment.centerLeft, child: TextButton.icon(
