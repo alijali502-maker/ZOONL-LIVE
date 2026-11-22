@@ -2733,10 +2733,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   final price = (item['coin_price'] as num?)?.toInt() ?? 0;
                   final owned = ownedCodes.contains(code);
                   final equipped = equippedCodes.contains(code);
+                  final mediaUrl = (item['media_url'] ?? '').toString();
+                  final mediaPath = mediaUrl.toLowerCase().split('?').first;
+                  final isVideoMedia = mediaPath.endsWith('.mp4') || mediaPath.endsWith('.webm');
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.auto_awesome,
-                        color: Color(0xFFD6B46A)),
+                    leading: Container(
+                      width: 46, height: 46,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF211735),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0x55D6B46A)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: mediaUrl.startsWith('http') && !isVideoMedia
+                          ? Image.network(mediaUrl, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFFD6B46A)))
+                          : Icon(isVideoMedia ? Icons.play_circle_fill : Icons.auto_awesome,
+                              color: const Color(0xFFD6B46A)),
+                    ),
                     title: Text(name),
                     subtitle: Text(
                       '$type • ${price == 0 ? 'Reward / Owner item' : '$price coins'}',
@@ -2816,7 +2831,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 final expiry = item['expires_at']?.toString();
                 final expiryDate = expiry == null ? null : DateTime.tryParse(expiry);
                 final expired = expiryDate != null && expiryDate.isBefore(DateTime.now());
+                final mediaUrl = (catalogItem['media_url'] ?? '').toString();
+                final mediaPath = mediaUrl.toLowerCase().split('?').first;
+                final isVideoMedia = mediaPath.endsWith('.mp4') || mediaPath.endsWith('.webm');
                 return ListTile(
+                  leading: Container(
+                    width: 42, height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF211735),
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0x55D6B46A)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: mediaUrl.startsWith('http') && !isVideoMedia
+                        ? Image.network(mediaUrl, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFFD6B46A)))
+                        : Icon(isVideoMedia ? Icons.play_circle_fill : Icons.auto_awesome,
+                            color: const Color(0xFFD6B46A)),
+                  ),
                   title: Text(name),
                   subtitle: Text(
                     expired
