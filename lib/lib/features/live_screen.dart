@@ -932,6 +932,9 @@ class _LiveScreenState extends State<LiveScreen> {
         _isLive = true;
       });
       joined = true;
+      // Announce this authenticated viewer using their server-owned equipped entry.
+      unawaited(_supabase.rpc('zoonl_emit_room_entry', params: <String, dynamic>{'p_room_id': roomId})
+          .then((_) {}).catchError((_) {}));
     } catch (error) {
       _showMessage('Live में जुड़ नहीं सके: ${_readable(error)}');
     } finally {
@@ -1613,7 +1616,9 @@ class _LiveScreenState extends State<LiveScreen> {
             ? publicProfile!['username'].toString()
             : 'ID ${publicProfile?['zoonl_id'] ?? 'Member'}';
         _entryBannerEffect = effect?['zoonl_item_name']?.toString() ?? 'Standard Entry';
-        _entryBannerMedia = effect?['media_url']?.toString();
+        _entryBannerMedia = (effect?['media_url']?.toString().trim().isNotEmpty == true)
+            ? effect!['media_url'].toString()
+            : code;
       });
       _entryBannerTimer = Timer(const Duration(seconds: 4), () {
         if (!mounted) return;
@@ -2522,41 +2527,68 @@ class _LiveScreenState extends State<LiveScreen> {
           children: [
             Positioned.fill(child: body),
             if (_entryBannerName != null)
-              Positioned(
-                top: 10,
-                left: 12,
-                right: 12,
+              Positioned.fill(
                 child: IgnorePointer(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 260),
-                    child: Container(
-                      key: ValueKey('$_entryBannerName-$_entryBannerEffect'),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF273B70), Color(0xFF39235D), Color(0xFF173F4A)],
+                  child: TweenAnimationBuilder<double>(
+                    key: ValueKey('entry-$_entryBannerName-$_entryBannerEffect'),
+                    tween: Tween<double>(begin: -1.35, end: 1.35),
+                    duration: const Duration(milliseconds: 3900),
+                    curve: Curves.easeInOutCubic,
+                    builder: (context, travel, child) => Align(
+                      alignment: Alignment(travel, 0.08),
+                      child: child,
+                    ),
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width * .82,
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xEE171126), Color(0xF02E1C4B), Color(0xEE101A2D)],
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFFFFD98B), width: 1.5),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x88D8A84E), blurRadius: 30, spreadRadius: 4),
+                              BoxShadow(color: Color(0xAA000000), blurRadius: 24, offset: Offset(0, 12)),
+                            ],
+                          ),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            if ((_entryBannerMedia ?? '').startsWith('https://'))
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: Image.network(_entryBannerMedia!, width: 118, height: 118, fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Text('✨', style: TextStyle(fontSize: 76))),
+                              )
+                            else
+                              Text(switch (_entryBannerMedia) {
+                                'ENTRY_HORSE_GOLD' => '🐎',
+                                'ENTRY_ELEPHANT_ROYAL' => '🐘',
+                                'ENTRY_LION_ROYAL' => '🦁',
+                                'ENTRY_BUTTERFLY_GLOW' => '🦋',
+                                'ENTRY_FALCON_SKY' => '🦅',
+                                'ENTRY_DEER_FOREST' => '🦌',
+                                'ENTRY_WOLF_SHADOW' => '🐺',
+                                'ENTRY_DRAGON_EMBER' => '🐉',
+                                'ENTRY_PHOENIX_FIRE' => '🔥',
+                                'ENTRY_UNICORN_DIAMOND' => '🦄',
+                                'ENTRY_PEACOCK_ROYAL' => '🦚',
+                                'ENTRY_TIGER_EMPEROR' => '🐅',
+                                _ => '👑',
+                              }, style: const TextStyle(fontSize: 82, height: 1.1)),
+                            const SizedBox(height: 8),
+                            Text((_entryBannerName ?? 'Member').toUpperCase(),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                            const SizedBox(height: 4),
+                            Text((_entryBannerEffect ?? 'Standard Entry').toUpperCase(),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFFFFE3A0), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                            const SizedBox(height: 3),
+                            const Text('HAS ENTERED THE ROOM', style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+                          ]),
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF8CEBFF), width: 1.2),
-                        boxShadow: [BoxShadow(color: const Color(0xFF8CEBFF).withOpacity(.16), blurRadius: 18)],
-                      ),
-                      child: Row(children: [
-                        if ((_entryBannerMedia ?? '').startsWith('https://'))
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(_entryBannerMedia!, width: 42, height: 42, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF), size: 30)),
-                          )
-                        else
-                          const Icon(Icons.auto_awesome, color: Color(0xFF8CEBFF), size: 30),
-                        const SizedBox(width: 11),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('$_entryBannerName ENTERED THE ROOM',
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: .6)),
-                          const SizedBox(height: 3),
-                          Text(_entryBannerEffect ?? 'Standard Entry',
-                            style: const TextStyle(color: Color(0xFF8CEBFF), fontSize: 12, fontWeight: FontWeight.w800)),
-                        ])),
                       ]),
                     ),
                   ),
