@@ -1792,6 +1792,8 @@ class _LiveScreenState extends State<LiveScreen> {
         for (final item in _messages) {
           if (item['sender_id'] == senderId) {
             item['badge'] = badge;
+            item['tier'] = tier;
+            item['chatColor'] = chatColor;
             item['level'] = '$level';
             if (username.isNotEmpty) item['name'] = username;
             if (avatar.startsWith('http')) item['avatar'] = avatar;
