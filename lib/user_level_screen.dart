@@ -99,6 +99,24 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     }catch(e){if(mounted)setState((){_loading=false;_error=e.toString();});}
   }
 
+  Future<void> _equipBackpackItem(Map<String, dynamic> item) async {
+    final code = item['zoonl_item_code']?.toString() ?? '';
+    if (code.isEmpty) return;
+    try {
+      await _db.rpc('equip_zoonl_cosmetic', params: <String, dynamic>{'p_item_code': code});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${code.replaceAll('_', ' ')} equipped')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not equip item: $e')),
+      );
+    }
+  }
+
   bool validBackpackItem(Map<String,dynamic> item) {
     final expiry=item['expires_at'];
     return expiry==null||(DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now())??false);
@@ -230,7 +248,16 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
                   if(item['is_equipped']==true)
                     const Text('EQUIPPED',style:TextStyle(color:Color(0xFF8DE6C0),fontSize:7,fontWeight:FontWeight.w900))
                   else
-                    const Text('OWNED',style:TextStyle(color:Colors.white38,fontSize:7,fontWeight:FontWeight.w800)),
+                    TextButton(
+                      onPressed: () => _equipBackpackItem(item),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFE6A1),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('EQUIP', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900)),
+                    ),
                 ])),
           ]),const Color(0xFFE6C47A)),
           if(_owner)...[
