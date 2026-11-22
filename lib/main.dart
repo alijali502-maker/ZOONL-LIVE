@@ -3981,6 +3981,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
+  // Profile background is painted across the full profile card; the avatar image is layered above frame media so the DP stays visible.
   Widget _luxuryCard({
     required String title,
     required Widget child,
