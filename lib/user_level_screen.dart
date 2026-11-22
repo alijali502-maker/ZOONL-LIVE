@@ -18,6 +18,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
   int _level = 1, _exp = 0;
   String _prime = 'Checking…', _entry = 'Checking…', _frame = 'Checking…', _badge = 'Checking…';
   List<Map<String,dynamic>> _levels = [];
+  List<Map<String,dynamic>> _backpack = [];
 
   static const _palettes = <List<Color>>[
     [Color(0xFF607D8B),Color(0xFFCFD8DC),Color(0xFF263746)],
@@ -87,6 +88,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
         _level=((r[0] as num?)?.toInt()??1).clamp(1,100).toInt();
         _exp=(r[1] as num?)?.toInt()??0;
         _levels=(r[2] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
+        _backpack=inventory.map((e)=>Map<String,dynamic>.from(e as Map)).toList();
         _owner=r[3]==true;
         _prime=activePrime?'ACTIVE':'Not assigned';
         _entry=entries.isEmpty?'No active Entry':entries.map((e)=>e['zoonl_item_code'].toString()).join(', ');
@@ -95,6 +97,11 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
         _loading=false;_error=null;
       });
     }catch(e){if(mounted)setState((){_loading=false;_error=e.toString();});}
+  }
+
+  bool validBackpackItem(Map<String,dynamic> item) {
+    final expiry=item['expires_at'];
+    return expiry==null||(DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now())??false);
   }
 
   Widget _glass(Widget child,Color c,{EdgeInsets padding=const EdgeInsets.all(15)})=>ClipRRect(
@@ -194,6 +201,38 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
             Text(next==null?'Highest rank configured.':'${_fmt(_exp)} / ${_fmt(target)} EXP • ${_fmt(remain)} EXP left',
               style:const TextStyle(color:Colors.white60,fontSize:10)),
           ]),c[1]),
+          const SizedBox(height:12),
+          _glass(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Row(children:[
+              const Icon(Icons.inventory_2_outlined,color:Color(0xFFE6C47A),size:17),
+              const SizedBox(width:7),
+              const Expanded(child:Text('MY BACKPACK',style:TextStyle(color:Color(0xFFFFE6A1),fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.1))),
+              Text('${_backpack.length} ITEMS',style:const TextStyle(color:Colors.white54,fontSize:8,fontWeight:FontWeight.w800)),
+            ]),
+            const SizedBox(height:5),
+            if(_backpack.isEmpty)
+              const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('Your owned frames, entries and effects will appear here.',style:TextStyle(color:Colors.white54,fontSize:10)))
+            else
+              for(final item in _backpack.where((e)=>validBackpackItem(e)))
+                Padding(padding:const EdgeInsets.symmetric(vertical:6),child:Row(children:[
+                  Container(width:34,height:34,decoration:BoxDecoration(
+                    gradient:const LinearGradient(colors:[Color(0xFF3C285C),Color(0xFF171126)]),
+                    borderRadius:BorderRadius.circular(10),border:Border.all(color:const Color(0x66E6C47A))),
+                    child:Icon(item['item_type']=='ENTRY_EFFECT'?Icons.bolt:item['item_type']=='FRAME'?Icons.crop_square:Icons.auto_awesome,
+                      color:const Color(0xFFE6C47A),size:17)),
+                  const SizedBox(width:9),
+                  Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                    Text((item['zoonl_item_code']??'ZOONL ITEM').toString().replaceAll('_',' '),
+                      style:const TextStyle(color:Colors.white,fontSize:9,fontWeight:FontWeight.w900)),
+                    Text((item['item_type']??'COSMETIC').toString().replaceAll('_',' '),
+                      style:const TextStyle(color:Colors.white54,fontSize:8)),
+                  ])),
+                  if(item['is_equipped']==true)
+                    const Text('EQUIPPED',style:TextStyle(color:Color(0xFF8DE6C0),fontSize:7,fontWeight:FontWeight.w900))
+                  else
+                    const Text('OWNED',style:TextStyle(color:Colors.white38,fontSize:7,fontWeight:FontWeight.w800)),
+                ])),
+          ]),const Color(0xFFE6C47A)),
           if(_owner)...[
             const SizedBox(height:12),_glass(Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               const Text('SOVEREIGN OWNER ENTITLEMENTS',style:TextStyle(color:Color(0xFFFFE6A1),fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.1)),
