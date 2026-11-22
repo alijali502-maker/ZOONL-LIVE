@@ -3390,6 +3390,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     final String profileBackgroundUrl =
         (store.currentUser['profileBackgroundUrl'] ?? '').toString();
     final activeBgCode = store.currentUser['activeProfileBgCode']?.toString() ?? '';
+    final activeBadgeCode = store.currentUser['activeBadgeCode']?.toString() ?? '';
+    final hasSovereignOwnerBadge = activeBadgeCode == 'ZOONL_OWNER_BADGE' && store.userBaggage.any((item) => item['zoonl_item_code'] == 'ZOONL_OWNER_BADGE' && item['is_equipped'] == true && (item['expires_at'] == null || (DateTime.tryParse(item['expires_at'].toString())?.isAfter(DateTime.now()) ?? false)));
     final activeFrameCode = store.currentUser['activeFrameCode']?.toString() ?? '';
     Map<String, dynamic>? activeBgItem;
     Map<String, dynamic>? activeFrameItem;
@@ -3561,6 +3563,23 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                        if (hasSovereignOwnerBadge)
+                          Container(
+                            margin: const EdgeInsets.only(top: 5, bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(colors: [Color(0xFFFFF3C4), Color(0xFFD5A84B), Color(0xFF8B5B18)]),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFFFF9DE), width: 1),
+                              boxShadow: const [BoxShadow(color: Color(0x88D6A84A), blurRadius: 12)],
+                            ),
+                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.workspace_premium, size: 12, color: Color(0xFF3B2509)),
+                              SizedBox(width: 5),
+                              Text('SOVEREIGN OWNER • PRIME V',
+                                style: TextStyle(color: Color(0xFF3B2509), fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: .5)),
+                            ]),
+                          ),
                         const SizedBox(height: 4),
                         Text('User ID: ${userId.isEmpty ? 'Not assigned' : userId}'),
                         Text(
