@@ -2717,7 +2717,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               if (_isStoreOwner)
                 const Padding(
                   padding: EdgeInsets.only(top: 6, bottom: 4),
-                  child: Text('OWNER CONTROL: change each item price below. Updates are verified by Supabase.',
+                  child: Text('OWNER CONTROL: upload transparent GIF / PNG for animated profile frames; use MP4, WebM or GIF for Live entry effects. Media is uploaded to the secured ZOONL Storage bucket.',
                     style: TextStyle(color: Color(0xFF8CEBFF), fontSize: 10, fontWeight: FontWeight.w700)),
                 ),
               const SizedBox(height: 8),
@@ -3534,6 +3534,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     final profileBgColors = _cosmeticGradientColors(activeBgItem?['color_theme_hex']?.toString());
     final frameColors = _cosmeticGradientColors(activeFrameItem?['color_theme_hex']?.toString());
     final isSovereignOwnerFrame = hasEquippedFrame && activeFrameCode == 'ZOONL_SOVEREIGN_OWNER_FRAME';
+    final frameMediaUrl = (activeFrameItem?['media_url'] ?? '').toString();
+    final frameMediaPath = frameMediaUrl.toLowerCase().split('?').first;
+    final hasFrameImageMedia = frameMediaPath.endsWith('.png') || frameMediaPath.endsWith('.jpg') || frameMediaPath.endsWith('.jpeg') || frameMediaPath.endsWith('.webp') || frameMediaPath.endsWith('.gif');
 
     Future<void> openProfileEditor() async {
       final bool? saved = await Navigator.of(context).push<bool>(
@@ -3650,6 +3653,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                                     : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
                               ),
                             ),
+                            if (hasEquippedFrame && hasFrameImageMedia && frameMediaUrl.startsWith('http'))
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Image.network(
+                                    frameMediaUrl,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
                             if (isSovereignOwnerFrame)
                               const Positioned(
                                 top: -2,
