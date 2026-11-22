@@ -3,11 +3,12 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import '../../camera_studio/zoonl_beauty_track_processor.dart';
 import '../../event_control_screen.dart';
 import '../../streamer_progress_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
-    show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, LocalVideoTrackExt, CameraPosition;
+    show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, LocalVideoTrackExt, CameraPosition, CameraCaptureOptions;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
@@ -996,6 +997,36 @@ class _LiveScreenState extends State<LiveScreen> {
       if (_selectedRoomType == 'video') {
         await room.localParticipant?.setCameraEnabled(
           _guestVideoAllowed && _cameraEnabled,
+          cameraCaptureOptions: CameraCaptureOptions(
+            cameraPosition: _frontLiveCamera
+                ? CameraPosition.front
+                : CameraPosition.back,
+            maxFrameRate: 24,
+            processor: ZoonlBeautyTrackProcessor(
+              look: _previewFilter,
+              intensity: _filterStrength,
+              smoothing: _previewFilter == 'Soft Glow'
+                  ? 0.42
+                  : 0.12 + (_filterStrength * 0.12),
+              glow: _previewFilter == 'Soft Glow'
+                  ? 0.38
+                  : _previewFilter == 'Natural'
+                      ? 0.08
+                      : 0.16 * _filterStrength,
+              brightness: _previewFilter == 'Cinema'
+                  ? -0.035
+                  : _previewFilter == 'Peach' || _previewFilter == 'Sunset'
+                      ? 0.025
+                      : 0.0,
+              warmth: _previewFilter == 'Warm' ||
+                      _previewFilter == 'Sunset' ||
+                      _previewFilter == 'Peach'
+                  ? 0.22 * _filterStrength
+                  : _previewFilter == 'Cool' || _previewFilter == 'Ice'
+                      ? -0.18 * _filterStrength
+                      : 0.0,
+            ),
+          ),
         );
       }
     }
