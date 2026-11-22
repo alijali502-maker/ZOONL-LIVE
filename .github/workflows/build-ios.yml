@@ -44,7 +44,7 @@ jobs:
           s = p.read_text()
           include = '#import "ZOONLBeautyProcessor.h"'
           if include not in s:
-              s += '\\n' + include + '\\n'
+              s += '\n' + include + '\n'
           p.write_text(s)
 
           app = Path("ios/Runner/AppDelegate.swift")
@@ -54,9 +54,17 @@ jobs:
                   if let registrar = self.registrar(forPlugin: "ZOONLBeautyProcessorPlugin") {
                     ZOONLBeautyProcessorPlugin.register(with: registrar)
                   }"""
-          if marker not in s:
-              raise SystemExit("Flutter AppDelegate registration marker was not found.")
-          s = s.replace(marker, registration, 1)
+          if marker in s:
+              s = s.replace(marker, registration, 1)
+          else:
+              launch_return = "return super.application("
+              if launch_return not in s:
+                  raise SystemExit("AppDelegate launch hook not found. Contents:\\n" + s)
+              plugin_registration = """if let registrar = self.registrar(forPlugin: "ZOONLBeautyProcessorPlugin") {
+                    ZOONLBeautyProcessorPlugin.register(with: registrar)
+                  }
+                  """
+              s = s.replace(launch_return, plugin_registration + launch_return, 1)
           app.write_text(s)
 
           import plistlib
