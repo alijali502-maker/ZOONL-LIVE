@@ -2505,6 +2505,67 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     }
   }
 
+  Future<void> _uploadCosmeticMedia(String itemCode, String itemName) async {
+    if (!_isStoreOwner) return;
+    final choice = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: const Color(0xFF171126),
+      builder: (sheetContext) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.image, color: Color(0xFFD6B46A)),
+            title: const Text('Upload image / animated GIF'),
+            onTap: () => Navigator.pop(sheetContext, 1),
+          ),
+          ListTile(
+            leading: const Icon(Icons.movie_creation, color: Color(0xFFB9AEFF)),
+            title: const Text('Upload MP4 / WebM animation'),
+            onTap: () => Navigator.pop(sheetContext, 2),
+          ),
+        ]),
+      ),
+    );
+    if (choice == null) return;
+    try {
+      final picker = ImagePicker();
+      final XFile? file = choice == 1
+          ? await picker.pickImage(source: ImageSource.gallery)
+          : await picker.pickVideo(source: ImageSource.gallery);
+      if (file == null) return;
+      final extension = file.name.toLowerCase().split('.').last;
+      const mimeTypes = <String, String>{
+        'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+        'webp': 'image/webp', 'gif': 'image/gif',
+        'mp4': 'video/mp4', 'webm': 'video/webm',
+      };
+      final mime = mimeTypes[extension];
+      if (mime == null) {
+        _showMessage('Supported: PNG, JPG, WEBP, GIF, MP4 and WEBM.');
+        return;
+      }
+      if (file.length() != null && await file.length() > 52428800) {
+        _showMessage('Media file must be 50 MB or smaller.');
+        return;
+      }
+      final objectPath = 'catalog/$itemCode/${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final bytes = await file.readAsBytes();
+      await Backend.client.storage.from('zoonl-live-cosmetics').uploadBinary(
+        objectPath,
+        bytes,
+        fileOptions: FileOptions(contentType: mime, upsert: true),
+      );
+      final publicUrl = Backend.client.storage.from('zoonl-live-cosmetics').getPublicUrl(objectPath);
+      await Backend.client.from('zoonl_live_cosmetics').update({
+        'media_url': publicUrl,
+        'is_animated_video': extension == 'gif' || extension == 'mp4' || extension == 'webm',
+      }).eq('project_name', 'ZOONL LIVE').eq('zoonl_item_code', itemCode);
+      await _loadVipStoreData();
+      _showMessage('$itemName media uploaded and connected to the catalog.');
+    } catch (error) {
+      _showMessage('Media upload failed: $error');
+    }
+  }
+
   Future<void> _buyCosmetic(String itemCode, String itemName) async {
     try {
       await Backend.client.rpc(
@@ -2592,11 +2653,26 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                      (DateTime.tryParse(m['expires_at'].toString())?.isAfter(DateTime.now()) ?? false)));
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.workspace_premium, color: Color(0xFFB9AEFF)),
+                  leading: Container(
+                    width: 34, height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: LinearGradient(colors: tierId == 5
+                          ? const [Color(0xFFD9B6FF), Color(0xFF8B4DDB), Color(0xFF241044)]
+                          : tierId == 4
+                              ? const [Color(0xFFFF9AA8), Color(0xFFE3264F), Color(0xFF650F2B)]
+                              : const [Color(0xFFFFE7A6), Color(0xFFB77A22), Color(0xFF57320D)]),
+                      boxShadow: [BoxShadow(
+                        color: (tierId == 5 ? const Color(0xFF9C63E6) : tierId == 4 ? const Color(0xFFE3264F) : const Color(0xFFB77A22)).withOpacity(.30),
+                        blurRadius: 10,
+                      )],
+                    ),
+                    child: Text('P$tierId', style: const TextStyle(
+                      color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ),
                   title: Text(tierName),
-                  subtitle: Text('${price} coins • $days days • ' + (benefits is Map
-                      ? benefits.entries.map((e) => '${e.key}: ${e.value}').join(' • ')
-                      : 'Tier $tierId')),
+                  subtitle: Text('${price} coins • $days days • ${benefits is Map ? (benefits['chat_tier'] ?? 'PRIME').toString() : 'Tier $tierId'} chat style'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     if (_isStoreOwner) IconButton(
                       tooltip: 'Owner: edit Prime price and duration',
@@ -2666,13 +2742,24 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       '$type • ${price == 0 ? 'Reward / Owner item' : '$price coins'}',
                     ),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (_isStoreOwner)
+                      if (_isStoreOwner) ...[
+                        IconButton(
+                          tooltip: 'Owner: upload / replace animation media',
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            (item['media_url']?.toString().startsWith('http') ?? false)
+                                ? Icons.video_library : Icons.add_photo_alternate,
+                            color: const Color(0xFFFFD98B), size: 18,
+                          ),
+                          onPressed: code.isEmpty ? null : () => _uploadCosmeticMedia(code, name),
+                        ),
                         IconButton(
                           tooltip: 'Owner: change item price',
                           visualDensity: VisualDensity.compact,
                           icon: const Icon(Icons.edit, color: Color(0xFF8CEBFF), size: 18),
                           onPressed: code.isEmpty ? null : () => _editCosmeticPrice(code, name, price),
                         ),
+                      ],
                       if (equipped)
                         const Text('EQUIPPED', style: TextStyle(color: Color(0xFF8CEBFF), fontSize: 10))
                       else
