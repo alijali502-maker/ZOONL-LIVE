@@ -2547,8 +2547,9 @@ class _LiveScreenState extends State<LiveScreen> {
   Future<void> _openLiveFilterSettings() async {
     final roomId = _roomId;
     final userId = _myId;
-    if (!_isHost || !_isLive || roomId == null || userId == null ||
-        _selectedRoomType != 'video') return;
+    final liveNow = _isLive;
+    if (!_isHost || _selectedRoomType != 'video') return;
+    if (liveNow && (roomId == null || userId == null)) return;
 
     var selected = _previewFilter;
     var strength = _filterStrength;
@@ -2607,22 +2608,24 @@ class _LiveScreenState extends State<LiveScreen> {
                     onPressed: saving ? null : () async {
                       setSheetState(() => saving = true);
                       try {
-                        final updated = await _supabase.from('live_rooms')
-                          .update({
-                            'video_filter_code': selected,
-                            'video_filter_strength': strength,
-                          })
-                          .eq('id', roomId)
-                          .eq('owner_id', userId)
-                          .select('id')
-                          .maybeSingle();
-                        if (updated == null) {
-                          throw StateError('Room filter could not be saved. Check live-room update permission.');
+                        if (liveNow) {
+                          final updated = await _supabase.from('live_rooms')
+                            .update({
+                              'video_filter_code': selected,
+                              'video_filter_strength': strength,
+                            })
+                            .eq('id', roomId!)
+                            .eq('owner_id', userId!)
+                            .select('id')
+                            .maybeSingle();
+                          if (updated == null) {
+                            throw StateError('Room filter could not be saved. Check live-room update permission.');
+                          }
+                          await _updateLiveBeautyProcessor(
+                            look: selected,
+                            strength: strength,
+                          );
                         }
-                        await _updateLiveBeautyProcessor(
-                          look: selected,
-                          strength: strength,
-                        );
                         if (mounted) {
                           setState(() {
                             _previewFilter = selected;
@@ -2631,7 +2634,7 @@ class _LiveScreenState extends State<LiveScreen> {
                           });
                         }
                         if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                        _showMessage('Filter updated for viewers.');
+                        _showMessage(liveNow ? 'Beauty filter applied to the live camera.' : 'Beauty filter saved for your next live.');
                       } catch (error) {
                         setSheetState(() => saving = false);
                         _showMessage('Filter update failed: ${_readable(error)}');
@@ -2982,6 +2985,18 @@ class _LiveScreenState extends State<LiveScreen> {
                     const SizedBox(height: 10),
                     const Text('FILTER LOOK', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _openLiveFilterSettings,
+                        icon: const Icon(Icons.auto_awesome),
+                        label: const Text('OPEN BEAUTY STUDIO • ALL FILTER SETTINGS'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFE6C47A),
+                          side: const BorderSide(color: Color(0xFFE6C47A)),
+                        ),
+                      ),
+                    ),
                     Wrap(spacing: 6, runSpacing: 6, children: _previewFilters.map((filter) =>
                       ChoiceChip(
                         label: Text(filter, style: const TextStyle(fontSize: 10)),
