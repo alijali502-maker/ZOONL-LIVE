@@ -93,7 +93,7 @@ jobs:
 
               @Override public VideoFrame onFrame(VideoFrame input) {
                 final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.22;
-                final double light = Math.max(0.0, Math.min(1.0, glow));
+                double light = Math.max(0.0, Math.min(1.0, glow));
                 final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 22.0;
                 final double warm = Math.max(-1.0, Math.min(1.0, warmth));
                 if (smooth < 0.001 && light < 0.001 && Math.abs(lift) < 0.1 && Math.abs(warm) < 0.001
