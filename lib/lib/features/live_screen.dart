@@ -163,7 +163,6 @@ class _LiveGiftMediaState extends State<_LiveGiftMedia> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadChatModerationAccess());
     if (_isVideo) _initializeVideo();
   }
 
@@ -343,6 +342,7 @@ class _LiveScreenState extends State<LiveScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadChatModerationAccess());
     if (!_isHost) {
       _busy = true;
       _joinAsViewer();
@@ -1601,8 +1601,14 @@ class _LiveScreenState extends State<LiveScreen> {
     final userId = member['user_id']?.toString() ?? '';
     if (userId.isEmpty) return;
     try {
-      final publicProfile = await _supabase.from('user_public_profiles')
-          .select('username,zoonl_id').eq('user_id', userId).maybeSingle();
+      final profileResults = await Future.wait<dynamic>([
+        _supabase.from('user_public_profiles')
+            .select('username,zoonl_id').eq('user_id', userId).maybeSingle(),
+        _supabase.from('profiles')
+            .select('display_name,avatar_url').eq('id', userId).maybeSingle(),
+      ]);
+      final publicProfile = profileResults[0] as Map<String, dynamic>?;
+      final privateProfile = profileResults[1] as Map<String, dynamic>?;
       final code = member['entry_code']?.toString() ?? '';
       Map<String, dynamic>? effect;
       if (code.isNotEmpty) {
@@ -1616,8 +1622,10 @@ class _LiveScreenState extends State<LiveScreen> {
       if (!mounted) return;
       _entryBannerTimer?.cancel();
       setState(() {
-        _entryBannerName = (publicProfile?['username']?.toString().trim().isNotEmpty == true)
-            ? publicProfile!['username'].toString()
+        final displayName = privateProfile?['display_name']?.toString().trim() ?? '';
+        final username = publicProfile?['username']?.toString().trim() ?? '';
+        _entryBannerName = displayName.isNotEmpty ? displayName
+            : username.isNotEmpty ? username
             : 'ID ${publicProfile?['zoonl_id'] ?? 'Member'}';
         _entryBannerEffect = effect?['zoonl_item_name']?.toString() ?? 'Standard Entry';
         _entryBannerMedia = (effect?['media_url']?.toString().trim().isNotEmpty == true)
@@ -1672,11 +1680,12 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
     try {
-      final allowed = await _supabase.rpc(
-        'is_zoonl_admin_allowed',
-        params: <String, dynamic>{'p_permission_key': 'moderate_live_chat'},
-      );
-      if (mounted) setState(() => _canModerateChat = allowed == true);
+      final results = await Future.wait<dynamic>([
+        _supabase.rpc('is_zoonl_owner'),
+        _supabase.rpc('is_zoonl_admin_allowed',
+          params: <String, dynamic>{'p_permission_key': 'moderate_live_chat'}),
+      ]);
+      if (mounted) setState(() => _canModerateChat = results[0] == true || results[1] == true);
     } catch (_) {
       if (mounted) setState(() => _canModerateChat = false);
     }
@@ -2651,8 +2660,7 @@ class _LiveScreenState extends State<LiveScreen> {
                             if ((_entryBannerMedia ?? '').startsWith('https://'))
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(18),
-                                child: Image.network(_entryBannerMedia!, width: 118, height: 118, fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => const Text('✨', style: TextStyle(fontSize: 76))),
+                                child: _LiveGiftMedia(url: _entryBannerMedia!, size: 118),
                               )
                             else
                               Text(switch (_entryBannerMedia) {
