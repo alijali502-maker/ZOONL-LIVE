@@ -56,8 +56,8 @@ class ZoonlBeautySettings {
       intensity: _unit(intensity ?? this.intensity),
       smoothing: _unit(smoothing ?? this.smoothing),
       glow: _unit(glow ?? this.glow),
-      brightness: (brightness ?? this.brightness).clamp(-1.0, 1.0),
-      warmth: (warmth ?? this.warmth).clamp(-1.0, 1.0),
+      brightness: (brightness ?? this.brightness).clamp(-1.0, 1.0).toDouble(),
+      warmth: (warmth ?? this.warmth).clamp(-1.0, 1.0).toDouble(),
       eyeLens: eyeLens ?? this.eyeLens,
       makeup: makeup ?? this.makeup,
     );
@@ -90,7 +90,7 @@ class ZoonlBeautySettings {
     );
   }
 
-  static double _unit(double value) => value.clamp(0.0, 1.0);
+  static double _unit(double value) => value.clamp(0.0, 1.0).toDouble();
   static double _number(Object? value, double fallback) =>
       value is num ? value.toDouble() : fallback;
 }
