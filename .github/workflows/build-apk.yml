@@ -49,7 +49,8 @@ jobs:
       - name: Install ZOONL native outgoing-video Beauty processor
         run: |
           PACKAGE_DIR="android/app/src/main/java/com/zoonllive/zoonl_live"
-          mkdir -p "$PACKAGE_DIR"
+          KOTLIN_DIR="android/app/src/main/kotlin/com/zoonllive/zoonl_live"
+          mkdir -p "$PACKAGE_DIR" "$KOTLIN_DIR"
           cat > "$PACKAGE_DIR/VideoProcessorSample.java" <<'JAVA'
           package com.zoonllive.zoonl_live;
 
@@ -191,7 +192,7 @@ jobs:
             }
           }
           JAVA
-          cat > "$PACKAGE_DIR/MainActivity.kt" <<'KOTLIN'
+          cat > "$KOTLIN_DIR/MainActivity.kt" <<'KOTLIN'
           package com.zoonllive.zoonl_live
 
           import io.flutter.embedding.android.FlutterActivity
