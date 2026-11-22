@@ -3549,13 +3549,11 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     });
     final activeBgUrl = hasEquippedBg ? (activeBgItem?['media_url']?.toString() ?? '') : '';
     final effectiveBgUrl = activeBgUrl.startsWith('http') ? activeBgUrl : profileBackgroundUrl;
-    final hasPremiumBg = hasEquippedBg;
     final hasEquippedFrame = activeFrameItem != null && store.userBaggage.any((item) {
       if (item['zoonl_item_code']?.toString() != activeFrameCode || item['is_equipped'] != true) return false;
       final expiry = item['expires_at'];
       return expiry == null || (DateTime.tryParse(expiry.toString())?.isAfter(DateTime.now()) ?? false);
     });
-    final profileBgColors = _cosmeticGradientColors(activeBgItem?['color_theme_hex']?.toString());
     final frameColors = _cosmeticGradientColors(activeFrameItem?['color_theme_hex']?.toString());
     final isSovereignOwnerFrame = hasEquippedFrame && activeFrameCode == 'ZOONL_SOVEREIGN_OWNER_FRAME';
     final frameMediaUrl = (activeFrameItem?['media_url'] ?? '').toString();
