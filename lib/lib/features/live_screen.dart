@@ -3114,10 +3114,9 @@ class _LiveScreenState extends State<LiveScreen> {
     final track = _activeVideoTrack();
 
     if (track != null) {
-      return ColorFiltered(
-        colorFilter: _selectedPreviewColorFilter,
-        child: VideoTrackRenderer(track),
-      );
+      // LiveKit publishes the native-processed camera frames. Do not apply a
+      // second display-only LUT here, otherwise viewers see a doubled filter.
+      return VideoTrackRenderer(track);
     }
 
     return Center(
