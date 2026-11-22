@@ -320,6 +320,8 @@ class _LiveScreenState extends State<LiveScreen> {
   final List<Map<String, String>> _messages = [];
   final Set<String> _seenMessageIds = {};
   final Map<String, String> _chatBadges = {};
+  final Map<String, int> _chatLevels = {};
+  final Map<String, String> _chatNames = {};
 
   String? get _myId => _supabase.auth.currentUser?.id;
 
@@ -1628,8 +1630,8 @@ class _LiveScreenState extends State<LiveScreen> {
   String _nameFor(String? senderId) {
     if (senderId == null) return 'User';
     if (senderId == _myId) return widget.userName;
-    if (senderId == _roomOwnerId) return 'Host';
-    return 'User ${senderId.substring(0, 4)}';
+    if (senderId == _roomOwnerId && _hostDisplayName.isNotEmpty) return _hostDisplayName;
+    return _chatNames[senderId] ?? 'User ${senderId.substring(0, 4)}';
   }
 
   void _addIncoming(Map<String, dynamic> row) {
@@ -1646,6 +1648,7 @@ class _LiveScreenState extends State<LiveScreen> {
         'name': _nameFor(senderId),
         'message': (row['message'] ?? '').toString(),
         'badge': _chatBadges[senderId] ?? 'NONE',
+        'level': '${_chatLevels[senderId] ?? 1}',
       });
     });
   }
@@ -1654,46 +1657,126 @@ class _LiveScreenState extends State<LiveScreen> {
     if (senderId.isEmpty || _chatBadges.containsKey(senderId)) return;
     _chatBadges[senderId] = 'LOADING';
     try {
-      final result = await _supabase.rpc(
-        'get_public_chat_badges',
-        params: <String, dynamic>{'p_user_ids': <String>[senderId]},
-      );
-      final rows = result is List ? result : const [];
-      var badge = 'NONE';
-      if (rows.isNotEmpty && rows.first is Map) {
-        badge = (rows.first['badge_code'] ?? 'NONE').toString();
-      }
+      final results = await Future.wait<dynamic>([
+        _supabase.rpc(
+          'get_public_chat_badges',
+          params: <String, dynamic>{'p_user_ids': <String>[senderId]},
+        ),
+        _supabase.rpc(
+          'zoonl_level_for_user',
+          params: <String, dynamic>{'p_user_id': senderId},
+        ),
+        _supabase.from('user_public_profiles')
+            .select('username').eq('user_id', senderId).maybeSingle(),
+      ]);
+      final rows = results[0] is List ? results[0] as List : const [];
+      final badge = rows.isNotEmpty && rows.first is Map
+          ? (rows.first['badge_code'] ?? 'NONE').toString()
+          : 'NONE';
+      final level = ((results[1] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
+      final profile = results[2] as Map<String, dynamic>?;
+      final username = profile?['username']?.toString().trim() ?? '';
       if (!mounted) return;
       setState(() {
         _chatBadges[senderId] = badge;
+        _chatLevels[senderId] = level;
+        if (username.isNotEmpty) _chatNames[senderId] = username;
         for (final item in _messages) {
-          if (item['sender_id'] == senderId) item['badge'] = badge;
+          if (item['sender_id'] == senderId) {
+            item['badge'] = badge;
+            item['level'] = '$level';
+            if (username.isNotEmpty) item['name'] = username;
+          }
         }
       });
     } catch (_) {
       _chatBadges[senderId] = 'NONE';
+      _chatLevels[senderId] = 1;
     }
+  }
+
+  List<Color> _chatRibbonColors(int level) {
+    if (level >= 91) return const [Color(0xFFFFE9A8), Color(0xFFB77A22), Color(0xFF57320D)];
+    if (level >= 71) return const [Color(0xFFB8A4FF), Color(0xFF6846B5), Color(0xFF27164F)];
+    if (level >= 51) return const [Color(0xFFFFC4EF), Color(0xFF9A3F8C), Color(0xFF42163F)];
+    if (level >= 31) return const [Color(0xFF9CEBFF), Color(0xFF347FAE), Color(0xFF15334F)];
+    if (level >= 11) return const [Color(0xFFB8E4D2), Color(0xFF367F70), Color(0xFF163D3A)];
+    return const [Color(0xFFE4D0AA), Color(0xFF98734A), Color(0xFF45301F)];
   }
 
   Widget _buildChatLine(Map<String, String> item) {
     final badge = item['badge'] ?? 'NONE';
-    final badgeColor = badge == 'SVIP'
-        ? const Color(0xFFE04455)
-        : const Color(0xFFD6B46A);
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(color: Colors.white, fontSize: 12),
+    final level = int.tryParse(item['level'] ?? '') ?? 1;
+    final colors = _chatRibbonColors(level);
+    final name = item['name'] ?? 'User';
+    final initial = name.isEmpty ? 'U' : name.characters.first.toUpperCase();
+    final vipColor = badge == 'SVIP'
+        ? const Color(0xFFFF657A)
+        : const Color(0xFFFFD77E);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(5, 3, 8, 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [colors[2].withOpacity(.88), colors[1].withOpacity(.30), Colors.transparent],
+        ),
+        borderRadius: BorderRadius.circular(9),
+        border: Border(left: BorderSide(color: colors[0], width: 2.2)),
+        boxShadow: [BoxShadow(color: colors[1].withOpacity(.16), blurRadius: 8)],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextSpan(
-            text: item['name'] ?? 'User',
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          if (badge == 'VIP' || badge == 'SVIP')
-            TextSpan(
-              text: ' [$badge]',
-              style: TextStyle(color: badgeColor, fontWeight: FontWeight.w900),
+          Container(
+            width: 23, height: 23,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(colors: [colors[0], colors[1], colors[2]]),
+              border: Border.all(color: colors[0].withOpacity(.95), width: 1),
+              boxShadow: [BoxShadow(color: colors[0].withOpacity(.45), blurRadius: 7)],
             ),
-          TextSpan(text: ': ${item['message'] ?? ''}'),
+            child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+          ),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 4, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colors[0], fontSize: 10, fontWeight: FontWeight.w900,
+                        shadows: [Shadow(color: colors[1].withOpacity(.8), blurRadius: 5)])),
+                    if (badge == 'VIP' || badge == 'SVIP')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: badge == 'SVIP'
+                              ? const [Color(0xFFFF8292), Color(0xFF9D1E42)]
+                              : const [Color(0xFFFFE8A8), Color(0xFF9D6A1E)]),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white.withOpacity(.65), width: .5),
+                        ),
+                        child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.w900, letterSpacing: .4)),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [colors[0], colors[1]]),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.white.withOpacity(.65), width: .5),
+                      ),
+                      child: Text('LV $level', style: const TextStyle(color: Color(0xFF101018), fontSize: 7, fontWeight: FontWeight.w900)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 1),
+                Text(item['message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.12)),
+              ],
+            ),
+          ),
         ],
       ),
     );
