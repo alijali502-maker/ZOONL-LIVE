@@ -163,6 +163,7 @@ class _LiveGiftMediaState extends State<_LiveGiftMedia> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadChatModerationAccess());
     if (_isVideo) _initializeVideo();
   }
 
@@ -323,6 +324,9 @@ class _LiveScreenState extends State<LiveScreen> {
   final Map<String, int> _chatLevels = {};
   final Map<String, String> _chatNames = {};
   final Map<String, String> _chatAvatars = {};
+  final Map<String, String> _chatTiers = {};
+  final Map<String, String> _chatColorHex = {};
+  bool _canModerateChat = false;
 
   String? get _myId => _supabase.auth.currentUser?.id;
 
@@ -1654,10 +1658,77 @@ class _LiveScreenState extends State<LiveScreen> {
         'name': _nameFor(senderId),
         'message': (row['message'] ?? '').toString(),
         'badge': _chatBadges[senderId] ?? 'NONE',
+        'tier': _chatTiers[senderId] ?? 'NONE',
+        'chatColor': _chatColorHex[senderId] ?? '',
         'level': '${_chatLevels[senderId] ?? 1}',
         'avatar': _chatAvatars[senderId] ?? '',
       });
     });
+  }
+
+  Future<void> _loadChatModerationAccess() async {
+    if (_isHost) {
+      if (mounted) setState(() => _canModerateChat = true);
+      return;
+    }
+    try {
+      final allowed = await _supabase.rpc(
+        'is_zoonl_admin_allowed',
+        params: <String, dynamic>{'p_permission_key': 'moderate_live_chat'},
+      );
+      if (mounted) setState(() => _canModerateChat = allowed == true);
+    } catch (_) {
+      if (mounted) setState(() => _canModerateChat = false);
+    }
+  }
+
+  Future<void> _moderateChatUser(String targetUserId) async {
+    final roomId = _roomId;
+    if (!_canModerateChat || roomId == null || targetUserId.isEmpty || targetUserId == _myId) return;
+    final action = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: const Color(0xFF171126),
+      builder: (sheetContext) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+            padding: EdgeInsets.all(14),
+            child: Text('LIVE CHAT MODERATION',
+              style: TextStyle(color: Color(0xFFFFE7B0), fontWeight: FontWeight.w900)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.timer, color: Color(0xFFFFD98B)),
+            title: const Text('Mute for 1 hour'),
+            onTap: () => Navigator.pop(sheetContext, 60),
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_off, color: Color(0xFFFF8292)),
+            title: const Text('Mute until Live ends'),
+            onTap: () => Navigator.pop(sheetContext, -1),
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_up, color: Color(0xFF8CEBFF)),
+            title: const Text('Unmute in this room'),
+            onTap: () => Navigator.pop(sheetContext, 0),
+          ),
+        ]),
+      ),
+    );
+    if (action == null) return;
+    try {
+      await _supabase.rpc('moderate_live_chat_user', params: <String, dynamic>{
+        'p_room_id': roomId,
+        'p_target_user_id': targetUserId,
+        'p_muted': action != 0,
+        'p_reason': 'Live room moderator action',
+        'p_duration_minutes': action == -1 ? null : (action == 0 ? null : action),
+      });
+      if (action != 0 && mounted) {
+        setState(() => _messages.removeWhere((message) => message['sender_id'] == targetUserId));
+      }
+      _showMessage(action == 0 ? 'User unmuted.' : 'User muted in this Live room.');
+    } catch (error) {
+      _showMessage('Moderation failed: ${_readable(error)}');
+    }
   }
 
   Future<void> _loadChatBadge(String senderId) async {
@@ -1673,6 +1744,10 @@ class _LiveScreenState extends State<LiveScreen> {
           params: <String, dynamic>{'p_user_ids': <String>[senderId]},
         )),
         safe(_supabase.rpc(
+          'get_public_chat_styles',
+          params: <String, dynamic>{'p_user_ids': <String>[senderId]},
+        )),
+        safe(_supabase.rpc(
           'zoonl_level_for_user',
           params: <String, dynamic>{'p_user_id': senderId},
         )),
@@ -1685,9 +1760,14 @@ class _LiveScreenState extends State<LiveScreen> {
       final badge = rows.isNotEmpty && rows.first is Map
           ? (rows.first['badge_code'] ?? 'NONE').toString()
           : 'NONE';
-      final level = ((results[1] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
-      final publicProfile = results[2] is Map ? results[2] as Map<String, dynamic> : null;
-      final privateProfile = results[3] is Map ? results[3] as Map<String, dynamic> : null;
+      final styleRows = results[1] is List ? results[1] as List : const [];
+      final style = styleRows.isNotEmpty && styleRows.first is Map
+          ? Map<String, dynamic>.from(styleRows.first as Map) : <String, dynamic>{};
+      final tier = (style['tier_code'] ?? 'NONE').toString();
+      final chatColor = (style['chat_color_hex'] ?? '').toString();
+      final level = ((results[2] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
+      final publicProfile = results[3] is Map ? results[3] as Map<String, dynamic> : null;
+      final privateProfile = results[4] is Map ? results[4] as Map<String, dynamic> : null;
       final publicName = publicProfile?['username']?.toString().trim() ?? '';
       final profileName = privateProfile?['display_name']?.toString().trim() ?? '';
       final username = profileName.isNotEmpty ? profileName : publicName;
@@ -1695,6 +1775,8 @@ class _LiveScreenState extends State<LiveScreen> {
       if (!mounted) return;
       setState(() {
         _chatBadges[senderId] = badge;
+        _chatTiers[senderId] = tier;
+        _chatColorHex[senderId] = chatColor;
         _chatLevels[senderId] = level;
         if (username.isNotEmpty) _chatNames[senderId] = username;
         if (avatar.startsWith('http')) _chatAvatars[senderId] = avatar;
@@ -1723,9 +1805,18 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _buildChatLine(Map<String, String> item) {
-    final badge = item['badge'] ?? 'NONE';
+    final tier = item['tier'] ?? 'NONE';
+    final badge = tier == 'VIP' || tier == 'SVIP' || tier == 'VVIP'
+        ? tier : (item['badge'] ?? 'NONE');
     final level = int.tryParse(item['level'] ?? '') ?? 1;
-    final colors = _chatRibbonColors(level);
+    final rawPalette = (item['chatColor'] ?? '').split(',');
+    final customColors = <Color>[];
+    for (final raw in rawPalette.take(3)) {
+      final hex = raw.trim().replaceFirst('#', '');
+      final value = int.tryParse(hex, radix: 16);
+      if (value != null) customColors.add(Color(0xFF000000 | value));
+    }
+    final colors = customColors.length >= 3 ? customColors : _chatRibbonColors(level);
     final name = item['name'] ?? 'User';
     final initial = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
     final avatar = item['avatar'] ?? '';
@@ -1768,13 +1859,15 @@ class _LiveScreenState extends State<LiveScreen> {
                     Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: colors[0], fontSize: 10, fontWeight: FontWeight.w900,
                         shadows: [Shadow(color: colors[1].withOpacity(.8), blurRadius: 5)])),
-                    if (badge == 'VIP' || badge == 'SVIP')
+                    if (badge == 'VIP' || badge == 'SVIP' || badge == 'VVIP')
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(colors: badge == 'SVIP'
                               ? const [Color(0xFFFF8292), Color(0xFF9D1E42)]
-                              : const [Color(0xFFFFE8A8), Color(0xFF9D6A1E)]),
+                              : badge == 'VVIP'
+                                  ? const [Color(0xFFD9B6FF), Color(0xFF6C35B4)]
+                                  : const [Color(0xFFFFE8A8), Color(0xFF9D6A1E)]),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(color: Colors.white.withOpacity(.65), width: .5),
                         ),
@@ -1792,7 +1885,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   ],
                 ),
                 const SizedBox(height: 1),
-                Text(item['message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.12)),
+                Text(item['message'] ?? '', style: TextStyle(color: badge == 'NONE' ? Colors.white : colors[0], fontSize: 11, height: 1.12, fontWeight: badge == 'NONE' ? FontWeight.normal : FontWeight.w600)),
               ],
             ),
           ),
@@ -2930,7 +3023,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   const Spacer(),Text('\${_messages.length} messages',style:const TextStyle(color:Colors.white38,fontSize:8))]),
                 const SizedBox(height:4),
                 SizedBox(height:102,child:ListView.builder(reverse:true,itemCount:_messages.length.clamp(0,3),itemBuilder:(context,index){
-                  final item=_messages[_messages.length-1-index];return Padding(padding:const EdgeInsets.symmetric(vertical:2),child:_buildChatLine(item));})),
+                  final item=_messages[_messages.length-1-index];final senderId=item['sender_id']??'';return Padding(padding:const EdgeInsets.symmetric(vertical:2),child:GestureDetector(onLongPress:_canModerateChat && senderId.isNotEmpty && senderId!=_myId ? ()=>_moderateChatUser(senderId) : null,child:_buildChatLine(item)));})),
                 const SizedBox(height:5),
                 Row(children:[
                   Expanded(child:TextField(controller:_messageController,maxLength:300,style:const TextStyle(color:Colors.white,fontSize:12),
