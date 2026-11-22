@@ -2897,7 +2897,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   const Text('LIVE CHAT',style:TextStyle(color:Colors.white70,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:1)),
                   const Spacer(),Text('\${_messages.length} messages',style:const TextStyle(color:Colors.white38,fontSize:8))]),
                 const SizedBox(height:4),
-                SizedBox(height:62,child:ListView.builder(reverse:true,itemCount:_messages.length.clamp(0,4),itemBuilder:(context,index){
+                SizedBox(height:102,child:ListView.builder(reverse:true,itemCount:_messages.length.clamp(0,3),itemBuilder:(context,index){
                   final item=_messages[_messages.length-1-index];return Padding(padding:const EdgeInsets.symmetric(vertical:2),child:_buildChatLine(item));})),
                 const SizedBox(height:5),
                 Row(children:[
