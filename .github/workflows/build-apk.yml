@@ -45,6 +45,173 @@ jobs:
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
 
+      - name: Install ZOONL native outgoing-video Beauty processor
+        run: |
+          PACKAGE_DIR="android/app/src/main/java/com/zoonllive/zoonl_live"
+          mkdir -p "$PACKAGE_DIR"
+          cat > "$PACKAGE_DIR/VideoProcessorSample.java" <<'JAVA'
+          package com.zoonllive.zoonl_live;
+
+          import androidx.annotation.NonNull;
+          import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin;
+          import com.cloudwebrtc.webrtc.LocalTrack;
+          import com.cloudwebrtc.webrtc.video.LocalVideoTrack;
+          import org.webrtc.JavaI420Buffer;
+          import org.webrtc.VideoFrame;
+          import org.webrtc.YuvHelper;
+          import java.nio.ByteBuffer;
+          import java.util.Arrays;
+          import java.util.HashMap;
+          import java.util.Map;
+          import io.flutter.plugin.common.BinaryMessenger;
+          import io.flutter.plugin.common.MethodCall;
+          import io.flutter.plugin.common.MethodChannel;
+
+          /** Native YUV frame processor attached to flutter_webrtc's camera source. */
+          public final class VideoProcessorSample implements MethodChannel.MethodCallHandler {
+            private static final class BeautyProcessor implements LocalVideoTrack.ExternalVideoFrameProcessing {
+              volatile double smoothing, glow, brightness, warmth, intensity;
+              volatile String look = "Natural";
+              private byte[] neutralChroma = new byte[0];
+
+              void configure(MethodCall call) {
+                smoothing = number(call, "smoothing", 0.15);
+                glow = number(call, "glow", 0.1);
+                brightness = number(call, "brightness", 0.0);
+                warmth = number(call, "warmth", 0.0);
+                intensity = number(call, "intensity", 0.35);
+                Object value = call.argument("look");
+                look = value == null ? "Natural" : value.toString();
+              }
+
+              private static double number(MethodCall call, String key, double fallback) {
+                Number value = call.argument(key);
+                return value == null ? fallback : value.doubleValue();
+              }
+
+              @Override public VideoFrame onFrame(VideoFrame input) {
+                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.22;
+                final double light = Math.max(0.0, Math.min(1.0, glow));
+                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 22.0;
+                final double warm = Math.max(-1.0, Math.min(1.0, warmth));
+                if (smooth < 0.001 && light < 0.001 && Math.abs(lift) < 0.1 && Math.abs(warm) < 0.001
+                    && !"Vivid".equals(look) && !"Cinema".equals(look)) return input;
+
+                VideoFrame.I420Buffer src = input.getBuffer().toI420();
+                if (src == null) return input;
+                final int width = src.getWidth(), height = src.getHeight();
+                final int cw = (width + 1) / 2, ch = (height + 1) / 2;
+                JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
+                ByteBuffer sy = src.getDataY(), dy = dst.getDataY();
+                int ss = src.getStrideY(), ds = dst.getStrideY();
+                for (int row = 0; row < height; row++) {
+                  for (int col = 0; col < width; col++) {
+                    int center = sy.get(row * ss + col) & 255;
+                    double value = center;
+                    if (smooth > 0.001) {
+                      int sum = center * 4, count = 4;
+                      if (col > 0) { sum += sy.get(row * ss + col - 1) & 255; count++; }
+                      if (col + 1 < width) { sum += sy.get(row * ss + col + 1) & 255; count++; }
+                      if (row > 0) { sum += sy.get((row - 1) * ss + col) & 255; count++; }
+                      if (row + 1 < height) { sum += sy.get((row + 1) * ss + col) & 255; count++; }
+                      value = center * (1.0 - smooth) + (sum / (double) count) * smooth;
+                    }
+                    value += lift;
+                    value += Math.max(0.0, value - 112.0) * light * 0.055;
+                    if ("Cinema".equals(look)) value = 128.0 + (value - 128.0) * 1.07;
+                    dy.put(row * ds + col, (byte) Math.max(0, Math.min(255, (int) Math.round(value))));
+                  }
+                }
+
+                ByteBuffer su = src.getDataU(), sv = src.getDataV();
+                ByteBuffer du = dst.getDataU(), dv = dst.getDataV();
+                int us = src.getStrideU(), vs = src.getStrideV();
+                int dus = dst.getStrideU(), dvs = dst.getStrideV();
+                double saturation = "Vivid".equals(look) ? 1.12 : 1.0;
+                for (int row = 0; row < ch; row++) {
+                  for (int col = 0; col < cw; col++) {
+                    int ui = row * us + col, vi = row * vs + col;
+                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - warm * 2.0;
+                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + warm * 3.0;
+                    du.put(row * dus + col, (byte) Math.max(0, Math.min(255, (int) Math.round(u))));
+                    dv.put(row * dvs + col, (byte) Math.max(0, Math.min(255, (int) Math.round(v))));
+                  }
+                }
+                src.release();
+                return new VideoFrame(dst, input.getRotation(), input.getTimestampNs());
+              }
+            }
+
+            private final MethodChannel channel;
+            private final Map<String, BeautyProcessor> processors = new HashMap<>();
+
+            VideoProcessorSample(BinaryMessenger messenger) {
+              channel = new MethodChannel(messenger, "zoonl.live/beauty");
+              channel.setMethodCallHandler(this);
+            }
+
+            private static LocalVideoTrack findTrack(String id) {
+              FlutterWebRTCPlugin plugin = FlutterWebRTCPlugin.sharedSingleton;
+              LocalTrack track = plugin == null ? null : plugin.getLocalTrack(id);
+              return track instanceof LocalVideoTrack ? (LocalVideoTrack) track : null;
+            }
+
+            @Override public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
+              String id = call.argument("trackId");
+              if (id == null) { result.error("bad_args", "trackId is required", null); return; }
+              if ("addBeauty".equals(call.method)) {
+                BeautyProcessor processor = processors.get(id);
+                if (processor == null) {
+                  LocalVideoTrack track = findTrack(id);
+                  if (track == null) { result.error("no_track", "Local camera track not found: " + id, null); return; }
+                  processor = new BeautyProcessor();
+                  track.addProcessor(processor);
+                  processors.put(id, processor);
+                }
+                processor.configure(call);
+                result.success(null);
+              } else if ("removeBeauty".equals(call.method)) {
+                BeautyProcessor processor = processors.remove(id);
+                LocalVideoTrack track = findTrack(id);
+                if (processor != null && track != null) track.removeProcessor(processor);
+                result.success(processor != null);
+              } else {
+                result.notImplemented();
+              }
+            }
+
+            void dispose() {
+              for (Map.Entry<String, BeautyProcessor> entry : processors.entrySet()) {
+                LocalVideoTrack track = findTrack(entry.getKey());
+                if (track != null) track.removeProcessor(entry.getValue());
+              }
+              processors.clear();
+              channel.setMethodCallHandler(null);
+            }
+          }
+          JAVA
+          cat > "$PACKAGE_DIR/MainActivity.kt" <<'KOTLIN'
+          package com.zoonllive.zoonl_live
+
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+
+          class MainActivity : FlutterActivity() {
+            private var zoonlBeautyProcessor: VideoProcessorSample? = null
+
+            override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+              super.configureFlutterEngine(flutterEngine)
+              zoonlBeautyProcessor = VideoProcessorSample(flutterEngine.dartExecutor.binaryMessenger)
+            }
+
+            override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+              zoonlBeautyProcessor?.dispose()
+              zoonlBeautyProcessor = null
+              super.cleanUpFlutterEngine(flutterEngine)
+            }
+          }
+          KOTLIN
+          echo "ZOONL Android native outgoing-frame processor installed."
       - name: Download ZOONL brand logo
         run: |
           mkdir -p assets/branding
