@@ -119,7 +119,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
       alignment:Alignment.center,
       transform:Matrix4.identity()..setEntry(3,2,.002)..rotateY(rotation),
       child:SizedBox(width:size*1.2,height:size*1.28,child:Stack(alignment:Alignment.center,children:[
-        CustomPaint(size:Size(size*1.08,size*1.16),painter:_EmblemPainter(colors:colors,tier:_tier(n),shine:sweep,owner:n>=100)),
+        CustomPaint(size:Size(size*1.08,size*1.16),painter:_EmblemPainter(colors:colors,tier:_tier(n),shine:sweep,owner:n>=100,level:n)),
         Positioned(top:size*.36,child:Text('$n',style:TextStyle(color:Colors.white,fontSize:size*.27,fontWeight:FontWeight.w900,
           shadows:[Shadow(color:Colors.black,blurRadius:5,offset:Offset(1,3)),Shadow(color:colors[1],blurRadius:size*.16)]))),
         Positioned(bottom:size*.15,child:Text(n>=100?'VIP':n<=10?'RANK':'ELITE',
@@ -253,13 +253,16 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 }
 
 class _EmblemPainter extends CustomPainter{
-  final List<Color> colors;final int tier;final double shine;final bool owner;
-  _EmblemPainter({required this.colors,required this.tier,required this.shine,required this.owner});
+  final List<Color> colors;final int tier;final double shine;final bool owner;final int level;
+  _EmblemPainter({required this.colors,required this.tier,required this.shine,required this.owner,required this.level});
   @override void paint(Canvas canvas,Size s){
     final w=s.width,h=s.height,cx=w/2;final p=Path();
-    if(owner){p.moveTo(cx,h*.03);p.lineTo(w*.9,h*.2);p.lineTo(w*.82,h*.72);p.lineTo(cx,h*.98);p.lineTo(w*.18,h*.72);p.lineTo(w*.1,h*.2);}
-    else if(tier<=2){p.moveTo(cx,h*.07);p.lineTo(w*.84,h*.25);p.lineTo(w*.74,h*.72);p.lineTo(cx,h*.93);p.lineTo(w*.26,h*.72);p.lineTo(w*.16,h*.25);}
-    else{p.moveTo(cx,h*.03);p.lineTo(w*.92,h*.2);p.lineTo(w*.84,h*.64);p.lineTo(w*.68,h*.82);p.lineTo(cx,h*.97);p.lineTo(w*.32,h*.82);p.lineTo(w*.16,h*.64);p.lineTo(w*.08,h*.2);}
+    final motif=level%4;
+    if(owner){p.moveTo(cx,h*.02);p.lineTo(w*.93,h*.18);p.lineTo(w*.86,h*.68);p.lineTo(cx,h*.99);p.lineTo(w*.14,h*.68);p.lineTo(w*.07,h*.18);}
+    else if(motif==0){p.moveTo(cx,h*.025);p.lineTo(w*.91,h*.19);p.lineTo(w*.82,h*.68);p.lineTo(cx,h*.96);p.lineTo(w*.18,h*.68);p.lineTo(w*.09,h*.19);}
+    else if(motif==1){p.moveTo(cx,h*.04);p.lineTo(w*.88,h*.12);p.lineTo(w*.96,h*.46);p.lineTo(w*.72,h*.82);p.lineTo(cx,h*.97);p.lineTo(w*.28,h*.82);p.lineTo(w*.04,h*.46);p.lineTo(w*.12,h*.12);}
+    else if(motif==2){p.moveTo(cx,h*.02);p.lineTo(w*.8,h*.12);p.lineTo(w*.96,h*.36);p.lineTo(w*.84,h*.76);p.lineTo(cx,h*.98);p.lineTo(w*.16,h*.76);p.lineTo(w*.04,h*.36);p.lineTo(w*.2,h*.12);}
+    else{p.moveTo(cx,h*.02);p.lineTo(w*.94,h*.27);p.lineTo(w*.78,h*.78);p.lineTo(cx,h*.96);p.lineTo(w*.22,h*.78);p.lineTo(w*.06,h*.27);}
     p.close();
     final shadow=Paint()..color=Colors.black87..maskFilter=const MaskFilter.blur(BlurStyle.normal,7);
     canvas.save();canvas.translate(2,7);canvas.drawPath(p,shadow);canvas.restore();
@@ -272,8 +275,22 @@ class _EmblemPainter extends CustomPainter{
       ..shader=LinearGradient(colors:[Colors.white,colors[1],colors.last,colors[0]]).createShader(Offset.zero&s));
     final sheen=Rect.fromLTWH(w*(shine*1.5-.25),0,w*.2,h);canvas.save();canvas.clipPath(p);
     canvas.drawRect(sheen,Paint()..shader=LinearGradient(colors:[Colors.transparent,Colors.white54,Colors.transparent]).createShader(sheen));canvas.restore();
-    final dots=Paint()..color=Colors.white.withOpacity(.9);
+    final inner=Rect.fromCenter(center:Offset(cx,h*.51),width:w*.55,height:h*.58);
+    canvas.drawOval(inner,Paint()..style=PaintingStyle.stroke..strokeWidth=1
+      ..color=Colors.white.withOpacity(.24));
+    final etch=Paint()..style=PaintingStyle.stroke..strokeWidth=1.1
+      ..color=colors[1].withOpacity(.85);
+    for(var i=0;i<3+(tier%4);i++){
+      final y=h*(.28+i*.105);
+      canvas.drawLine(Offset(w*.2,y),Offset(w*.8,y),etch);
+    }
+    final dots=Paint()..color=Colors.white.withOpacity(.92);
     for(final q in [Offset(w*.25,h*.34),Offset(w*.75,h*.34),Offset(cx,h*.18),Offset(w*.3,h*.7),Offset(w*.7,h*.7)])canvas.drawCircle(q,owner?2.2:1.4,dots);
+    final gem=Path()..moveTo(cx,h*.12)..lineTo(w*.57,h*.2)..lineTo(cx,h*.29)..lineTo(w*.43,h*.2)..close();
+    canvas.drawPath(gem,Paint()..shader=LinearGradient(colors:[Colors.white,colors[1],colors[0]]).createShader(Offset.zero&s));
+    canvas.drawPath(gem,Paint()..style=PaintingStyle.stroke..strokeWidth=.7..color=Colors.white);
+    final glint=Paint()..color=Colors.white.withOpacity(.55+.35*math.sin(shine*math.pi*2).abs())..maskFilter=const MaskFilter.blur(BlurStyle.normal,3);
+    canvas.drawCircle(Offset(w*(.22+(.56*shine)),h*.12),owner?2.5:1.6,glint);
   }
-  @override bool shouldRepaint(covariant _EmblemPainter old)=>old.shine!=shine||old.tier!=tier||old.owner!=owner||old.colors!=colors;
+  @override bool shouldRepaint(covariant _EmblemPainter old)=>old.shine!=shine||old.tier!=tier||old.owner!=owner||old.level!=level||old.colors!=colors;
 }
