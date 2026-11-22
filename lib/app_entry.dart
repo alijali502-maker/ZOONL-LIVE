@@ -75,7 +75,7 @@ class ZoonlAuthGate extends StatelessWidget {
                         Text(
                           profileSnapshot.hasError
                               ? 'Profile setup failed: ${profileSnapshot.error}'
-                              : 'Profile record नहीं मिली। कृपया दोबारा Login करें।',
+                              : 'Profile record was not found. Please log in again.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
