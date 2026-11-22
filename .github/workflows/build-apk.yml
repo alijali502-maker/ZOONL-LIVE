@@ -191,10 +191,17 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release -t lib/app_entry.dart
 
-      - name: Upload APK
+      - name: Package APK ZIP
+        run: |
+          cd build/app/outputs/flutter-apk
+          printf 'ZOONL LIVE Android release\\nCommit: %s\\n' "$GITHUB_SHA" > README.txt
+          zip -9 zoonl-live-release.zip app-release.apk README.txt
+          sha256sum app-release.apk zoonl-live-release.zip
+
+      - name: Upload APK ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: zoonl-live-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: zoonl-live-release-zip
+          path: build/app/outputs/flutter-apk/zoonl-live-release.zip
           if-no-files-found: error
           retention-days: 7
