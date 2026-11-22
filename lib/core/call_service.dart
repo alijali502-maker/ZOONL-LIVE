@@ -4,7 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
-import '../core/call_service.dart';
+import 'services/call_service.dart';
 
 class VideoCallScreen extends StatefulWidget {
   final String serverUrl;

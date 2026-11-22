@@ -9,9 +9,14 @@ on:
   push:
     branches:
       - main
+      - feat/progressive-levels-3d-chat
 
 permissions:
   contents: read
+
+concurrency:
+  group: zoonl-live-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -40,6 +45,276 @@ jobs:
         run: |
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
+
+      - name: Install ZOONL native outgoing-video Beauty processor
+        run: |
+          PACKAGE_DIR="android/app/src/main/java/com/zoonllive/zoonl_live"
+          KOTLIN_DIR="android/app/src/main/kotlin/com/zoonllive/zoonl_live"
+          mkdir -p "$PACKAGE_DIR" "$KOTLIN_DIR"
+          cat > "$PACKAGE_DIR/VideoProcessorSample.java" <<'JAVA'
+          package com.zoonllive.zoonl_live;
+
+          import androidx.annotation.NonNull;
+          import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin;
+          import com.cloudwebrtc.webrtc.LocalTrack;
+          import com.cloudwebrtc.webrtc.video.LocalVideoTrack;
+          import org.webrtc.JavaI420Buffer;
+          import org.webrtc.VideoFrame;
+          import org.webrtc.YuvHelper;
+          import java.nio.ByteBuffer;
+          import java.util.Arrays;
+          import java.util.HashMap;
+          import java.util.Map;
+          import io.flutter.plugin.common.BinaryMessenger;
+          import io.flutter.plugin.common.MethodCall;
+          import io.flutter.plugin.common.MethodChannel;
+
+          /** Native YUV frame processor attached to flutter_webrtc's camera source. */
+          public final class VideoProcessorSample implements MethodChannel.MethodCallHandler {
+            private static final class BeautyProcessor implements LocalVideoTrack.ExternalVideoFrameProcessing {
+              volatile double smoothing, glow, brightness, warmth, intensity;
+              volatile String look = "Natural";
+              private byte[] neutralChroma = new byte[0];
+
+              void configure(MethodCall call) {
+                smoothing = number(call, "smoothing", 0.15);
+                glow = number(call, "glow", 0.1);
+                brightness = number(call, "brightness", 0.0);
+                warmth = number(call, "warmth", 0.0);
+                intensity = number(call, "intensity", 0.35);
+                Object value = call.argument("look");
+                look = value == null ? "Natural" : value.toString();
+              }
+
+              private static double number(MethodCall call, String key, double fallback) {
+                Number value = call.argument(key);
+                return value == null ? fallback : value.doubleValue();
+              }
+
+              @Override public VideoFrame onFrame(VideoFrame input) {
+                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.22;
+                double light = Math.max(0.0, Math.min(1.0, glow));
+                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 22.0;
+                final double warm = Math.max(-1.0, Math.min(1.0, warmth));
+
+                VideoFrame.I420Buffer src = input.getBuffer().toI420();
+                if (src == null) return input;
+                final int width = src.getWidth(), height = src.getHeight();
+                final int cw = (width + 1) / 2, ch = (height + 1) / 2;
+                JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
+                double amount = Math.max(0.0, Math.min(1.0, intensity));
+                double saturation = 1.0;
+                double contrast = 1.0;
+                double toneWarmth = warm;
+                if ("Vivid".equals(look)) { saturation = 1.0 + 0.28 * amount; contrast = 1.0 + 0.08 * amount; }
+                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.16 * amount; contrast = 1.0 + 0.16 * amount; }
+                else if ("Warm".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth += 0.30 * amount; }
+                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth += 0.55 * amount; }
+                else if ("Cool".equals(look)) { toneWarmth -= 0.32 * amount; }
+                else if ("Ice".equals(look)) { saturation = 1.0 - 0.06 * amount; toneWarmth -= 0.55 * amount; }
+                else if ("Rose".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth += 0.18 * amount; }
+                else if ("Peach".equals(look)) { saturation = 1.0 + 0.07 * amount; toneWarmth += 0.38 * amount; }
+                else if ("Mint".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth -= 0.12 * amount; }
+                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.04 * amount; toneWarmth -= 0.20 * amount; }
+                else if ("Mono".equals(look)) { saturation = 1.0 - amount; }
+                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.30 * amount); }
+
+                ByteBuffer sy = src.getDataY(), dy = dst.getDataY();
+                int ss = src.getStrideY(), ds = dst.getStrideY();
+                for (int row = 0; row < height; row++) {
+                  for (int col = 0; col < width; col++) {
+                    int center = sy.get(row * ss + col) & 255;
+                    double value = center;
+                    if (smooth > 0.001) {
+                      int sum = center * 4, count = 4;
+                      if (col > 0) { sum += sy.get(row * ss + col - 1) & 255; count++; }
+                      if (col + 1 < width) { sum += sy.get(row * ss + col + 1) & 255; count++; }
+                      if (row > 0) { sum += sy.get((row - 1) * ss + col) & 255; count++; }
+                      if (row + 1 < height) { sum += sy.get((row + 1) * ss + col) & 255; count++; }
+                      value = center * (1.0 - smooth) + (sum / (double) count) * smooth;
+                    }
+                    value += lift;
+                    value += Math.max(0.0, value - 112.0) * light * 0.075;
+                    value = 128.0 + (value - 128.0) * contrast;
+                    dy.put(row * ds + col, (byte) Math.max(0, Math.min(255, (int) Math.round(value))));
+                  }
+                }
+
+                ByteBuffer su = src.getDataU(), sv = src.getDataV();
+                ByteBuffer du = dst.getDataU(), dv = dst.getDataV();
+                int us = src.getStrideU(), vs = src.getStrideV();
+                int dus = dst.getStrideU(), dvs = dst.getStrideV();
+                for (int row = 0; row < ch; row++) {
+                  for (int col = 0; col < cw; col++) {
+                    int ui = row * us + col, vi = row * vs + col;
+                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - toneWarmth * 3.0;
+                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + toneWarmth * 4.0;
+                    du.put(row * dus + col, (byte) Math.max(0, Math.min(255, (int) Math.round(u))));
+                    dv.put(row * dvs + col, (byte) Math.max(0, Math.min(255, (int) Math.round(v))));
+                  }
+                }
+                src.release();
+                return new VideoFrame(dst, input.getRotation(), input.getTimestampNs());
+              }
+            }
+
+            private final MethodChannel channel;
+            private final Map<String, BeautyProcessor> processors = new HashMap<>();
+
+            VideoProcessorSample(BinaryMessenger messenger) {
+              channel = new MethodChannel(messenger, "zoonl.live/beauty");
+              channel.setMethodCallHandler(this);
+            }
+
+            private static LocalVideoTrack findTrack(String id) {
+              FlutterWebRTCPlugin plugin = FlutterWebRTCPlugin.sharedSingleton;
+              LocalTrack track = plugin == null ? null : plugin.getLocalTrack(id);
+              return track instanceof LocalVideoTrack ? (LocalVideoTrack) track : null;
+            }
+
+            @Override public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
+              String id = call.argument("trackId");
+              if (id == null) { result.error("bad_args", "trackId is required", null); return; }
+              if ("addBeauty".equals(call.method)) {
+                BeautyProcessor processor = processors.get(id);
+                if (processor == null) {
+                  LocalVideoTrack track = findTrack(id);
+                  if (track == null) { result.error("no_track", "Local camera track not found: " + id, null); return; }
+                  processor = new BeautyProcessor();
+                  track.addProcessor(processor);
+                  processors.put(id, processor);
+                }
+                processor.configure(call);
+                result.success(null);
+              } else if ("removeBeauty".equals(call.method)) {
+                BeautyProcessor processor = processors.remove(id);
+                LocalVideoTrack track = findTrack(id);
+                if (processor != null && track != null) track.removeProcessor(processor);
+                result.success(processor != null);
+              } else {
+                result.notImplemented();
+              }
+            }
+
+            void dispose() {
+              for (Map.Entry<String, BeautyProcessor> entry : processors.entrySet()) {
+                LocalVideoTrack track = findTrack(entry.getKey());
+                if (track != null) track.removeProcessor(entry.getValue());
+              }
+              processors.clear();
+              channel.setMethodCallHandler(null);
+            }
+          }
+          JAVA
+          cat > "$KOTLIN_DIR/MainActivity.kt" <<'KOTLIN'
+          package com.zoonllive.zoonl_live
+
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+
+          class MainActivity : FlutterActivity() {
+            private var zoonlBeautyProcessor: VideoProcessorSample? = null
+
+            override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+              super.configureFlutterEngine(flutterEngine)
+              zoonlBeautyProcessor = VideoProcessorSample(flutterEngine.dartExecutor.binaryMessenger)
+            }
+
+            override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+              zoonlBeautyProcessor?.dispose()
+              zoonlBeautyProcessor = null
+              super.cleanUpFlutterEngine(flutterEngine)
+            }
+          }
+          KOTLIN
+          echo "ZOONL Android native outgoing-frame processor installed."
+      - name: Download ZOONL brand logo
+        run: |
+          mkdir -p assets/branding
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://ewzdhminqdldilydrpmk.supabase.co/storage/v1/object/public/avatars/ZOONL%20Streaming%20Logo_20261122_110907_0001.png" \
+            --output assets/branding/zoonl_logo.png
+          file assets/branding/zoonl_logo.png
+          test -s assets/branding/zoonl_logo.png
+
+      - name: Apply ZOONL Android launcher and splash branding
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          mkdir -p android/app/src/main/res/drawable-nodpi
+          cp assets/branding/zoonl_logo.png android/app/src/main/res/drawable-nodpi/zoonl_splash_logo.png
+          for item in "mdpi:48" "hdpi:72" "xhdpi:96" "xxhdpi:144" "xxxhdpi:192"; do
+            density="${item%%:*}"
+            size="${item##*:}"
+            mkdir -p "android/app/src/main/res/mipmap-${density}"
+            convert assets/branding/zoonl_logo.png -thumbnail "${size}x${size}" \
+              -gravity center -background "#080510" -extent "${size}x${size}" \
+              "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+          done
+          cat > android/app/src/main/res/drawable/launch_background.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item android:drawable="@android:color/black"/>
+              <item>
+                  <bitmap
+                      android:gravity="center"
+                      android:src="@drawable/zoonl_splash_logo"/>
+              </item>
+          </layer-list>
+          EOF
+
+      - name: Ensure Gradle plugin repositories
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("android/settings.gradle.kts")
+          s = p.read_text()
+          match = re.search(r"pluginManagement\s*\{", s)
+          if not match:
+              raise SystemExit("pluginManagement block was not generated.")
+          start = match.end()
+          repo_match = re.search(r"repositories\s*\{", s[start:])
+          if not repo_match:
+              raise SystemExit("pluginManagement repositories block was not generated.")
+          repo_start = start + repo_match.end()
+          close = s.find("}", repo_start)
+          if close < 0:
+              raise SystemExit("Could not locate plugin repository block end.")
+          block = s[repo_start:close]
+          additions = []
+          if "google()" not in block:
+              additions.append("google()")
+          if "mavenCentral()" not in block:
+              additions.append("mavenCentral()")
+          if "gradlePluginPortal()" not in block:
+              additions.append("gradlePluginPortal()")
+          if additions:
+              s = s[:repo_start] + "\n" + "\n".join("        " + item for item in additions) + "\n" + s[repo_start:]
+              p.write_text(s)
+          print("Gradle plugin resolution repositories verified.")
+          PY
+
+      - name: Set Android minimum SDK for native video filters
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          target = next((p for p in candidates if p.exists()), None)
+          if target is None:
+              raise SystemExit("Android app Gradle file was not generated.")
+          source = target.read_text()
+          if target.suffix == ".kts":
+              source = source.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+          else:
+              source = source.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
+          target.write_text(source)
+          if "minSdk = 24" not in source and "minSdkVersion 24" not in source:
+              raise SystemExit("Could not set Android minSdkVersion to 24.")
+          print(f"Android minSdkVersion set to 24 in {target}")
+          PY
 
       - name: Add Android Internet Permission
         run: |
@@ -77,6 +352,34 @@ jobs:
           print("Internet, Camera, Microphone, audio permissions, and Supabase OAuth deep link configured.")
           PY
 
+      - name: Expose flutter_webrtc native classes to app processor
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          target = next((p for p in candidates if p.exists()), None)
+          if target is None:
+              raise SystemExit("Android app Gradle file was not generated.")
+          source = target.read_text()
+          coordinate = "io.github.webrtc-sdk:android:137.7151.04"
+          if coordinate in source:
+              print("WebRTC native dependency already exposed to app compile classpath.")
+              raise SystemExit(0)
+          line = (f'    implementation("{coordinate}")' if target.suffix == ".kts"
+                  else f"    implementation '{coordinate}'")
+          match = re.search(r"dependencies\s*\{", source)
+          if match:
+              source = source[:match.end()] + "\n" + line + "\n" + source[match.end():]
+          else:
+              source = source.rstrip() + "\n\ndependencies {\n" + line + "\n}\n"
+          target.write_text(source)
+          if coordinate not in target.read_text():
+              raise SystemExit("WebRTC dependency injection did not persist.")
+          print(f"Added {coordinate} to {target} so native frame processor can compile.")
+          PY
+
       - name: Clean project
         run: flutter clean
 
@@ -99,10 +402,17 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release -t lib/app_entry.dart
 
-      - name: Upload APK
+      - name: Package APK ZIP
+        run: |
+          cd build/app/outputs/flutter-apk
+          printf 'ZOONL LIVE Android release\\nCommit: %s\\n' "$GITHUB_SHA" > README.txt
+          zip -9 zoonl-live-release.zip app-release.apk README.txt
+          sha256sum app-release.apk zoonl-live-release.zip
+
+      - name: Upload APK ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: zoonl-live-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: zoonl-live-release-zip
+          path: build/app/outputs/flutter-apk/zoonl-live-release.zip
           if-no-files-found: error
           retention-days: 7

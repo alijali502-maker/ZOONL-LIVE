@@ -5,20 +5,23 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.0
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
+  camera: ^0.11.0+2
   supabase_flutter: ^2.9.0
-  livekit_client: ^2.4.9
+  livekit_client: ^2.10.0
+  flutter_webrtc: ^1.6.3
   flutter_dotenv: ^5.2.1
   permission_handler: ^11.3.1
   video_player: ^2.9.2
   just_audio: ^0.9.42
   image_picker: ^1.1.2
+  filmkit: ^0.7.1
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +30,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/zoonl_logo.png
+
+dependency_overrides:
+  # 12.4.0 calls an iOS SDK selector absent from the hosted Xcode SDK used by CI.
+  # Keep the compatible 12.3.x implementation until the runner SDK is aligned.
+  device_info_plus: 12.3.0
+  # connectivity_plus 7.3.x uses an NWPath API unavailable in the hosted Xcode SDK.
+  connectivity_plus: 6.1.5

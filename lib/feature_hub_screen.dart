@@ -4,21 +4,24 @@ import 'core/backend.dart';
 import 'lib/features/live_screen.dart';
 import 'role_portals_screen.dart';
 import 'settings_center_screen.dart';
+import 'short_video_studio_screen.dart';
+import 'short_video_feed_screen.dart';
 
 class FeatureHubScreen extends StatefulWidget {
-  const FeatureHubScreen({super.key});
+  final String? roomTypeFilter;
+  const FeatureHubScreen({super.key, this.roomTypeFilter});
 
   @override
   State<FeatureHubScreen> createState() => _FeatureHubScreenState();
 }
 
 class _FeatureHubScreenState extends State<FeatureHubScreen> {
-  static const Color _bg = Color(0xFF080D14);
-  static const Color _panel = Color(0xFF17232E);
-  static const Color _panelRaised = Color(0xFF1D2B37);
-  static const Color _gold = Color(0xFFD6B46A);
-  static const Color _teal = Color(0xFF4BC2B0);
-  static const Color _muted = Color(0xFFAAB5BE);
+  static const Color _bg = Color(0xFF050505);
+  static const Color _panel = Color(0xCC111111);
+  static const Color _panelRaised = Color(0xCC202020);
+  static const Color _gold = Color(0xFFF5F5F5);
+  static const Color _teal = Color(0xFFBDBDBD);
+  static const Color _muted = Color(0xFFBDBDBD);
 
   bool _loading = true;
   bool _canHost = false;
@@ -26,6 +29,9 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   Map<String, dynamic> _profile = {};
   List<Map<String, dynamic>> _rooms = [];
   List<Map<String, dynamic>> _gifts = [];
+  List<Map<String, dynamic>> _guestInvites = [];
+  List<Map<String, dynamic>> _privateInvites = [];
+  List<Map<String, dynamic>> _shortVideos = [];
 
   @override
   void initState() {
@@ -60,15 +66,47 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .eq('id', userId)
           .maybeSingle();
 
+      final publicProfile = await Backend.client
+          .from('user_public_profiles')
+          .select('zoonl_id')
+          .eq('user_id', userId)
+          .maybeSingle();
       final owner = await Backend.isZoonlOwner();
-      final roomsRaw = await Backend.client
+      var roomQuery = Backend.client
           .from('live_rooms')
           .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
           .eq('is_live', true)
           .eq('is_private', false)
-          .eq('is_locked', false)
+          .eq('is_locked', false);
+      if (widget.roomTypeFilter != null) {
+        roomQuery = roomQuery.eq('room_type', widget.roomTypeFilter!);
+      }
+      final roomsRaw = await roomQuery
           .order('created_at', ascending: false)
           .limit(30);
+
+      final guestInvitesRaw = await Backend.client
+          .from('room_guest_invitations')
+          .select('id, room_id, inviter_id, invitee_id, seat_number, invite_status, expires_at, is_video_enabled, is_audio_enabled')
+          .eq('invitee_id', userId)
+          .eq('invite_status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+
+      final privateInvitesRaw = await Backend.client
+          .from('private_room_invites')
+          .select('id, room_id, inviter_id, invite_status, expires_at, created_at')
+          .eq('invitee_id', userId)
+          .eq('invite_status', 'pending')
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+
+      final shortsRaw = await Backend.client
+          .from('short_videos')
+          .select('id,user_id,video_url,caption,duration_seconds,likes_count,created_at')
+          .eq('is_public', true)
+          .order('created_at', ascending: false)
+          .limit(5);
 
       final giftsRaw = await Backend.client
           .from('gifts')
@@ -79,12 +117,24 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
 
       if (!mounted) return;
       setState(() {
-        _profile = _map(profile);
+        _profile = <String, dynamic>{
+          ..._map(profile),
+          'zoonl_id': publicProfile?['zoonl_id'],
+        };
         _canHost = owner || profile?['is_verified'] == true;
         _rooms = (roomsRaw as List)
             .map((row) => _map(row))
             .toList();
         _gifts = (giftsRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _guestInvites = (guestInvitesRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _privateInvites = (privateInvitesRaw as List)
+            .map((row) => _map(row))
+            .toList();
+        _shortVideos = (shortsRaw as List)
             .map((row) => _map(row))
             .toList();
         _loading = false;
@@ -115,7 +165,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL Host').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: (_profile['zoonl_id'] ?? '').toString(),
           roomType: roomType,
         ),
       ),
@@ -123,12 +173,96 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
     _loadDashboard();
   }
 
+  Future<void> _openShortStudio() async {
+    final uploaded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const ShortVideoStudioScreen()),
+    );
+    if (uploaded == true) await _loadDashboard();
+  }
+
+  Future<void> _openShortFeed({bool onlyMine = false}) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ShortVideoFeedScreen(onlyMine: onlyMine),
+      ),
+    );
+    await _loadDashboard();
+  }
+
+  Future<void> _respondGuestInvite(
+    Map<String, dynamic> invitation,
+    bool accept,
+  ) async {
+    try {
+      final seatId = await Backend.client.rpc(
+        'room_respond_guest_invitation',
+        params: <String, dynamic>{
+          'p_invitation_id': invitation['id'],
+          'p_accept': accept,
+        },
+      );
+      if (!mounted) return;
+      if (accept) {
+        if (seatId == null) {
+          _notice('This guest invitation expired or the seat was taken.');
+          await _loadDashboard();
+          return;
+        }
+        final roomId = invitation['room_id'].toString();
+        final room = await Backend.client
+            .from('live_rooms')
+            .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked, is_live')
+            .eq('id', roomId)
+            .maybeSingle();
+        if (room == null || room['is_live'] != true) {
+          _notice('This live room has already ended.');
+          await _loadDashboard();
+          return;
+        }
+        await _joinRoom(_map(room));
+      } else {
+        _notice('Guest invitation declined.');
+      }
+      await _loadDashboard();
+    } catch (error) {
+      _notice('Guest invitation could not be processed: $error');
+    }
+  }
+
+
+  Future<void> _respondPrivateInvite(Map<String, dynamic> invite, bool accept) async {
+    try {
+      await Backend.client.rpc('private_room_respond_invite', params: {
+        'p_invite_id': invite['id'],
+        'p_accept': accept,
+      });
+      if (!mounted) return;
+      if (!accept) {
+        _notice('Private room invitation declined.');
+        await _loadDashboard();
+        return;
+      }
+      final room = await Backend.client.from('live_rooms')
+          .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked, is_live')
+          .eq('id', invite['room_id'].toString()).maybeSingle();
+      if (room == null || room['is_live'] != true) {
+        _notice('This private live has already ended.');
+        await _loadDashboard();
+        return;
+      }
+      await _joinRoom(_map(room));
+      await _loadDashboard();
+    } catch (error) {
+      _notice('Private invitation could not be processed: $error');
+    }
+  }
+
   Future<void> _joinRoom(Map<String, dynamic> room) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL User').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: (_profile['zoonl_id'] ?? '').toString(),
           joinRoomId: room['id'].toString(),
           roomType: (room['room_type'] ?? 'video').toString(),
         ),
@@ -144,7 +278,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF354653)),
+        border: Border.all(color: const Color(0x55FFFFFF)),
       ),
       child: child,
     );
@@ -179,7 +313,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   @override
   Widget build(BuildContext context) {
     final name = (_profile['display_name'] ?? 'ZOONL Member').toString();
-    final publicId = (_profile['username'] ?? '').toString();
+    final publicId = (_profile['zoonl_id'] ?? '').toString();
     final level = (_profile['user_level'] as num?)?.toInt() ?? 1;
 
     return Scaffold(
@@ -229,26 +363,34 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                     style: const TextStyle(color: _muted, fontSize: 11),
                   ),
                   const SizedBox(height: 15),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
-                          icon: const Icon(Icons.videocam_rounded),
-                          label: const Text('VIDEO LIVE'),
-                          style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
-                        ),
-                      ),
+                  if (widget.roomTypeFilter == 'video')
+                    SizedBox(width: double.infinity, child: FilledButton.icon(
+                      onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
+                      icon: const Icon(Icons.videocam_rounded),
+                      label: const Text('START VIDEO LIVE'),
+                      style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
+                    ))
+                  else if (widget.roomTypeFilter == 'audio')
+                    SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                      onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
+                      icon: const Icon(Icons.mic_rounded),
+                      label: const Text('START AUDIO LIVE'),
+                    ))
+                  else
+                    Row(children: [
+                      Expanded(child: FilledButton.icon(
+                        onPressed: _canHost ? () => _startLive(roomType: 'video') : null,
+                        icon: const Icon(Icons.videocam_rounded),
+                        label: const Text('VIDEO LIVE'),
+                        style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: const Color(0xFF071713)),
+                      )),
                       const SizedBox(width: 9),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
-                          icon: const Icon(Icons.mic_rounded),
-                          label: const Text('AUDIO LIVE'),
-                        ),
-                      ),
-                    ],
-                  ),
+                      Expanded(child: OutlinedButton.icon(
+                        onPressed: _canHost ? () => _startLive(roomType: 'audio') : null,
+                        icon: const Icon(Icons.mic_rounded),
+                        label: const Text('AUDIO LIVE'),
+                      )),
+                    ]),
                   if (!_canHost)
                     const Padding(
                       padding: EdgeInsets.only(top: 8),
@@ -257,6 +399,68 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                         style: TextStyle(color: _muted, fontSize: 10),
                       ),
                     ),
+                ],
+              ),
+            ),
+            _sectionTitle('Short Videos', trailing: 'VIEW ALL', onTap: () => _openShortFeed()),
+            _panelCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Record, publish and watch public Shorts',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _openShortStudio,
+                          icon: const Icon(Icons.videocam),
+                          label: const Text('UPLOAD SHORT'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _teal,
+                            foregroundColor: const Color(0xFF071713),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openShortFeed(onlyMine: true),
+                          icon: const Icon(Icons.person),
+                          label: const Text('MY SHORTS'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_shortVideos.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 10),
+                      child: Text('No public Shorts yet. Be the first to publish.',
+                          style: TextStyle(color: _muted, fontSize: 11)),
+                    )
+                  else
+                    ..._shortVideos.map((video) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.play_circle_fill, color: _gold, size: 30),
+                      title: Text(
+                        (video['caption'] ?? 'ZOONL Short').toString().isEmpty
+                            ? 'ZOONL Short'
+                            : (video['caption'] ?? '').toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        '${video['duration_seconds']} sec • ${video['likes_count']} likes',
+                        style: const TextStyle(color: _muted, fontSize: 10),
+                      ),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => ShortVideoPlayerScreen(video: video),
+                      )),
+                    )),
                 ],
               ),
             ),
@@ -303,6 +507,56 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                   ),
                 );
               }),
+            if (_privateInvites.isNotEmpty) ...[
+              _sectionTitle('Private Live Invitations'),
+              ..._privateInvites.map((invite) => _panelCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.lock_person_rounded, color: _gold, size: 28),
+                  title: Text('Private Live • ${invite['room_id']}',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  subtitle: const Text('Invitation expires in 10 minutes', style: TextStyle(color: _muted, fontSize: 11)),
+                  trailing: Wrap(spacing: 2, children: [
+                    IconButton(tooltip: 'Accept', onPressed: () => _respondPrivateInvite(invite, true),
+                      icon: const Icon(Icons.check_circle, color: Colors.greenAccent)),
+                    IconButton(tooltip: 'Decline', onPressed: () => _respondPrivateInvite(invite, false),
+                      icon: const Icon(Icons.cancel, color: Colors.redAccent)),
+                  ]),
+                ),
+              )),
+            ],
+            if (_guestInvites.isNotEmpty) ...[
+              _sectionTitle('Guest Seat Invitations'),
+              ..._guestInvites.map((invite) => _panelCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.video_call_rounded, color: _gold, size: 28),
+                  title: Text('Room ${invite['room_id']} • Seat ${invite['seat_number']}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    '${invite['is_video_enabled'] == true ? 'Video' : 'Audio only'} guest invitation',
+                    style: const TextStyle(color: _muted, fontSize: 11),
+                  ),
+                  trailing: Wrap(
+                    spacing: 2,
+                    children: [
+                      IconButton(
+                        tooltip: 'Accept',
+                        onPressed: () => _respondGuestInvite(invite, true),
+                        icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
+                      ),
+                      IconButton(
+                        tooltip: 'Decline',
+                        onPressed: () => _respondGuestInvite(invite, false),
+                        icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+            ],
             _sectionTitle('Gift Collection'),
             if (_gifts.isEmpty && !_loading)
               _panelCard(child: const Text('Gift catalog is empty or unavailable.', style: TextStyle(color: _muted, fontSize: 12)))

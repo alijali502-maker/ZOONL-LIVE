@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/backend.dart';
 import 'profile_edit_screen.dart';
@@ -6,15 +8,15 @@ import 'profile_edit_screen.dart';
 class SettingsCenterScreen extends StatelessWidget {
   const SettingsCenterScreen({super.key});
 
-  static const Color _gold = Color(0xFFD6B46A);
-  static const Color _panel = Color(0xFF17232E);
-  static const Color _muted = Color(0xFFAAB5BE);
+  static const Color _gold = Color(0xFFF5F5F5);
+  static const Color _panel = Color(0xCC101010);
+  static const Color _muted = Color(0xFFBDBDBD);
 
   void _showDetails(BuildContext context, String title, String detail) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF17232E),
+        backgroundColor: const Color(0xFF101010),
         title: Text(title, style: const TextStyle(color: _gold)),
         content: Text(detail, style: const TextStyle(color: _muted, height: 1.5)),
         actions: [
@@ -77,7 +79,8 @@ class SettingsCenterScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: _panel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF354653)),
+        border: Border.all(color: const Color(0x55FFFFFF)),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 22, offset: Offset(0, 8))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,7 +126,7 @@ class SettingsCenterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080D14),
+      backgroundColor: const Color(0xFF050505),
       appBar: AppBar(
         title: const Text('Settings Center'),
       ),
@@ -135,7 +138,7 @@ class SettingsCenterScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF293B49), Color(0xFF17232E)],
+                colors: [Color(0xCC292929), Color(0xCC090909)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -192,34 +195,20 @@ class SettingsCenterScreen extends StatelessWidget {
           ]),
           _section(context, 'Privacy and safety', [
             _SettingItem(
-              Icons.people_outline,
-              'Friends and followers',
-              'Friend list visibility and social connections',
-              () => _showDetails(
-                context,
-                'Friends and followers',
-                'Friend-list visibility is currently shown in your profile settings. Persistent privacy controls will be connected to the verified account settings service before they are presented as saved.',
-              ),
+              Icons.mark_chat_read_outlined,
+              'Message privacy',
+              'Choose who can send you messages',
+              () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const MessagePrivacyScreen(),
+              )),
             ),
             _SettingItem(
               Icons.block_outlined,
               'Blocked users',
-              'Review accounts you have blocked',
-              () => _showDetails(
-                context,
-                'Blocked users',
-                'The blocked-user management screen requires the account safety records to be connected. No blocked-user data is fabricated here.',
-              ),
-            ),
-            _SettingItem(
-              Icons.report_gmailerrorred_outlined,
-              'Report a problem',
-              'Safety, abuse and technical support',
-              () => _showDetails(
-                context,
-                'Report a problem',
-                'The support submission workflow will be connected to the official ZOONL support service.',
-              ),
+              'Review and unblock accounts you blocked',
+              () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const BlockedUsersScreen(),
+              )),
             ),
           ]),
           _section(context, 'Application preferences', [
@@ -230,28 +219,16 @@ class SettingsCenterScreen extends StatelessWidget {
               () => _showDetails(
                 context,
                 'Appearance',
-                'The current application theme is Premium Obsidian with Champagne Gold and Teal accents.',
+                'The current appearance uses neutral black glass surfaces, soft white edges and clear white typography.',
               ),
             ),
             _SettingItem(
               Icons.notifications_none,
               'Notifications',
-              'Live, messages, gifts and account alerts',
-              () => _showDetails(
-                context,
-                'Notifications',
-                'Notification preferences will be saved when the push-notification settings service is connected.',
-              ),
-            ),
-            _SettingItem(
-              Icons.language,
-              'Language',
-              'Application language preferences',
-              () => _showDetails(
-                context,
-                'Language',
-                'Language selection will be connected to the application localization settings.',
-              ),
+              'View your in-app notification inbox',
+              () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => const InAppNotificationsScreen(),
+              )),
             ),
           ]),
           const SizedBox(height: 4),
@@ -284,4 +261,223 @@ class _SettingItem {
   final VoidCallback onTap;
 
   const _SettingItem(this.icon, this.title, this.subtitle, this.onTap);
+}
+
+
+class MessagePrivacyScreen extends StatefulWidget {
+  const MessagePrivacyScreen({super.key});
+  @override
+  State<MessagePrivacyScreen> createState() => _MessagePrivacyScreenState();
+}
+
+class _MessagePrivacyScreenState extends State<MessagePrivacyScreen> {
+  final _db = Supabase.instance.client;
+  String _value = 'everyone';
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final uid = _db.auth.currentUser?.id;
+      if (uid == null) throw StateError('Login required.');
+      final row = await _db.from('messaging_preferences')
+          .select('allow_messages_from').eq('user_id', uid).maybeSingle();
+      if (mounted) setState(() {
+        _value = (row?['allow_messages_from'] ?? 'everyone').toString();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _save(String value) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null || _saving) return;
+    setState(() { _saving = true; _error = null; });
+    try {
+      await _db.from('messaging_preferences').upsert({
+        'user_id': uid,
+        'allow_messages_from': value,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id');
+      if (mounted) setState(() => _value = value);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Message Privacy')),
+    backgroundColor: const Color(0xFF080D14),
+    body: _loading ? const Center(child: CircularProgressIndicator())
+      : ListView(padding: const EdgeInsets.all(16), children: [
+        const Text('WHO CAN MESSAGE YOU?', style: TextStyle(color: const Color(0xFFD6B46A), fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        RadioListTile<String>(
+          value: 'everyone', groupValue: _value, onChanged: _saving ? null : (v) { if (v != null) _save(v); },
+          title: const Text('Everyone'), subtitle: const Text('Anyone can send you a message'),
+        ),
+        RadioListTile<String>(
+          value: 'friends_only', groupValue: _value, onChanged: _saving ? null : (v) { if (v != null) _save(v); },
+          title: const Text('Friends only'), subtitle: const Text('Only accepted friends can message you'),
+        ),
+        if (_saving) const LinearProgressIndicator(),
+        if (_error != null) Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+        const Text('This setting is saved to your account messaging preferences.', style: TextStyle(color: const Color(0xFFAAB5BE), fontSize: 12)),
+      ]),
+  );
+}
+
+class BlockedUsersScreen extends StatefulWidget {
+  const BlockedUsersScreen({super.key});
+  @override
+  State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
+}
+
+class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _rows = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final uid = _db.auth.currentUser?.id;
+      if (uid == null) throw StateError('Login required.');
+      final raw = await _db.from('user_blocks').select('id,blocked_id,created_at')
+          .eq('blocker_id', uid).order('created_at', ascending: false);
+      final rows = (raw as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final ids = rows.map((e) => e['blocked_id'].toString()).toSet().toList();
+      if (ids.isNotEmpty) {
+        final profiles = await _db.from('user_public_profiles')
+            .select('user_id,username,avatar_url,zoonl_id')
+            .inFilter('user_id', ids);
+        final byId = {
+          for (final p in profiles as List)
+            p['user_id'].toString(): Map<String, dynamic>.from(p as Map),
+        };
+        for (final row in rows) {
+          row['profile'] = byId[row['blocked_id'].toString()] ?? {};
+        }
+      }
+      if (mounted) setState(() { _rows = rows; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _unblock(Map<String, dynamic> row) async {
+    try {
+      final uid = _db.auth.currentUser?.id;
+      if (uid == null) throw StateError('Login required.');
+      await _db.from('user_blocks').delete()
+          .eq('id', row['id']).eq('blocker_id', uid);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unblock failed: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Blocked Users')),
+    backgroundColor: const Color(0xFF080D14),
+    body: _loading ? const Center(child: CircularProgressIndicator())
+      : _error != null ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
+      : _rows.isEmpty ? const Center(child: Text('You have not blocked anyone.', style: TextStyle(color: const Color(0xFFAAB5BE))))
+      : ListView.builder(itemCount: _rows.length, itemBuilder: (context, i) {
+        final row = _rows[i];
+        final profile = row['profile'] as Map<String, dynamic>? ?? {};
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: (profile['avatar_url'] ?? '').toString().startsWith('http')
+                ? NetworkImage(profile['avatar_url'].toString()) : null,
+            child: (profile['avatar_url'] ?? '').toString().isEmpty ? const Icon(Icons.person) : null,
+          ),
+          title: Text((profile['username'] ?? 'ZOONL User').toString()),
+          subtitle: Text(
+            'ZOONL ID ${profile['zoonl_id'] ?? 'Unavailable'}',
+            style: const TextStyle(color: Color(0xFFAAB5BE), fontSize: 10),
+          ),
+          trailing: TextButton(onPressed: () => _unblock(row), child: const Text('UNBLOCK')),
+        );
+      }),
+  );
+}
+
+class InAppNotificationsScreen extends StatefulWidget {
+  const InAppNotificationsScreen({super.key});
+  @override
+  State<InAppNotificationsScreen> createState() => _InAppNotificationsScreenState();
+}
+
+class _InAppNotificationsScreenState extends State<InAppNotificationsScreen> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _rows = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final uid = _db.auth.currentUser?.id;
+      if (uid == null) throw StateError('Login required.');
+      final raw = await _db.from('user_notifications').select(
+        'id,title,body,notification_type,related_id,is_read,created_at')
+        .eq('user_id', uid).order('created_at', ascending: false).limit(100);
+      if (mounted) setState(() {
+        _rows = (raw as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _markRead(Map<String, dynamic> row) async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      await _db.from('user_notifications').update({'is_read': true})
+          .eq('id', row['id']).eq('user_id', uid);
+      if (mounted) setState(() => row['is_read'] = true);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not mark notification read: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Notifications')),
+    backgroundColor: const Color(0xFF080D14),
+    body: _loading ? const Center(child: CircularProgressIndicator())
+      : _error != null ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
+      : _rows.isEmpty ? const Center(child: Text('No notifications yet.', style: TextStyle(color: const Color(0xFFAAB5BE))))
+      : RefreshIndicator(onRefresh: _load, child: ListView.builder(
+        itemCount: _rows.length,
+        itemBuilder: (context, i) {
+          final row = _rows[i];
+          final read = row['is_read'] == true;
+          return ListTile(
+            leading: Icon(read ? Icons.notifications_none : Icons.notifications_active, color: read ? const Color(0xFFAAB5BE) : const Color(0xFFD6B46A)),
+            title: Text((row['title'] ?? 'ZOONL LIVE').toString()),
+            subtitle: Text((row['body'] ?? '').toString(), maxLines: 3, overflow: TextOverflow.ellipsis),
+            trailing: read ? null : TextButton(onPressed: () => _markRead(row), child: const Text('READ')),
+          );
+        },
+      )),
+  );
 }

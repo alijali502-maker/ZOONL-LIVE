@@ -1,12 +1,17 @@
-import 'package:flutter/material.dart';
-import 'core/backend.dart';
+import 'dart:io';
 
-const Color _bg = Color(0xFF080D14);
-const Color _panel = Color(0xFF17232E);
-const Color _raised = Color(0xFF1D2B37);
-const Color _gold = Color(0xFFD6B46A);
-const Color _teal = Color(0xFF4BC2B0);
-const Color _muted = Color(0xFFAAB5BE);
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/backend.dart';
+import 'event_control_screen.dart';
+
+const Color _bg = Color(0xFF080510);
+const Color _panel = Color(0xFF171126);
+const Color _raised = Color(0xFF211735);
+const Color _gold = Color(0xFFE6C47A);
+const Color _teal = Color(0xFFDA65C8);
+const Color _muted = Color(0xFFC2B8D2);
 
 class RolePortalGateScreen extends StatefulWidget {
   const RolePortalGateScreen({super.key});
@@ -22,12 +27,12 @@ class _RolePortalGateScreenState extends State<RolePortalGateScreen> {
 
   static const Map<String, String> permissionLabels = {
     'manage_users': 'User Management',
-    'manage_topups': 'Top-up Management',
     'manage_agencies': 'Agency Management',
     'manage_hosts': 'Host Management',
     'manage_withdrawals': 'Withdrawal Review',
     'view_reports': 'Reports & Analytics',
     'manage_live_rooms': 'Live Room Moderation',
+    'moderate_live_chat': 'Mute / Unmute Live Chat Users',
     'manage_gifts': 'Gift Catalogue',
   };
 
@@ -116,6 +121,8 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   String? error;
   List<Map<String, dynamic>> records = const [];
   final TextEditingController search = TextEditingController();
+  final TextEditingController moderatorZoonlId = TextEditingController();
+  bool moderatorBusy = false;
 
   static const List<_PortalSection> sections = [
     _PortalSection('Overview', Icons.dashboard_outlined),
@@ -154,6 +161,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   @override
   void dispose() {
     search.dispose();
+    moderatorZoonlId.dispose();
     super.dispose();
   }
 
@@ -240,6 +248,17 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
         icon: const Icon(Icons.account_balance_wallet),
         label: const Text('OPEN WALLET & TOP-UP RECORDS'),
       ),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => const EventControlScreen(),
+          ),
+        ),
+        icon: const Icon(Icons.event_available),
+        label: const Text('OPEN LIVE EVENT & REWARD CONTROL'),
+      ),
+
     ],
   );
 
@@ -269,9 +288,94 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     ],
   );
 
+  Future<void> _openAgencyReview(Map<String, dynamic> row) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => AgencyApplicationReviewScreen(application: row),
+      ),
+    );
+    if (changed == true) _loadRecords();
+  }
+
+  Future<void> _setLiveChatModerator(bool allowed) async {
+    final zoonlId = moderatorZoonlId.text.trim();
+    if (zoonlId.isEmpty || moderatorBusy) return;
+    setState(() => moderatorBusy = true);
+    try {
+      await Backend.client.rpc('owner_set_live_chat_moderator', params: {
+        'p_target_zoonl_id': zoonlId,
+        'p_is_allowed': allowed,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(allowed
+            ? 'Live chat moderation granted to ZOONL ID $zoonlId.'
+            : 'Live chat moderation revoked from ZOONL ID $zoonlId.'),
+      ));
+      moderatorZoonlId.clear();
+      await _loadRecords();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission update failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => moderatorBusy = false);
+    }
+  }
+
+  Widget _liveChatModeratorControls() => Card(
+    color: _panel,
+    margin: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: _gold.withOpacity(.35)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.volume_off, color: _gold, size: 20),
+          SizedBox(width: 8),
+          Text('LIVE CHAT MODERATOR ACCESS',
+            style: TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 12)),
+        ]),
+        const SizedBox(height: 6),
+        const Text('Enter the Admin user’s numeric ZOONL ID. This permission only allows room chat mute / unmute.',
+          style: TextStyle(color: _muted, fontSize: 11)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: moderatorZoonlId,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Admin ZOONL ID',
+            prefixIcon: Icon(Icons.badge_outlined),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          FilledButton.icon(
+            onPressed: moderatorBusy ? null : () => _setLiveChatModerator(true),
+            icon: const Icon(Icons.verified_user),
+            label: const Text('GRANT MUTE ACCESS'),
+          ),
+          OutlinedButton.icon(
+            onPressed: moderatorBusy ? null : () => _setLiveChatModerator(false),
+            icon: const Icon(Icons.remove_moderator),
+            label: const Text('REVOKE'),
+          ),
+        ]),
+        if (moderatorBusy) const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: LinearProgressIndicator(color: _gold),
+        ),
+      ]),
+    ),
+  );
+
   Widget _records() {
     final filtered = records.where((row) => row.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
     return Column(children: [
+      if (selected == 1) _liveChatModeratorControls(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: TextField(
@@ -297,8 +401,16 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
                       leading: const Icon(Icons.storage_outlined, color: _gold),
                       title: Text(title.toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                       subtitle: Text(row.entries.take(5).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
-                      trailing: const Icon(Icons.chevron_right, color: _gold),
-                      onTap: () => showDialog<void>(
+                      trailing: selected == 2
+                          ? IconButton(
+                              tooltip: 'Review application',
+                              onPressed: () => _openAgencyReview(row),
+                              icon: const Icon(Icons.fact_check, color: _gold),
+                            )
+                          : const Icon(Icons.chevron_right, color: _gold),
+                      onTap: selected == 2
+                          ? () => _openAgencyReview(row)
+                          : () => showDialog<void>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           backgroundColor: _panel,
@@ -352,6 +464,401 @@ class AdminOperationsPortalScreen extends StatelessWidget {
   }
 }
 
+class AgencyApplicationReviewScreen extends StatefulWidget {
+  final Map<String, dynamic> application;
+  const AgencyApplicationReviewScreen({super.key, required this.application});
+
+  @override
+  State<AgencyApplicationReviewScreen> createState() => _AgencyApplicationReviewScreenState();
+}
+
+class _AgencyApplicationReviewScreenState extends State<AgencyApplicationReviewScreen> {
+  final TextEditingController _note = TextEditingController();
+  bool _busy = false;
+  String? _receiptUrl;
+  String? _message;
+  String? _agencyCode;
+
+  Map<String, dynamic> get app => widget.application;
+  String get applicationId => app['id'].toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReceipt();
+  }
+
+  Future<void> _loadReceipt() async {
+    final path = app['deposit_receipt_path']?.toString();
+    if (path == null || path.isEmpty) return;
+    try {
+      final url = await Backend.client.storage
+          .from('agency-documents-private')
+          .createSignedUrl(path, 3600);
+      if (mounted) setState(() => _receiptUrl = url);
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Receipt preview unavailable: $error');
+    }
+  }
+
+  Future<void> _setDeposit(String status) async {
+    setState(() { _busy = true; _message = null; });
+    try {
+      await Backend.client.rpc(
+        'owner_set_agency_deposit_status',
+        params: <String, dynamic>{
+          'p_application_id': applicationId,
+          'p_deposit_status': status,
+          'p_review_note': _note.text.trim(),
+        },
+      );
+      if (mounted) setState(() => _message = 'Deposit status set to $status.');
+    } catch (error) {
+      if (mounted) setState(() => _message = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _review(String decision) async {
+    setState(() { _busy = true; _message = null; });
+    try {
+      final result = await Backend.client.rpc(
+        'owner_review_agency_application',
+        params: <String, dynamic>{
+          'p_application_id': applicationId,
+          'p_decision': decision,
+          'p_review_note': _note.text.trim(),
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _agencyCode = result is Map ? result['agency_code']?.toString() : null;
+          _message = decision == 'approved'
+              ? 'Agency approved. Official code: ${_agencyCode ?? 'pending'}'
+              : 'Application rejected.';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final depositStatus = (app['deposit_status'] ?? 'pending').toString();
+    final applicationStatus = (app['application_status'] ?? 'pending').toString();
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(title: const Text('Review Agency Application')),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        _portalCard(
+          (app['proposed_name'] ?? 'Agency').toString(),
+          'Type: ${app['agency_type']} • Deposit: USD ${app['deposit_amount']} • Application: $applicationStatus • Deposit status: $depositStatus',
+          Icons.business,
+        ),
+        const SizedBox(height: 10),
+        Text('Contact: ${app['contact_details']}', style: const TextStyle(color: _muted)),
+        Text('Deposit reference: ${app['deposit_reference'] ?? 'Not supplied'}',
+            style: const TextStyle(color: _muted)),
+        if (_receiptUrl != null) ...[
+          const SizedBox(height: 12),
+          const Text('Private deposit receipt', style: TextStyle(color: _gold, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.network(_receiptUrl!, height: 220, fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Text('Receipt preview could not be rendered.', style: TextStyle(color: _muted))),
+          ),
+        ],
+        const SizedBox(height: 12),
+        TextField(
+          controller: _note,
+          maxLines: 3,
+          decoration: const InputDecoration(labelText: 'Owner review note'),
+        ),
+        const SizedBox(height: 12),
+        if (applicationStatus == 'pending') ...[
+          if (depositStatus == 'pending')
+            FilledButton(
+              onPressed: _busy ? null : () => _setDeposit('verified'),
+              child: const Text('VERIFY USD 300 DEPOSIT'),
+            ),
+          if (depositStatus != 'rejected')
+            OutlinedButton(
+              onPressed: _busy ? null : () => _setDeposit('rejected'),
+              child: const Text('REJECT DEPOSIT RECEIPT'),
+            ),
+          if (depositStatus == 'verified')
+            FilledButton(
+              onPressed: _busy ? null : () => _review('approved'),
+              child: const Text('APPROVE & ISSUE AGENCY CODE'),
+            ),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _review('rejected'),
+            child: const Text('REJECT APPLICATION'),
+          ),
+        ],
+        if (_message != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(_message!, style: const TextStyle(color: _teal)),
+          ),
+        if (_busy) const Padding(
+          padding: EdgeInsets.all(12),
+          child: Center(child: CircularProgressIndicator(color: _gold)),
+        ),
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('BACK TO AGENCY RECORDS'),
+        ),
+      ]),
+    );
+  }
+}
+
+class AgencyApplicationFormScreen extends StatefulWidget {
+  const AgencyApplicationFormScreen({super.key});
+  @override
+  State<AgencyApplicationFormScreen> createState() => _AgencyApplicationFormScreenState();
+}
+
+class _AgencyApplicationFormScreenState extends State<AgencyApplicationFormScreen> {
+  final SupabaseClient _db = Backend.client;
+  final ImagePicker _picker = ImagePicker();
+  final TextEditingController _name = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _phone = TextEditingController();
+  final TextEditingController _whatsapp = TextEditingController();
+  final TextEditingController _country = TextEditingController();
+  final TextEditingController _depositReference = TextEditingController();
+  String _agencyType = 'streamer';
+  XFile? _receipt;
+  bool _uploading = false;
+  bool _submitting = false;
+  bool _checkingEligibility = true;
+  bool _adultVerified = false;
+  String? _eligibilityError;
+  String? _receiptPath;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdultVerification();
+  }
+
+  Future<void> _checkAdultVerification() async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      if (mounted) setState(() {
+        _checkingEligibility = false;
+        _eligibilityError = 'Please sign in first.';
+      });
+      return;
+    }
+    try {
+      final now = DateTime.now();
+      final cutoff = DateTime(now.year - 18, now.month, now.day);
+      final cutoffText = cutoff.year.toString().padLeft(4, '0') + '-' + cutoff.month.toString().padLeft(2, '0') + '-' + cutoff.day.toString().padLeft(2, '0');
+      final rows = await _db.from('host_verification_submissions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('verification_status', 'approved')
+          .lte('date_of_birth', cutoffText)
+          .limit(1);
+      if (mounted) setState(() {
+        _adultVerified = (rows as List).isNotEmpty;
+        _checkingEligibility = false;
+      });
+    } catch (error) {
+      if (mounted) setState(() {
+        _adultVerified = false;
+        _checkingEligibility = false;
+        _eligibilityError = 'Adult verification status could not be confirmed: $error';
+      });
+    }
+  }
+
+  Future<void> _pickReceipt() async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+      );
+      if (file == null) return;
+      setState(() { _receipt = file; _receiptPath = null; _error = null; });
+    } catch (error) {
+      setState(() => _error = 'Receipt image could not be selected: $error');
+    }
+  }
+
+  Future<void> _uploadReceipt() async {
+    final file = _receipt;
+    final userId = _db.auth.currentUser?.id;
+    if (file == null || userId == null) return;
+    setState(() { _uploading = true; _error = null; });
+    try {
+      final path = '$userId/agency-receipts/${DateTime.now().microsecondsSinceEpoch}.jpg';
+      await _db.storage.from('agency-documents-private').upload(
+        path,
+        File(file.path),
+        fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+      );
+      if (mounted) setState(() => _receiptPath = path);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Receipt upload failed: $error');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_adultVerified) {
+      setState(() => _error = 'Approved adult verification (18+) is required before an agency application.');
+      return;
+    }
+    if (_name.text.trim().isEmpty ||
+        _email.text.trim().isEmpty ||
+        _phone.text.trim().isEmpty ||
+        _depositReference.text.trim().isEmpty ||
+        _receiptPath == null) {
+      setState(() => _error = 'Complete the contact details and upload the \$300 deposit receipt.');
+      return;
+    }
+    setState(() { _submitting = true; _error = null; });
+    try {
+      await _db.rpc(
+        'submit_agency_application',
+        params: <String, dynamic>{
+          'p_proposed_name': _name.text.trim(),
+          'p_agency_type': _agencyType,
+          'p_contact_details': <String, dynamic>{
+            'email': _email.text.trim(),
+            'phone': _phone.text.trim(),
+            'whatsapp': _whatsapp.text.trim(),
+            'country': _country.text.trim(),
+          },
+          'p_deposit_reference': _depositReference.text.trim(),
+          'p_deposit_receipt_path': _receiptPath,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agency application submitted for Owner review.')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _whatsapp.dispose();
+    _country.dispose();
+    _depositReference.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: _bg,
+    appBar: AppBar(title: const Text('Agency Application')),
+    body: _checkingEligibility
+        ? const Center(child: CircularProgressIndicator(color: _gold))
+        : !_adultVerified
+            ? ListView(padding: const EdgeInsets.all(18), children: [
+                const SizedBox(height: 60),
+                _portalCard(
+                  'ADULT VERIFICATION REQUIRED',
+                  'Agency applications include a USD 300 deposit and are available only to applicants with approved identity verification confirming age 18 or older. If you are under 18, do not submit identity documents, deposit receipts or payments.',
+                  Icons.lock_outline,
+                ),
+                if (_eligibilityError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_eligibilityError!, style: const TextStyle(color: Color(0xFFE47777))),
+                  ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _checkAdultVerification,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('CHECK ELIGIBILITY'),
+                ),
+              ])
+            : ListView(padding: const EdgeInsets.all(16), children: [
+      _portalCard('AGENCY DEPOSIT', 'Required deposit: USD 300. Upload the receipt for manual verification. This form does not charge a card or process a payment.', Icons.receipt_long),
+      const SizedBox(height: 12),
+      TextField(controller: _name, decoration: const InputDecoration(labelText: 'Proposed agency name')),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        value: _agencyType,
+        decoration: const InputDecoration(labelText: 'Agency type'),
+        items: const [
+          DropdownMenuItem(value: 'streamer', child: Text('Streamer Agency')),
+          DropdownMenuItem(value: 'topup', child: Text('Top-up Agency')),
+          DropdownMenuItem(value: 'both', child: Text('Both')),
+        ],
+        onChanged: (value) => setState(() => _agencyType = value ?? 'streamer'),
+      ),
+      const SizedBox(height: 8),
+      TextField(controller: _email, keyboardType: TextInputType.emailAddress,
+        decoration: const InputDecoration(labelText: 'Contact email')),
+      const SizedBox(height: 8),
+      TextField(controller: _phone, keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(labelText: 'Contact mobile number')),
+      const SizedBox(height: 8),
+      TextField(controller: _whatsapp, keyboardType: TextInputType.phone,
+        decoration: const InputDecoration(labelText: 'WhatsApp number')),
+      const SizedBox(height: 8),
+      TextField(controller: _country,
+        decoration: const InputDecoration(labelText: 'Agency country')),
+      const SizedBox(height: 8),
+      TextField(controller: _depositReference,
+        decoration: const InputDecoration(labelText: 'Deposit reference')),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: _uploading ? null : _pickReceipt,
+        icon: const Icon(Icons.image),
+        label: Text(_receipt == null ? 'SELECT DEPOSIT RECEIPT' : 'RECEIPT SELECTED'),
+      ),
+      if (_receipt != null)
+        Text(_receiptPath == null ? 'Selected: ${_receipt!.name}' : 'Receipt securely uploaded.',
+          style: const TextStyle(color: _teal, fontSize: 11)),
+      if (_receipt != null && _receiptPath == null)
+        FilledButton(
+          onPressed: _uploading ? null : _uploadReceipt,
+          child: Text(_uploading ? 'Uploading...' : 'UPLOAD RECEIPT SECURELY'),
+        ),
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(_error!, style: const TextStyle(color: Color(0xFFE47777))),
+        ),
+      const SizedBox(height: 12),
+      FilledButton.icon(
+        onPressed: _submitting || _uploading ? null : _submit,
+        icon: const Icon(Icons.send),
+        label: Text(_submitting ? 'Submitting...' : 'SUBMIT FOR OWNER REVIEW'),
+      ),
+    ]),
+  );
+}
+
 class AgencyPortalScreen extends StatefulWidget {
   const AgencyPortalScreen({super.key});
   @override
@@ -361,7 +868,8 @@ class AgencyPortalScreen extends StatefulWidget {
 class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
   bool loading = true;
   String? error;
-  List<Map<String, dynamic>> rows = [];
+  Map<String, dynamic> dashboard = {};
+  List<Map<String, dynamic>> applications = [];
 
   @override
   void initState() { super.initState(); _load(); }
@@ -369,49 +877,140 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
   Future<void> _load() async {
     setState(() { loading = true; error = null; });
     try {
-      final result = await Backend.fetchPortalRows('agency_applications');
+      final raw = await Backend.client.rpc('get_my_agency_dashboard');
+      final apps = await Backend.client.from('agency_applications')
+          .select('id,proposed_name,agency_type,application_status,deposit_status,deposit_amount,created_at,review_note')
+          .eq('applicant_id', Backend.currentUserId!)
+          .order('created_at', ascending: false);
       if (!mounted) return;
-      setState(() { rows = result; loading = false; });
+      setState(() {
+        dashboard = raw is Map ? Map<String, dynamic>.from(raw) : {};
+        applications = (apps as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        loading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() { error = e.toString(); loading = false; });
     }
   }
 
+  Future<void> _openAgencyApplication() async {
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const AgencyApplicationFormScreen()),
+    );
+    if (submitted == true) await _load();
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: _bg,
-    appBar: AppBar(title: const Text('Agency & Creator Portal')),
-    body: ListView(padding: const EdgeInsets.all(16), children: [
-      _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
-      const SizedBox(height: 14),
-      _portalCard('AGENCY APPLICATIONS', 'Application records below are loaded from the connected agency_applications table. Approval and official agency ID issuance remain Owner-authorized server operations.', Icons.assignment),
-      const SizedBox(height: 10),
-      FilledButton.icon(onPressed: () => _agencyApplicationInfo(context), icon: const Icon(Icons.add_business), label: const Text('START AGENCY APPLICATION')),
-      const SizedBox(height: 14),
-      if (loading) const Center(child: CircularProgressIndicator(color: _gold)),
-      if (error != null) Text('Agency records could not be loaded: $error', style: const TextStyle(color: Color(0xFFE47777))),
-      if (!loading && error == null && rows.isEmpty)
-        const Padding(padding: EdgeInsets.all(20), child: Text('No agency application records returned.', textAlign: TextAlign.center, style: TextStyle(color: _muted))),
-      for (final row in rows)
-        Card(color: _panel, child: ListTile(
-          leading: const Icon(Icons.business, color: _gold),
-          title: Text((row['agency_name'] ?? row['name'] ?? row['id'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
-          subtitle: Text(row.entries.take(4).map((e) => '${e.key}: ${e.value}').join(' • '), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _muted, fontSize: 10)),
-        )),
-      OutlinedButton.icon(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh), label: const Text('REFRESH')),
+  Widget build(BuildContext context) {
+    final agencies = (dashboard['agencies'] as List? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final members = (dashboard['members'] as List? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        title: const Text('Agency & Creator Portal'),
+        actions: [IconButton(onPressed: loading ? null : _load, icon: const Icon(Icons.refresh))],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator(color: _gold))
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              _portalHeader('OFFICIAL AGENCY CENTER', 'STREAMER • TOP-UP • COMBINED AGENCY', Icons.business_center),
+              const SizedBox(height: 12),
+              _portalCard('YOUR AGENCY WORKSPACE', 'This portal shows agencies approved for your account, linked streamer roster, registration status and official contact details assigned by the Owner.', Icons.business),
+              if (error != null)
+                Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text('Dashboard load failed: $error', style: const TextStyle(color: Color(0xFFE47777)))),
+              if (agencies.isNotEmpty) ...[
+                Row(children: [
+                  Expanded(child: _agencyMetric('AGENCIES', agencies.length.toString(), Icons.business)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _agencyMetric('STREAMERS', members.length.toString(), Icons.people_alt)),
+                ]),
+                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                for (final agency in agencies) ...[
+                  _portalCard(
+                    (agency['agency_name'] ?? 'Agency').toString(),
+                    'Owner ZOONL ID: ' + (agency['agency_zoonl_id'] ?? 'Not linked').toString() +
+                    ' • Agency Code: ' + (agency['agency_code'] ?? 'Pending').toString() +
+                    '\nType: ' + (agency['agency_type'] ?? 'streamer').toString().toUpperCase() +
+                    ' • Status: ' + (agency['agency_status'] ?? 'pending').toString() +
+                    '\nApproved streamers: ' + (agency['member_count'] ?? 0).toString(),
+                    Icons.verified,
+                  ),
+                  if ((agency['official_topup_number'] ?? '').toString().isNotEmpty)
+                    _portalCard('OFFICIAL TOP-UP CONTACT',
+                      'Number: ' + agency['official_topup_number'].toString() +
+                      '\nWhatsApp: ' + (agency['official_whatsapp_number'] ?? 'Not configured').toString(),
+                      Icons.phone_android),
+                  if (agency['contact_details'] is Map)
+                    _portalCard('REGISTERED AGENCY CONTACT',
+                      'Country: ' + (((agency['contact_details'] as Map?)?['country'] ?? agency['country'] ?? 'Not supplied').toString()) +
+                      '\nEmail: ' + (((agency['contact_details'] as Map?)?['email'] ?? 'Not supplied').toString()) +
+                      '\nPhone: ' + (((agency['contact_details'] as Map?)?['phone'] ?? 'Not supplied').toString()) +
+                      '\nWhatsApp: ' + (((agency['contact_details'] as Map?)?['whatsapp'] ?? 'Not supplied').toString()),
+                      Icons.contact_phone),
+                ],
+                const SizedBox(height: 8),
+                const Text('REGISTERED STREAMERS', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+                if (members.isEmpty)
+                  const Padding(padding: EdgeInsets.all(12), child: Text('No streamer registrations are linked to this agency yet.', style: TextStyle(color: _muted)))
+                else
+                  for (final member in members)
+                    Card(color: _panel, child: ListTile(
+                      leading: const Icon(Icons.person, color: _gold),
+                      title: Text((member['display_name'] ?? 'ZOONL Streamer').toString(), style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(
+                        'ZOONL ID: ' + (member['zoonl_id'] ?? 'Not assigned').toString() +
+                        ' • ' + (member['member_role'] ?? 'streamer').toString() +
+                        '\nStatus: ' + (member['member_status'] ?? 'pending').toString(),
+                        style: const TextStyle(color: _muted, fontSize: 10),
+                      ),
+                    )),
+              ] else
+                _portalCard('NO APPROVED AGENCY LINKED', 'Your application status is shown below. The full Agency Portal activates after Owner approval and official agency code issuance.', Icons.info_outline),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _openAgencyApplication,
+                icon: const Icon(Icons.add_business),
+                label: const Text('START AGENCY APPLICATION'),
+              ),
+              const SizedBox(height: 12),
+              const Text('YOUR AGENCY APPLICATION HISTORY', style: TextStyle(color: _gold, fontWeight: FontWeight.w800)),
+              if (applications.isEmpty)
+                const Padding(padding: EdgeInsets.all(12), child: Text('No agency applications submitted.', style: TextStyle(color: _muted)))
+              else
+                for (final app in applications)
+                  Card(color: _panel, child: ListTile(
+                    leading: const Icon(Icons.assignment_outlined, color: _gold),
+                    title: Text((app['proposed_name'] ?? 'Agency application').toString(), style: const TextStyle(color: Colors.white)),
+                    subtitle: Text(
+                      'Type: ' + (app['agency_type'] ?? '').toString() +
+                      ' • Deposit: USD ' + (app['deposit_amount'] ?? 300).toString() +
+                      '\nApplication: ' + (app['application_status'] ?? 'pending').toString() +
+                      ' • Deposit: ' + (app['deposit_status'] ?? 'pending').toString(),
+                      style: const TextStyle(color: _muted, fontSize: 10),
+                    ),
+                  )),
+            ]),
+    );
+  }
+
+  Widget _agencyMetric(String label, String value, IconData icon) => Container(
+    padding: const EdgeInsets.all(11),
+    decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFF354653))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: _gold, size: 20),
+      const SizedBox(height: 6),
+      Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+      Text(label, style: const TextStyle(color: _muted, fontSize: 9)),
     ]),
   );
-
-  void _agencyApplicationInfo(BuildContext context) {
-    showDialog<void>(context: context, builder: (ctx) => AlertDialog(
-      backgroundColor: _panel,
-      title: const Text('Agency application', style: TextStyle(color: _gold)),
-      content: const Text('Choose Streamer Agency, Top-up Agency or Both in the application flow. The secure submission endpoint and official ID issuance must be enabled in Supabase before this app can submit or approve an application. No local or sample application is created.', style: TextStyle(color: _muted, height: 1.5)),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
-    ));
-  }
 }
+
 
 class _PortalSection {
   final String title;

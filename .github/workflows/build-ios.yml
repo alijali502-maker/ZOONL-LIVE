@@ -1,0 +1,103 @@
+name: Build ZOONL LIVE iOS Beauty
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feat/progressive-levels-3d-chat
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zoonl-live-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    name: Build iOS release (unsigned)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate iOS runner scaffold
+        run: |
+          flutter create --platforms=ios --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-ios
+          cp -R /tmp/zoonl-live-ios/ios "$GITHUB_WORKSPACE/ios"
+
+      - name: Install ZOONL native iOS outgoing-video Beauty processor
+        run: |
+          cp native/ios/ZOONLBeautyProcessor.h ios/Runner/
+          cp native/ios/ZOONLBeautyProcessor.m ios/Runner/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("ios/Runner/Runner-Bridging-Header.h")
+          s = p.read_text()
+          include = '#import "ZOONLBeautyProcessor.h"'
+          if include not in s:
+              s += '\n' + include + '\n'
+          p.write_text(s)
+
+          app = Path("ios/Runner/AppDelegate.swift")
+          s = app.read_text()
+          marker = "GeneratedPluginRegistrant.register(with: self)"
+          registration = """GeneratedPluginRegistrant.register(with: self)
+                  if let registrar = self.registrar(forPlugin: "ZOONLBeautyProcessorPlugin") {
+                    ZOONLBeautyProcessorPlugin.register(with: registrar)
+                  }"""
+          if marker in s:
+              s = s.replace(marker, registration, 1)
+          else:
+              launch_return = "return super.application("
+              if launch_return not in s:
+                  raise SystemExit("AppDelegate launch hook not found. Contents:\\n" + s)
+              plugin_registration = """if let registrar = self.registrar(forPlugin: "ZOONLBeautyProcessorPlugin") {
+                    ZOONLBeautyProcessorPlugin.register(with: registrar)
+                  }
+                  """
+              s = s.replace(launch_return, plugin_registration + launch_return, 1)
+          app.write_text(s)
+
+          import plistlib
+          plist = Path("ios/Runner/Info.plist")
+          data = plistlib.loads(plist.read_bytes())
+          data["NSCameraUsageDescription"] = "ZOONL LIVE uses the camera for live video and Beauty Studio."
+          data["NSMicrophoneUsageDescription"] = "ZOONL LIVE uses the microphone during live rooms."
+          plist.write_bytes(plistlib.dumps(data))
+          PY
+
+      - name: Download ZOONL brand logo
+        run: |
+          mkdir -p assets/branding
+          curl --fail --location --retry 3 --retry-all-errors \
+            "https://ewzdhminqdldilydrpmk.supabase.co/storage/v1/object/public/avatars/ZOONL%20Streaming%20Logo_20261122_110907_0001.png" \
+            --output assets/branding/zoonl_logo.png
+          test -s assets/branding/zoonl_logo.png
+
+      - name: Resolve Flutter packages
+        run: flutter pub get
+
+      - name: Build iOS release without signing
+        run: flutter build ios --release --no-codesign -t lib/app_entry.dart
+
+      - name: Package iOS app for validation
+        run: |
+          cd build/ios/iphoneos
+          ditto -c -k --sequesterRsrc --keepParent Runner.app zoonl-live-ios-unsigned.zip
+          shasum -a 256 zoonl-live-ios-unsigned.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zoonl-live-ios-unsigned
+          path: build/ios/iphoneos/zoonl-live-ios-unsigned.zip
+          if-no-files-found: error
+          retention-days: 7

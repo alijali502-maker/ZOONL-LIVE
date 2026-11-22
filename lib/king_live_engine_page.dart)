@@ -753,33 +753,23 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
   Future<void> _refreshMe() async {
     final uid = _uid;
     if (uid == null) return;
-
     final w = await _sb.from('wallets').select('coins').eq('user_id', uid).maybeSingle();
     final newCoins = (w?['coins'] as num?)?.toInt() ?? 0;
-
     var xp = 0;
     try {
-      final sends = await _sb
-          .from('gift_sends')
-          .select('total_coins')
-          .eq('sender_id', uid)
-          .limit(5000);
-      for (final r in List<Map<String, dynamic>>.from(sends)) {
-        xp += (r['total_coins'] as num?)?.toInt() ?? 0;
-      }
+      final value = await _sb.rpc('zoonl_my_lifetime_gift_exp');
+      if (value is num) xp = value.toInt();
     } catch (_) {}
-
     var lv = _levelFromXp(xp);
     try {
-      final r = await _sb.rpc('zoonl_my_level');
-      if (r is num) lv = r.toInt();
+      final value = await _sb.rpc('zoonl_my_level');
+      if (value is num) lv = value.toInt();
     } catch (_) {}
-
     if (!mounted) return;
     setState(() {
       coins = newCoins;
       progressCoins = xp;
-      myLevel = lv < 1 ? 1 : lv;
+      myLevel = lv.clamp(1, 100).toInt();
     });
   }
 
@@ -877,49 +867,54 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
         .subscribe();
   }
 
+  String _rankTitle(int level) {
+    if (level >= 100) return 'SOVEREIGN OWNER';
+    const names = ['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
+    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
+    return names[tier];
+  }
+
+  Color _rankColor(int level) {
+    if (level >= 100) return const Color(0xFFFFD98B);
+    const palette = [
+      Color(0xFF90A4AE), Color(0xFF36C9F0), Color(0xFFB69AFF),
+      Color(0xFFFFB86B), Color(0xFFFF8FC4), Color(0xFF70F2E8),
+      Color(0xFFFF8B83), Color(0xFFFFD76A), Color(0xFFFF9EEB),
+      Color(0xFFFFE5A0),
+    ];
+    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
+    final base = HSVColor.fromColor(palette[tier]);
+    return base.withHue((base.hue + (level % 10) * 3.2) % 360).toColor();
+  }
+
   Future<_Person> _person(String uid) async {
     final cached = _people[uid];
     if (cached != null) return cached;
-
     var name = uid.length >= 4 ? 'User ${uid.substring(0, 4)}' : 'User';
     var zid = '';
     var level = 1;
-    var ribbon = chatRibbonPalette.first;
-
     try {
-      final r = await _sb
-          .from('user_public_profiles')
-          .select('username, zoonl_id')
-          .eq('user_id', uid)
-          .maybeSingle();
+      final r = await _sb.from('user_public_profiles')
+          .select('username, zoonl_id').eq('user_id', uid).maybeSingle();
       if (r != null) {
         final n = (r['username'] ?? '').toString();
         if (n.isNotEmpty) name = n;
         zid = (r['zoonl_id'] ?? '').toString();
       }
     } catch (_) {}
-
     try {
-      final r = await _sb.from('profiles').select('user_level').eq('id', uid).maybeSingle();
-      level = (r?['user_level'] as num?)?.toInt() ?? 1;
+      final value = await _sb.rpc('zoonl_level_for_user', params: {'p_user_id': uid});
+      if (value is num) level = value.toInt();
     } catch (_) {}
-
+    var ribbon = _rankColor(level);
     try {
-      final r = await _sb
-          .from('zoonl_live_active_styles')
-          .select('active_chat_bubble_code')
-          .eq('user_id', uid)
-          .maybeSingle();
+      final r = await _sb.from('zoonl_live_active_styles')
+          .select('active_chat_bubble_code').eq('user_id', uid).maybeSingle();
       final c = _cosmeticByCode(r?['active_chat_bubble_code']?.toString());
       if (c != null) ribbon = c.colors.first;
     } catch (_) {}
-
-    final p = _Person(
-      name: name,
-      zid: zid.isEmpty ? 'ID: -' : 'ID: $zid',
-      level: level,
-      ribbon: ribbon,
-    );
+    final p = _Person(name: name, zid: zid.isEmpty ? 'ID: -' : 'ID: $zid',
+      level: level, ribbon: ribbon);
     _people[uid] = p;
     return p;
   }
@@ -2155,17 +2150,45 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
               itemCount: chatList.length,
               itemBuilder: (ctx, i) {
                 final m = chatList[chatList.length - 1 - i];
+                final rank = _rankColor(m.level);
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  margin: const EdgeInsets.only(bottom: 5, left: 2, right: 3),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [m.ribbonColor.withOpacity(0.85), Colors.black54]),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(m.level <= 5 ? 7 : m.level <= 10 ? 10 : m.level <= 20 ? 14 : m.level <= 50 ? 9 : 16),
+                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      colors: [rank.withOpacity(.95), m.ribbonColor.withOpacity(.78), const Color(0xFF10121C)]),
+                    border: Border.all(color: rank.withOpacity(.85), width: 1),
+                    boxShadow: [BoxShadow(color: rank.withOpacity(.30), blurRadius: 11, offset: const Offset(0, 3)),
+                      const BoxShadow(color: Colors.black54, blurRadius: 5, offset: Offset(1, 3))],
                   ),
-                  child: Text(
-                    'Lv.${m.level} ${m.sender} (${m.userId}): ${m.text}',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
+                  child: Stack(children: [
+                    Positioned(right: 0, top: 0, bottom: 0, width: 35,
+                      child: IgnorePointer(child: DecoratedBox(decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [Colors.white.withOpacity(.16), Colors.transparent]))))),
+                    Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Transform.rotate(angle: -.08, child: Container(
+                          width: 27, height: 29, alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+                              colors: [Colors.white.withOpacity(.85), rank, rank.withOpacity(.45)]),
+                            borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), topRight: Radius.circular(8),
+                              bottomLeft: Radius.circular(11), bottomRight: Radius.circular(11)),
+                            border: Border.all(color: Colors.white.withOpacity(.85), width: .8),
+                            boxShadow: [BoxShadow(color: rank.withOpacity(.55), blurRadius: 8, offset: const Offset(1, 2))],
+                          ),
+                          child: Text('${m.level}', style: const TextStyle(color: Color(0xFF10121C), fontSize: 9, fontWeight: FontWeight.w900)),
+                        )),
+                        const SizedBox(width: 7),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('LV.${m.level} ${_rankTitle(m.level)}  •  ${m.sender}  •  ${m.userId}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w900)),
+                          const SizedBox(height: 2),
+                          Text(m.text, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+                        ])),
+                      ]),
+                    ),
+                  ]),
                 );
               },
             ),
@@ -2348,7 +2371,24 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
                   ),
             child: Row(
               children: [
-                _buildFramedAvatar(frames[activeFrameIdx], size: 46, muted: false),
+                Stack(clipBehavior: Clip.none, children: [
+                  _buildFramedAvatar(frames[activeFrameIdx], size: 46, muted: false),
+                  Positioned(right: -5, bottom: -7, child: Transform.rotate(
+                    angle: -.08,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+                          colors: [_rankColor(myLevel).withOpacity(.95), const Color(0xFF111521), _rankColor(myLevel)]),
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(color: Colors.white.withOpacity(.9), width: .8),
+                        boxShadow: [BoxShadow(color: _rankColor(myLevel).withOpacity(.7), blurRadius: 9, offset: const Offset(1, 2)),
+                          const BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(1, 3))],
+                      ),
+                      child: Text('LV.$myLevel', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
+                    ),
+                  )),
+                ]),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

@@ -1,6 +1,4 @@
 
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -77,7 +75,7 @@ class ZoonlAuthGate extends StatelessWidget {
                         Text(
                           profileSnapshot.hasError
                               ? 'Profile setup failed: ${profileSnapshot.error}'
-                              : 'Profile record नहीं मिली। कृपया दोबारा Login करें।',
+                              : 'Profile record was not found. Please log in again.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -93,7 +91,6 @@ class ZoonlAuthGate extends StatelessWidget {
             }
 
             final profile = profileSnapshot.data!;
-
             // Owner status is checked asynchronously by the trusted
             // Supabase function. Never grant Owner from a client-editable ID.
             return FutureBuilder<bool>(
@@ -110,7 +107,7 @@ class ZoonlAuthGate extends StatelessWidget {
                 // Owner's canonical ZOONL ID is 10001, but the Owner role
                 // itself comes only from the trusted Supabase RPC.
                 final String profileUserId =
-                    (profile['username'] ?? '').toString().trim();
+                    (profile['zoonl_id'] ?? '').toString().trim();
                 final String userId = isOwner ? '10001' : profileUserId;
 
                 if (userId.isEmpty) {
@@ -150,7 +147,7 @@ class ZoonlAuthGate extends StatelessWidget {
                       'isOwner': isOwner,
                       'trustedRole': isOwner ? 'OWNER' : 'USER',
                       'isVerifiedStreamer': profile['is_verified'] == true,
-                      'level': profile['user_level'] ?? 1,
+                      'level': profile['server_level'] ?? profile['user_level'] ?? 1,
                       'coins': (home.wallet['coins'] as num?)?.toInt() ?? 0,
                       'diamonds': (home.wallet['diamonds'] as num?)?.toInt() ?? 0,
                       'sentCoins': 0,
@@ -168,13 +165,30 @@ class ZoonlAuthGate extends StatelessWidget {
                       'isLive': false,
                       'offlineSince': null,
                       'avatarUrl': profile['avatar_url'],
+                      'profileBackgroundUrl': profile['profile_background_url'],
                       'country': profile['country'],
                       'language': profile['language'],
                       'bio': profile['bio'],
                     };
 
-                    zoonl.ZoonlStore.instance.setAppMode(zoonl.ZoonlAppMode.live);
-                    zoonl.ZoonlStore.instance.streamers
+                    final appStore = zoonl.ZoonlStore.instance;
+                    appStore.setAppMode(zoonl.ZoonlAppMode.live);
+                    appStore.memberships = home.memberships;
+                    appStore.walletTransactions = home.walletTransactions;
+                    appStore.agencyApplications = home.agencyApplications;
+                    appStore.giftCatalog = home.gifts;
+                    appStore.cosmeticsCatalog = home.cosmetics;
+                    appStore.primeTiers = home.primeTiers;
+                    appStore.userBaggage = home.baggage;
+                    appStore.userTrial = home.userTrial;
+                    appStore.backupStore
+                      ..clear()
+                      ..addAll(home.baggage.where((item) {
+                        final expiry = DateTime.tryParse(item['expires_at']?.toString() ?? '');
+                        return item['acquired_via'] == 'NEW_ID_TRIAL' &&
+                            expiry != null && expiry.isBefore(DateTime.now());
+                      }));
+                    appStore.streamers
                       ..clear()
                       ..addAll(home.rooms.map((room) => <String, dynamic>{
                         'roomId': room['id'],
@@ -205,6 +219,29 @@ class ZoonlAuthGate extends StatelessWidget {
   Future<_HomeData> _loadHomeData(String authUserId) async {
     Map<String, dynamic> wallet = <String, dynamic>{};
     List<Map<String, dynamic>> rooms = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> memberships = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> agencyApplications = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> gifts = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> cosmetics = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> primeTiers = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> baggage = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> walletTransactions = <Map<String, dynamic>>[];
+    Map<String, dynamic> userTrial = <String, dynamic>{};
+
+    try {
+      await Backend.client.rpc('expire_zoonl_user_trial');
+    } catch (_) {}
+
+    try {
+      final trial = await Backend.client
+          .from('zoonl_user_trials')
+          .select('started_at, expires_at, trial_status, svip_active')
+          .eq('user_id', authUserId)
+          .maybeSingle();
+      if (trial != null) userTrial = Map<String, dynamic>.from(trial);
+    } catch (_) {
+      userTrial = <String, dynamic>{};
+    }
 
     try {
       wallet = await Backend.client
@@ -229,7 +266,114 @@ class ZoonlAuthGate extends StatelessWidget {
       rooms = <Map<String, dynamic>>[];
     }
 
-    return _HomeData(wallet: wallet, rooms: rooms);
+    try {
+      final rows = await Backend.client
+          .from('user_prime_memberships')
+          .select('id, prime_tier_id, started_at, expires_at, is_active')
+          .eq('user_id', authUserId)
+          .eq('is_active', true)
+          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
+          .order('started_at', ascending: false);
+      memberships = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      memberships = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('agency_applications')
+          .select('id, proposed_name, contact_details, application_status, reviewed_at, created_at')
+          .eq('applicant_id', authUserId)
+          .order('created_at', ascending: false);
+      agencyApplications = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      agencyApplications = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('gifts')
+          .select('id, gift_name, image_url, animation_url, animation_3d_url, sound_url, preview_url, coin_price, diamond_value, category, gift_config')
+          .eq('is_active', true)
+          .order('coin_price', ascending: true);
+      gifts = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      gifts = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_cosmetics')
+          .select('id, zoonl_item_code, zoonl_item_name, item_type, media_url, sound_fx, color_theme_hex, duration_sec, min_level_req, coin_price, reward_points')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('is_active', true)
+          .order('sort_order', ascending: true);
+      cosmetics = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      cosmetics = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('prime_tiers')
+          .select('id, tier_name, benefits')
+          .eq('is_active', true)
+          .order('id', ascending: true);
+      primeTiers = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      primeTiers = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('wallet_transactions')
+          .select('id, transaction_type, currency, amount, description, created_at')
+          .eq('user_id', authUserId)
+          .order('created_at', ascending: false)
+          .limit(30);
+      walletTransactions = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      walletTransactions = <Map<String, dynamic>>[];
+    }
+
+    try {
+      final rows = await Backend.client
+          .from('zoonl_live_user_baggage')
+          .select('id, zoonl_item_code, item_type, is_equipped, acquired_via, expires_at, created_at')
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('user_id', authUserId)
+          .order('created_at', ascending: false);
+      baggage = (rows as List)
+          .map((row) => Map<String, dynamic>.from(row as Map))
+          .toList();
+    } catch (_) {
+      baggage = <Map<String, dynamic>>[];
+    }
+
+    return _HomeData(
+      wallet: wallet,
+      rooms: rooms,
+      memberships: memberships,
+      agencyApplications: agencyApplications,
+      gifts: gifts,
+      cosmetics: cosmetics,
+      primeTiers: primeTiers,
+      baggage: baggage,
+      walletTransactions: walletTransactions,
+      userTrial: userTrial,
+    );
   }
 
   Future<bool> _loadOwnerStatus() async {
@@ -244,25 +388,13 @@ class ZoonlAuthGate extends StatelessWidget {
   }
 
   static const String _profileColumns =
-      'id, username, display_name, avatar_url, country, '
+      'id, username, display_name, avatar_url, profile_background_url, country, '
       'language, bio, is_verified, user_level';
-
-  String _newZoonlId() {
-    // Numeric public ID only. This value never grants Owner/Admin access.
-    return (Random.secure().nextInt(90000000) + 10000000).toString();
-  }
 
   Future<Map<String, dynamic>?> _loadProfile(
     String authUserId,
   ) async {
     final client = Backend.client;
-
-    var trustedOwner = false;
-    try {
-      trustedOwner = await client.rpc('is_zoonl_owner') == true;
-    } catch (_) {
-      // Fail closed. A public ID never substitutes for the Owner RPC.
-    }
 
     Map<String, dynamic>? profile = await client
         .from('profiles')
@@ -270,92 +402,98 @@ class ZoonlAuthGate extends StatelessWidget {
         .eq('id', authUserId)
         .maybeSingle();
 
-    // A profile trigger may not have created the row. Try creating only
-    // this authenticated user's own profile, without changing DB policies.
     if (profile == null) {
-      if (trustedOwner) {
-        throw StateError('Owner profile row is missing.');
-      }
-      final String candidateId = _newZoonlId();
       final metadataName =
-          Backend.currentUser?.userMetadata?['display_name']?.toString() ??
-              '';
-
+          Backend.currentUser?.userMetadata?['display_name']?.toString() ?? '';
       try {
         profile = await client
             .from('profiles')
             .insert({
               'id': authUserId,
-              'username': candidateId,
               'display_name': metadataName,
             })
             .select(_profileColumns)
             .maybeSingle();
       } on PostgrestException {
-        // If an Auth trigger created the row at the same time, read it again.
+        // An auth trigger may have inserted the row concurrently.
         profile = await client
             .from('profiles')
             .select(_profileColumns)
             .eq('id', authUserId)
             .maybeSingle();
-
         if (profile == null) rethrow;
       }
     }
 
     if (profile == null) {
+      throw StateError('Profile row create/read failed. Check profiles RLS.');
+    }
+
+    // The numeric public ZOONL ID belongs to user_public_profiles. Never
+    // mint a random ID into profiles.username or use it as authorization.
+    final publicProfile = await client
+        .from('user_public_profiles')
+        .select('zoonl_id')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+
+    final zoonlId = publicProfile?['zoonl_id']?.toString().trim() ?? '';
+    int serverLevel = (profile['user_level'] as num?)?.toInt() ?? 1;
+    try {
+      final dynamic resolvedLevel = await client.rpc('zoonl_my_level');
+      if (resolvedLevel is num) serverLevel = resolvedLevel.toInt();
+    } catch (_) {
+      // Keep the stored profile level if the trusted level RPC is unavailable.
+    }
+    if (zoonlId.isEmpty) {
       throw StateError(
-        'Profile row create/read failed. Check the profiles table policy.',
+        'ZOONL ID is missing from user_public_profiles for this account.',
       );
     }
 
-    // Keep the Owner's canonical public ID (10001) unchanged.
-    if (trustedOwner) return profile;
-
-    final existingId = profile['username']?.toString().trim() ?? '';
-    if (existingId.isNotEmpty) return profile;
-
-    // Existing accounts with an empty username receive a numeric ZOONL ID.
-    // A unique-constraint collision is retried with another candidate.
-    for (var attempt = 0; attempt < 8; attempt++) {
-      final candidateId = _newZoonlId();
-
-      try {
-        final updated = await client
-            .from('profiles')
-            .update({'username': candidateId})
-            .eq('id', authUserId)
-            .select(_profileColumns)
-            .maybeSingle();
-
-        if (updated != null &&
-            (updated['username']?.toString().trim().isNotEmpty ?? false)) {
-          return updated;
-        }
-
-        throw StateError(
-          'ZOONL ID update returned no profile row. Check profile update policy.',
-        );
-      } on PostgrestException catch (error) {
-        if (error.code == '23505') continue;
-        rethrow;
-      }
-    }
-
-    throw StateError(
-      'Unique ZOONL ID could not be assigned after several attempts.',
-    );
+    return <String, dynamic>{
+      ...profile,
+      'zoonl_id': zoonlId,
+      'server_level': serverLevel,
+    };
   }
 }
 
 class _HomeData {
   final Map<String, dynamic> wallet;
   final List<Map<String, dynamic>> rooms;
+  final List<Map<String, dynamic>> memberships;
+  final List<Map<String, dynamic>> agencyApplications;
+  final List<Map<String, dynamic>> gifts;
+  final List<Map<String, dynamic>> cosmetics;
+  final List<Map<String, dynamic>> primeTiers;
+  final List<Map<String, dynamic>> baggage;
+  final List<Map<String, dynamic>> walletTransactions;
+  final Map<String, dynamic> userTrial;
 
-  const _HomeData({required this.wallet, required this.rooms});
+  const _HomeData({
+    required this.wallet,
+    required this.rooms,
+    required this.memberships,
+    required this.agencyApplications,
+    required this.gifts,
+    required this.cosmetics,
+    required this.primeTiers,
+    required this.baggage,
+    required this.walletTransactions,
+    required this.userTrial,
+  });
 
   factory _HomeData.empty() => const _HomeData(
     wallet: <String, dynamic>{},
     rooms: <Map<String, dynamic>>[],
+    memberships: <Map<String, dynamic>>[],
+    agencyApplications: <Map<String, dynamic>>[],
+    gifts: <Map<String, dynamic>>[],
+    cosmetics: <Map<String, dynamic>>[],
+    primeTiers: <Map<String, dynamic>>[],
+    baggage: <Map<String, dynamic>>[],
+    walletTransactions: <Map<String, dynamic>>[],
+    userTrial: <String, dynamic>{},
   );
 }
