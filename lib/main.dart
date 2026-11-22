@@ -3596,35 +3596,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: <Widget>[
-        if (effectiveBgUrl.startsWith('http') || hasPremiumBg)
-          Container(
-            height: 136,
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: profileBgColors),
-              borderRadius: BorderRadius.circular(18),
-              image: effectiveBgUrl.startsWith('http')
-                  ? DecorationImage(
-                      image: NetworkImage(effectiveBgUrl),
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(Colors.black.withOpacity(.32), BlendMode.darken),
-                    )
-                  : null,
-              border: Border.all(color: const Color(0xFF8CEBFF).withOpacity(.7)),
-            ),
-            alignment: Alignment.bottomLeft,
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              hasPremiumBg
-                  ? 'PROFILE BACKGROUND • ${activeBgItem?['zoonl_item_name'] ?? 'PREMIUM'}'
-                  : 'PROFILE BACKGROUND',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
         _luxuryCard(
           title: 'MY ZOONL PROFILE',
+          backgroundImageUrl: effectiveBgUrl,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -3641,42 +3615,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           clipBehavior: Clip.none,
                           alignment: Alignment.center,
                           children: [
-                            Container(
-                              width: 82,
-                              height: 82,
-                              padding: EdgeInsets.all(hasEquippedFrame ? (isSovereignOwnerFrame ? 4 : 3) : 0),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: hasEquippedFrame ? LinearGradient(
-                                  colors: frameColors,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ) : null,
-                                border: hasEquippedFrame
-                                    ? Border.all(
-                                        color: isSovereignOwnerFrame ? const Color(0xFFFFF3C1) : const Color(0xFF8CEBFF),
-                                        width: isSovereignOwnerFrame ? 2 : 1,
-                                      )
-                                    : null,
-                                boxShadow: hasEquippedFrame ? [
-                                  BoxShadow(
-                                    color: isSovereignOwnerFrame
-                                        ? const Color(0x99E6BE63)
-                                        : const Color(0x668CEBFF),
-                                    blurRadius: isSovereignOwnerFrame ? 24 : 14,
-                                    spreadRadius: isSovereignOwnerFrame ? 2 : 0,
-                                  ),
-                                ] : const [],
-                              ),
-                              child: CircleAvatar(
-                                radius: 36,
-                                backgroundColor: const Color(0xFF293B49),
-                                backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
-                                child: avatarUrl.startsWith('http')
-                                    ? null
-                                    : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
-                              ),
-                            ),
                             if (hasEquippedFrame && hasFrameImageMedia && frameMediaUrl.startsWith('http'))
                               Positioned.fill(
                                 child: IgnorePointer(
@@ -3687,6 +3625,42 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                                   ),
                                 ),
                               ),
+                            Container(
+                              width: hasEquippedFrame && hasFrameImageMedia ? 62 : 70,
+                              height: hasEquippedFrame && hasFrameImageMedia ? 62 : 70,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF293B49),
+                                gradient: hasEquippedFrame && !hasFrameImageMedia
+                                    ? LinearGradient(colors: frameColors, begin: Alignment.topLeft, end: Alignment.bottomRight)
+                                    : null,
+                                border: Border.all(
+                                  color: hasEquippedFrame
+                                      ? (isSovereignOwnerFrame ? const Color(0xFFFFF3C1) : const Color(0xFF8CEBFF))
+                                      : const Color(0xFF526779),
+                                  width: hasEquippedFrame ? 2 : 1,
+                                ),
+                                boxShadow: hasEquippedFrame ? [
+                                  BoxShadow(
+                                    color: isSovereignOwnerFrame
+                                        ? const Color(0x99E6BE63)
+                                        : const Color(0x668CEBFF),
+                                    blurRadius: isSovereignOwnerFrame ? 18 : 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ] : const [],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: avatarUrl.startsWith('http')
+                                  ? Image.network(
+                                      avatarUrl,
+                                      width: 70,
+                                      height: 70,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                                    )
+                                  : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                            ),
                             if (isSovereignOwnerFrame)
                               const Positioned(
                                 top: -2,
@@ -4013,13 +3987,26 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     required String title,
     required Widget child,
     Widget? trailing,
+    String? backgroundImageUrl,
   }) {
+    final hasBackgroundImage = backgroundImageUrl != null &&
+        backgroundImageUrl.startsWith('http');
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFF17232E),
         borderRadius: BorderRadius.circular(16),
+        image: hasBackgroundImage
+            ? DecorationImage(
+                image: NetworkImage(backgroundImageUrl),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  const Color(0xCC101923),
+                  BlendMode.darken,
+                ),
+              )
+            : null,
         border: Border.all(
           color: const Color(0xFF354653),
         ),
