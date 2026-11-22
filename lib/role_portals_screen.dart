@@ -32,6 +32,7 @@ class _RolePortalGateScreenState extends State<RolePortalGateScreen> {
     'manage_withdrawals': 'Withdrawal Review',
     'view_reports': 'Reports & Analytics',
     'manage_live_rooms': 'Live Room Moderation',
+    'moderate_live_chat': 'Mute / Unmute Live Chat Users',
     'manage_gifts': 'Gift Catalogue',
   };
 
@@ -120,6 +121,8 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   String? error;
   List<Map<String, dynamic>> records = const [];
   final TextEditingController search = TextEditingController();
+  final TextEditingController moderatorZoonlId = TextEditingController();
+  bool moderatorBusy = false;
 
   static const List<_PortalSection> sections = [
     _PortalSection('Overview', Icons.dashboard_outlined),
@@ -158,6 +161,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
   @override
   void dispose() {
     search.dispose();
+    moderatorZoonlId.dispose();
     super.dispose();
   }
 
@@ -293,9 +297,85 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
     if (changed == true) _loadRecords();
   }
 
+  Future<void> _setLiveChatModerator(bool allowed) async {
+    final zoonlId = moderatorZoonlId.text.trim();
+    if (zoonlId.isEmpty || moderatorBusy) return;
+    setState(() => moderatorBusy = true);
+    try {
+      await Backend.client.rpc('owner_set_live_chat_moderator', params: {
+        'p_target_zoonl_id': zoonlId,
+        'p_is_allowed': allowed,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(allowed
+            ? 'Live chat moderation granted to ZOONL ID $zoonlId.'
+            : 'Live chat moderation revoked from ZOONL ID $zoonlId.'),
+      ));
+      moderatorZoonlId.clear();
+      await _loadRecords();
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission update failed: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => moderatorBusy = false);
+    }
+  }
+
+  Widget _liveChatModeratorControls() => Card(
+    color: _panel,
+    margin: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: _gold.withOpacity(.35)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.volume_off, color: _gold, size: 20),
+          SizedBox(width: 8),
+          Text('LIVE CHAT MODERATOR ACCESS',
+            style: TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 12)),
+        ]),
+        const SizedBox(height: 6),
+        const Text('Enter the Admin user’s numeric ZOONL ID. This permission only allows room chat mute / unmute.',
+          style: TextStyle(color: _muted, fontSize: 11)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: moderatorZoonlId,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Admin ZOONL ID',
+            prefixIcon: Icon(Icons.badge_outlined),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          FilledButton.icon(
+            onPressed: moderatorBusy ? null : () => _setLiveChatModerator(true),
+            icon: const Icon(Icons.verified_user),
+            label: const Text('GRANT MUTE ACCESS'),
+          ),
+          OutlinedButton.icon(
+            onPressed: moderatorBusy ? null : () => _setLiveChatModerator(false),
+            icon: const Icon(Icons.remove_moderator),
+            label: const Text('REVOKE'),
+          ),
+        ]),
+        if (moderatorBusy) const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: LinearProgressIndicator(color: _gold),
+        ),
+      ]),
+    ),
+  );
+
   Widget _records() {
     final filtered = records.where((row) => row.toString().toLowerCase().contains(search.text.toLowerCase())).toList();
     return Column(children: [
+      if (selected == 1) _liveChatModeratorControls(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: TextField(
