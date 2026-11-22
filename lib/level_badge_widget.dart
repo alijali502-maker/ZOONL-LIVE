@@ -55,21 +55,31 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     return const [Color(0xFFE4E9F2), Color(0xFF7C8DA5), Color(0xFF283447)];
   }
 
+  List<Color> _levelMetal(int level) {
+    final base = _metal(level);
+    final hueShift = (level * 3.7) % 360;
+    return base.map((color) {
+      final hsv = HSVColor.fromColor(color);
+      return hsv.withHue((hsv.hue + hueShift) % 360).toColor();
+    }).toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<int>(
       future: _levelFuture,
       builder: (context, snapshot) {
         final level = snapshot.data ?? 1;
-        final colors = _metal(level);
+        final colors = _levelMetal(level);
+        final pulse = .68 + ((_shine.value * 2 - 1).abs() * .32);
         return GestureDetector(
           onTap: widget.onTap,
           child: AnimatedBuilder(
             animation: _shine,
             builder: (context, child) => Container(
-              height: 24,
-              constraints: const BoxConstraints(minWidth: 72, maxWidth: 92),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              height: 27,
+              constraints: const BoxConstraints(minWidth: 78, maxWidth: 100),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -77,9 +87,10 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
                   colors: colors,
                 ),
                 borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0xFFFFF4C5), width: .8),
+                border: Border.all(color: const Color(0xFFFFF4C5), width: 1),
                 boxShadow: [
-                  BoxShadow(color: colors.first.withOpacity(.48), blurRadius: 9, spreadRadius: .3),
+                  BoxShadow(color: colors.first.withOpacity(pulse * .78), blurRadius: 13 + pulse * 5, spreadRadius: .7),
+                  BoxShadow(color: colors[1].withOpacity(.32), blurRadius: 20, spreadRadius: 1),
                   const BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 2)),
                 ],
               ),
@@ -104,7 +115,8 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.shield, size: 13, color: Color(0xFF241707)),
+                      Icon(level >= 91 ? Icons.workspace_premium : level >= 51 ? Icons.military_tech : Icons.shield,
+                        size: 14, color: const Color(0xFF241707)),
                       const SizedBox(width: 4),
                       Text(
                         level >= 100 ? 'OWNER 100' : 'LEVEL ${level.toString().padLeft(2, '0')}',
