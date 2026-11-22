@@ -325,6 +325,7 @@ class _LiveScreenState extends State<LiveScreen> {
   final Map<String, String> _chatAvatars = {};
   final Map<String, String> _chatTiers = {};
   final Map<String, String> _chatColorHex = {};
+  final Map<String, String> _chatFrameMedia = {};
   bool _canModerateChat = false;
 
   String? get _myId => _supabase.auth.currentUser?.id;
@@ -1668,6 +1669,7 @@ class _LiveScreenState extends State<LiveScreen> {
         'badge': _chatBadges[senderId] ?? 'NONE',
         'tier': _chatTiers[senderId] ?? 'NONE',
         'chatColor': _chatColorHex[senderId] ?? '',
+        'frameMedia': _chatFrameMedia[senderId] ?? '',
         'level': '${_chatLevels[senderId] ?? 1}',
         'avatar': _chatAvatars[senderId] ?? '',
       });
@@ -1774,6 +1776,7 @@ class _LiveScreenState extends State<LiveScreen> {
           ? Map<String, dynamic>.from(styleRows.first as Map) : <String, dynamic>{};
       final tier = (style['tier_code'] ?? 'NONE').toString();
       final chatColor = (style['chat_color_hex'] ?? '').toString();
+      final frameMedia = (style['frame_media_url'] ?? '').toString();
       final level = ((results[2] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
       final publicProfile = results[3] is Map ? results[3] as Map<String, dynamic> : null;
       final privateProfile = results[4] is Map ? results[4] as Map<String, dynamic> : null;
@@ -1786,6 +1789,7 @@ class _LiveScreenState extends State<LiveScreen> {
         _chatBadges[senderId] = badge;
         _chatTiers[senderId] = tier;
         _chatColorHex[senderId] = chatColor;
+        _chatFrameMedia[senderId] = frameMedia;
         _chatLevels[senderId] = level;
         if (username.isNotEmpty) _chatNames[senderId] = username;
         if (avatar.startsWith('http')) _chatAvatars[senderId] = avatar;
@@ -1794,6 +1798,7 @@ class _LiveScreenState extends State<LiveScreen> {
             item['badge'] = badge;
             item['tier'] = tier;
             item['chatColor'] = chatColor;
+            item['frameMedia'] = frameMedia;
             item['level'] = '$level';
             if (username.isNotEmpty) item['name'] = username;
             if (avatar.startsWith('http')) item['avatar'] = avatar;
@@ -1831,6 +1836,12 @@ class _LiveScreenState extends State<LiveScreen> {
     final name = item['name'] ?? 'User';
     final initial = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
     final avatar = item['avatar'] ?? '';
+    final frameMedia = item['frameMedia'] ?? '';
+    final framePath = frameMedia.toLowerCase().split('?').first;
+    final showFrameMedia = frameMedia.startsWith('http') &&
+        (framePath.endsWith('.png') || framePath.endsWith('.jpg') ||
+         framePath.endsWith('.jpeg') || framePath.endsWith('.webp') ||
+         framePath.endsWith('.gif'));
     return Container(
       padding: const EdgeInsets.fromLTRB(5, 3, 8, 4),
       decoration: BoxDecoration(
@@ -1846,18 +1857,33 @@ class _LiveScreenState extends State<LiveScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 23, height: 23,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [colors[0], colors[1], colors[2]]),
-              border: Border.all(color: colors[0].withOpacity(.95), width: 1),
-              boxShadow: [BoxShadow(color: colors[0].withOpacity(.45), blurRadius: 7)],
+          SizedBox(
+            width: 30, height: 30,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 23, height: 23,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: [colors[0], colors[1], colors[2]]),
+                    border: Border.all(color: colors[0].withOpacity(.95), width: 1),
+                    boxShadow: [BoxShadow(color: colors[0].withOpacity(.45), blurRadius: 7)],
+                  ),
+                  child: avatar.startsWith('http')
+                      ? ClipOval(child: Image.network(avatar, width: 23, height: 23, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)))))
+                      : Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+                ),
+                if (showFrameMedia)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Image.network(frameMedia, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                    ),
+                  ),
+              ],
             ),
-            child: avatar.startsWith('http')
-                ? ClipOval(child: Image.network(avatar, width: 23, height: 23, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)))))
-                : Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
           ),
           const SizedBox(width: 5),
           Expanded(
