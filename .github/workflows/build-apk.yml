@@ -119,8 +119,8 @@ jobs:
                       value = center * (1.0 - smooth) + (sum / (double) count) * smooth;
                     }
                     value += lift;
-                    value += Math.max(0.0, value - 112.0) * light * 0.055;
-                    if ("Cinema".equals(look)) value = 128.0 + (value - 128.0) * 1.07;
+                    value += Math.max(0.0, value - 112.0) * light * 0.075;
+                    value = 128.0 + (value - 128.0) * contrast;
                     dy.put(row * ds + col, (byte) Math.max(0, Math.min(255, (int) Math.round(value))));
                   }
                 }
@@ -129,12 +129,27 @@ jobs:
                 ByteBuffer du = dst.getDataU(), dv = dst.getDataV();
                 int us = src.getStrideU(), vs = src.getStrideV();
                 int dus = dst.getStrideU(), dvs = dst.getStrideV();
-                double saturation = "Vivid".equals(look) ? 1.12 : 1.0;
+                double amount = Math.max(0.0, Math.min(1.0, intensity));
+                double saturation = 1.0;
+                double contrast = 1.0;
+                double toneWarmth = warm;
+                if ("Vivid".equals(look)) { saturation = 1.0 + 0.28 * amount; contrast = 1.0 + 0.08 * amount; }
+                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.16 * amount; contrast = 1.0 + 0.16 * amount; }
+                else if ("Warm".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth += 0.30 * amount; }
+                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth += 0.55 * amount; }
+                else if ("Cool".equals(look)) { toneWarmth -= 0.32 * amount; }
+                else if ("Ice".equals(look)) { saturation = 1.0 - 0.06 * amount; toneWarmth -= 0.55 * amount; }
+                else if ("Rose".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth += 0.18 * amount; }
+                else if ("Peach".equals(look)) { saturation = 1.0 + 0.07 * amount; toneWarmth += 0.38 * amount; }
+                else if ("Mint".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth -= 0.12 * amount; }
+                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.04 * amount; toneWarmth -= 0.20 * amount; }
+                else if ("Mono".equals(look)) { saturation = 1.0 - amount; }
+                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.30 * amount); }
                 for (int row = 0; row < ch; row++) {
                   for (int col = 0; col < cw; col++) {
                     int ui = row * us + col, vi = row * vs + col;
-                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - warm * 2.0;
-                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + warm * 3.0;
+                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - toneWarmth * 3.0;
+                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + toneWarmth * 4.0;
                     du.put(row * dus + col, (byte) Math.max(0, Math.min(255, (int) Math.round(u))));
                     dv.put(row * dvs + col, (byte) Math.max(0, Math.min(255, (int) Math.round(v))));
                   }
