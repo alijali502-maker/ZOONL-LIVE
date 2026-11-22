@@ -1527,6 +1527,12 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  void _hideMutedChatMessages(Map<String, dynamic> row) {
+    final mutedUserId = row['muted_user_id']?.toString() ?? '';
+    if (mutedUserId.isEmpty || !mounted) return;
+    setState(() => _messages.removeWhere((message) => message['sender_id'] == mutedUserId));
+  }
+
   // ---------- Realtime: chat + room end ----------
   void _subscribeRealtime(String roomId) {
     _channel = _supabase
@@ -1563,6 +1569,28 @@ class _LiveScreenState extends State<LiveScreen> {
             value: roomId,
           ),
           callback: (payload) => unawaited(_showRoomEntry(payload.newRecord)),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'live_room_chat_mutes',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => _hideMutedChatMessages(payload.newRecord),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'live_room_chat_mutes',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => _hideMutedChatMessages(payload.newRecord),
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
