@@ -322,6 +322,7 @@ class _LiveScreenState extends State<LiveScreen> {
   final Map<String, String> _chatBadges = {};
   final Map<String, int> _chatLevels = {};
   final Map<String, String> _chatNames = {};
+  final Map<String, String> _chatAvatars = {};
 
   String? get _myId => _supabase.auth.currentUser?.id;
 
@@ -1649,6 +1650,7 @@ class _LiveScreenState extends State<LiveScreen> {
         'message': (row['message'] ?? '').toString(),
         'badge': _chatBadges[senderId] ?? 'NONE',
         'level': '${_chatLevels[senderId] ?? 1}',
+        'avatar': _chatAvatars[senderId] ?? '',
       });
     });
   }
@@ -1671,24 +1673,32 @@ class _LiveScreenState extends State<LiveScreen> {
         )),
         safe(_supabase.from('user_public_profiles')
             .select('username').eq('user_id', senderId).maybeSingle()),
+        safe(_supabase.from('profiles')
+            .select('display_name,avatar_url').eq('id', senderId).maybeSingle()),
       ]);
       final rows = results[0] is List ? results[0] as List : const [];
       final badge = rows.isNotEmpty && rows.first is Map
           ? (rows.first['badge_code'] ?? 'NONE').toString()
           : 'NONE';
       final level = ((results[1] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
-      final profile = results[2] is Map ? results[2] as Map<String, dynamic> : null;
-      final username = profile?['username']?.toString().trim() ?? '';
+      final publicProfile = results[2] is Map ? results[2] as Map<String, dynamic> : null;
+      final privateProfile = results[3] is Map ? results[3] as Map<String, dynamic> : null;
+      final publicName = publicProfile?['username']?.toString().trim() ?? '';
+      final profileName = privateProfile?['display_name']?.toString().trim() ?? '';
+      final username = profileName.isNotEmpty ? profileName : publicName;
+      final avatar = privateProfile?['avatar_url']?.toString().trim() ?? '';
       if (!mounted) return;
       setState(() {
         _chatBadges[senderId] = badge;
         _chatLevels[senderId] = level;
         if (username.isNotEmpty) _chatNames[senderId] = username;
+        if (avatar.startsWith('http')) _chatAvatars[senderId] = avatar;
         for (final item in _messages) {
           if (item['sender_id'] == senderId) {
             item['badge'] = badge;
             item['level'] = '$level';
             if (username.isNotEmpty) item['name'] = username;
+            if (avatar.startsWith('http')) item['avatar'] = avatar;
           }
         }
       });
@@ -1713,9 +1723,7 @@ class _LiveScreenState extends State<LiveScreen> {
     final colors = _chatRibbonColors(level);
     final name = item['name'] ?? 'User';
     final initial = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
-    final vipColor = badge == 'SVIP'
-        ? const Color(0xFFFF657A)
-        : const Color(0xFFFFD77E);
+    final avatar = item['avatar'] ?? '';
     return Container(
       padding: const EdgeInsets.fromLTRB(5, 3, 8, 4),
       decoration: BoxDecoration(
@@ -1739,7 +1747,10 @@ class _LiveScreenState extends State<LiveScreen> {
               border: Border.all(color: colors[0].withOpacity(.95), width: 1),
               boxShadow: [BoxShadow(color: colors[0].withOpacity(.45), blurRadius: 7)],
             ),
-            child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+            child: avatar.startsWith('http')
+                ? ClipOval(child: Image.network(avatar, width: 23, height: 23, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)))))
+                : Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
           ),
           const SizedBox(width: 5),
           Expanded(
