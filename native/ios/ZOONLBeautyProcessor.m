@@ -41,9 +41,20 @@
   double brightness = [settings[@"brightness"] doubleValue] * intensity;
   double warmth = [settings[@"warmth"] doubleValue] * intensity;
   NSString *look = [settings[@"look"] isKindOfClass:NSString.class] ? settings[@"look"] : @"Natural";
-  int saturation = [look isEqualToString:@"Vivid"] ? 1120 : 1000;
-  int contrast = [look isEqualToString:@"Cinema"] ? 1070 : 1000;
-  if ([look isEqualToString:@"Mono"]) saturation = 0;
+  int saturation = 1000;
+  int contrast = 1000;
+  if ([look isEqualToString:@"Vivid"]) { saturation = 1000 + (int)lrint(280 * intensity); contrast = 1000 + (int)lrint(80 * intensity); }
+  else if ([look isEqualToString:@"Cinema"]) { saturation = 1000 - (int)lrint(160 * intensity); contrast = 1000 + (int)lrint(160 * intensity); }
+  else if ([look isEqualToString:@"Warm"]) { saturation = 1000 + (int)lrint(80 * intensity); warmth += 0.30 * intensity; }
+  else if ([look isEqualToString:@"Sunset"]) { saturation = 1000 + (int)lrint(160 * intensity); warmth += 0.55 * intensity; }
+  else if ([look isEqualToString:@"Cool"]) { warmth -= 0.32 * intensity; }
+  else if ([look isEqualToString:@"Ice"]) { saturation = 1000 - (int)lrint(60 * intensity); warmth -= 0.55 * intensity; }
+  else if ([look isEqualToString:@"Rose"]) { saturation = 1000 + (int)lrint(100 * intensity); warmth += 0.18 * intensity; }
+  else if ([look isEqualToString:@"Peach"]) { saturation = 1000 + (int)lrint(70 * intensity); warmth += 0.38 * intensity; }
+  else if ([look isEqualToString:@"Mint"]) { saturation = 1000 + (int)lrint(80 * intensity); warmth -= 0.12 * intensity; }
+  else if ([look isEqualToString:@"Lavender"]) { saturation = 1000 + (int)lrint(40 * intensity); warmth -= 0.20 * intensity; }
+  else if ([look isEqualToString:@"Mono"]) { saturation = 1000 - (int)lrint(1000 * intensity); }
+  else if ([look isEqualToString:@"Soft Glow"]) { glow += 0.30 * intensity; }
   atomic_store(&_smoothing, (int)lrint(fmax(0, fmin(1, smoothing)) * 180));
   atomic_store(&_glow, (int)lrint(fmax(0, fmin(1, glow)) * 1000));
   atomic_store(&_brightness, (int)lrint(fmax(-1, fmin(1, brightness)) * 22));
