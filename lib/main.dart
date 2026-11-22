@@ -1704,12 +1704,14 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       final client = Backend.client;
       final owner = await Backend.isZoonlOwner();
       final remoteLevel = await client.rpc('zoonl_my_level');
-      final catalog = await client
+      var catalogQuery = client
           .from('zoonl_live_cosmetics')
           .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
-          .eq('project_name', 'ZOONL LIVE')
-          .eq('is_active', true)
-          .order('sort_order');
+          .eq('project_name', 'ZOONL LIVE');
+      if (!owner) {
+        catalogQuery = catalogQuery.eq('is_active', true);
+      }
+      final catalog = await catalogQuery.order('sort_order');
       final tiers = await client
           .from('prime_tiers')
           .select('id,tier_name,benefits,is_active,coin_price,duration_days')
@@ -1809,6 +1811,21 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       _showMessage('Price update failed: $error');
     } finally {
       controller.dispose();
+    }
+  }
+
+  Future<void> _publishCosmetic(String itemCode, String itemName) async {
+    if (!_isStoreOwner) return;
+    try {
+      await Backend.client
+          .from('zoonl_live_cosmetics')
+          .update({'is_active': true})
+          .eq('project_name', 'ZOONL LIVE')
+          .eq('zoonl_item_code', itemCode);
+      await _loadVipStoreData();
+      _showMessage('$itemName is now published in the public Store.');
+    } catch (error) {
+      _showMessage('Publish failed: $error');
     }
   }
 
@@ -2754,10 +2771,17 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                     ),
                     title: Text(name),
                     subtitle: Text(
-                      '$type • ${price == 0 ? 'Reward / Owner item' : '$price coins'}',
+                      '${item['is_active'] == true ? 'PUBLIC STORE' : 'OWNER DRAFT'} • $type • ${price == 0 ? 'Free' : '$price coins'}',
                     ),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       if (_isStoreOwner) ...[
+                        if (item['is_active'] != true)
+                          IconButton(
+                            tooltip: 'Publish to Public Store',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.publish, color: Color(0xFF8CEBFF), size: 20),
+                            onPressed: code.isEmpty ? null : () => _publishCosmetic(code, name),
+                          ),
                         IconButton(
                           tooltip: 'Owner: upload / replace animation media',
                           visualDensity: VisualDensity.compact,
