@@ -96,14 +96,29 @@ jobs:
                 double light = Math.max(0.0, Math.min(1.0, glow));
                 final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 22.0;
                 final double warm = Math.max(-1.0, Math.min(1.0, warmth));
-                if (smooth < 0.001 && light < 0.001 && Math.abs(lift) < 0.1 && Math.abs(warm) < 0.001
-                    && !"Vivid".equals(look) && !"Cinema".equals(look)) return input;
 
                 VideoFrame.I420Buffer src = input.getBuffer().toI420();
                 if (src == null) return input;
                 final int width = src.getWidth(), height = src.getHeight();
                 final int cw = (width + 1) / 2, ch = (height + 1) / 2;
                 JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
+                double amount = Math.max(0.0, Math.min(1.0, intensity));
+                double saturation = 1.0;
+                double contrast = 1.0;
+                double toneWarmth = warm;
+                if ("Vivid".equals(look)) { saturation = 1.0 + 0.28 * amount; contrast = 1.0 + 0.08 * amount; }
+                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.16 * amount; contrast = 1.0 + 0.16 * amount; }
+                else if ("Warm".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth += 0.30 * amount; }
+                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth += 0.55 * amount; }
+                else if ("Cool".equals(look)) { toneWarmth -= 0.32 * amount; }
+                else if ("Ice".equals(look)) { saturation = 1.0 - 0.06 * amount; toneWarmth -= 0.55 * amount; }
+                else if ("Rose".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth += 0.18 * amount; }
+                else if ("Peach".equals(look)) { saturation = 1.0 + 0.07 * amount; toneWarmth += 0.38 * amount; }
+                else if ("Mint".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth -= 0.12 * amount; }
+                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.04 * amount; toneWarmth -= 0.20 * amount; }
+                else if ("Mono".equals(look)) { saturation = 1.0 - amount; }
+                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.30 * amount); }
+
                 ByteBuffer sy = src.getDataY(), dy = dst.getDataY();
                 int ss = src.getStrideY(), ds = dst.getStrideY();
                 for (int row = 0; row < height; row++) {
@@ -129,22 +144,6 @@ jobs:
                 ByteBuffer du = dst.getDataU(), dv = dst.getDataV();
                 int us = src.getStrideU(), vs = src.getStrideV();
                 int dus = dst.getStrideU(), dvs = dst.getStrideV();
-                double amount = Math.max(0.0, Math.min(1.0, intensity));
-                double saturation = 1.0;
-                double contrast = 1.0;
-                double toneWarmth = warm;
-                if ("Vivid".equals(look)) { saturation = 1.0 + 0.28 * amount; contrast = 1.0 + 0.08 * amount; }
-                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.16 * amount; contrast = 1.0 + 0.16 * amount; }
-                else if ("Warm".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth += 0.30 * amount; }
-                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth += 0.55 * amount; }
-                else if ("Cool".equals(look)) { toneWarmth -= 0.32 * amount; }
-                else if ("Ice".equals(look)) { saturation = 1.0 - 0.06 * amount; toneWarmth -= 0.55 * amount; }
-                else if ("Rose".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth += 0.18 * amount; }
-                else if ("Peach".equals(look)) { saturation = 1.0 + 0.07 * amount; toneWarmth += 0.38 * amount; }
-                else if ("Mint".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth -= 0.12 * amount; }
-                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.04 * amount; toneWarmth -= 0.20 * amount; }
-                else if ("Mono".equals(look)) { saturation = 1.0 - amount; }
-                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.30 * amount); }
                 for (int row = 0; row < ch; row++) {
                   for (int col = 0; col < cw; col++) {
                     int ui = row * us + col, vi = row * vs + col;
