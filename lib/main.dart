@@ -2596,6 +2596,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     }
   }
 
+  Future<void> _equipCosmetic(String itemCode, String itemName) async {
+    try {
+      await Backend.equipZoonlCosmetic(itemCode: itemCode);
+      await _refreshCosmeticsData();
+      _showMessage('$itemName equipped.');
+    } catch (error) {
+      _showMessage('Could not equip item: $error');
+    }
+  }
+
   Future<void> _toggleProfileCosmetic(String itemCode, String itemName) async {
     try {
       final equipped = await Backend.toggleZoonlProfileCosmetic(itemCode: itemCode);
