@@ -859,6 +859,96 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
     );
   }
 
+  Future<void> _openNotificationBell() async {
+    final userId = Backend.currentUserId;
+    if (userId == null) {
+      _showMessage('Please sign in to view notifications.');
+      return;
+    }
+    try {
+      final rows = await Backend.client
+          .from('user_notifications')
+          .select('id,title,body,notification_type,is_read,created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      if (!mounted) return;
+      final notifications = List<Map<String, dynamic>>.from(rows);
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: const Color(0xFF100B1D),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * .72,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(width: 42, height: 4,
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8))),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(18, 18, 18, 12),
+                  child: Row(children: [
+                    Icon(Icons.notifications_active, color: Color(0xFFFFD98B)),
+                    SizedBox(width: 10),
+                    Text('NOTIFICATIONS', style: TextStyle(color: Color(0xFFFFE7B0), fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                  ]),
+                ),
+                Expanded(
+                  child: notifications.isEmpty
+                    ? const Center(child: Text('No notifications yet.', style: TextStyle(color: Colors.white60)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
+                        itemCount: notifications.length,
+                        separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
+                        itemBuilder: (_, index) {
+                          final item = notifications[index];
+                          final read = item['is_read'] == true;
+                          return ListTile(
+                            leading: Icon(read ? Icons.notifications_none : Icons.notifications_active,
+                              color: read ? Colors.white38 : const Color(0xFFFFD98B)),
+                            title: Text(item['title']?.toString() ?? 'ZOONL LIVE',
+                              style: TextStyle(color: Colors.white, fontWeight: read ? FontWeight.w500 : FontWeight.w900)),
+                            subtitle: Text(item['body']?.toString() ?? '',
+                              style: const TextStyle(color: Colors.white70)),
+                            trailing: read ? null : const Icon(Icons.circle, size: 8, color: Color(0xFF63E6BE)),
+                          );
+                        },
+                      ),
+                ),
+                if (notifications.any((item) => item['is_read'] != true))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: SizedBox(width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          try {
+                            await Backend.client.from('user_notifications')
+                              .update({'is_read': true})
+                              .eq('user_id', userId).eq('is_read', false);
+                            if (sheetContext.mounted) Navigator.pop(sheetContext);
+                            _showMessage('Notifications marked as read.');
+                          } catch (error) {
+                            _showMessage('Could not update notifications: $error');
+                          }
+                        },
+                        child: const Text('MARK ALL AS READ'),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      _showMessage('Notifications unavailable: $error');
+    }
+  }
+
   Widget _buildTopSectionTabs() {
     const List<String> labels = <String>[
       'Short Video',
@@ -868,31 +958,51 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
       'VIP Hub',
     ];
 
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (BuildContext context, int index) {
-          final bool active = topTabIndex == index;
-          return ChoiceChip(
-            label: Text(labels[index]),
-            selected: active,
-            selectedColor: const Color(0xFF4BC2B0),
-            backgroundColor: const Color(0xFF17232E),
-            labelStyle: TextStyle(
-              color: active
-                  ? Colors.white
-                  : const Color(0xFFD6B46A),
-              fontWeight: FontWeight.bold,
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: labels.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (BuildContext context, int index) {
+                  final bool active = topTabIndex == index;
+                  return ChoiceChip(
+                    label: Text(labels[index]),
+                    selected: active,
+                    selectedColor: const Color(0xFF4BC2B0),
+                    backgroundColor: const Color(0xFF17232E),
+                    labelStyle: TextStyle(
+                      color: active ? Colors.white : const Color(0xFFD6B46A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (_) => setState(() => topTabIndex = index),
+                  );
+                },
+              ),
             ),
-            onSelected: (_) {
-              setState(() => topTabIndex = index);
-            },
-          );
-        },
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFF211735),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFD6B46A), width: 1),
+              boxShadow: const [BoxShadow(color: Color(0x445C3C91), blurRadius: 12)],
+            ),
+            child: IconButton(
+              tooltip: 'Notifications',
+              visualDensity: VisualDensity.compact,
+              onPressed: _openNotificationBell,
+              icon: const Icon(Icons.notifications_active_outlined,
+                color: Color(0xFFFFD98B), size: 21),
+            ),
+          ),
+        ],
       ),
     );
   }
