@@ -338,6 +338,31 @@ jobs:
           print("Internet, Camera, Microphone, audio permissions, and Supabase OAuth deep link configured.")
           PY
 
+      - name: Expose flutter_webrtc native classes to app processor
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          target = next((p for p in candidates if p.exists()), None)
+          if target is None:
+              raise SystemExit("Android app Gradle file was not generated.")
+          source = target.read_text()
+          coordinate = "io.github.webrtc-sdk:android:137.7151.04"
+          if coordinate in source:
+              print("WebRTC native dependency already exposed to app compile classpath.")
+              raise SystemExit(0)
+          match = re.search(r"dependencies\\s*\\{", source)
+          if not match:
+              raise SystemExit("Android app dependencies block was not found.")
+          line = (f'    implementation("{coordinate}")\\n' if target.suffix == ".kts"
+                  else f"    implementation '{coordinate}'\\n")
+          source = source[:match.end()] + "\\n" + line + source[match.end():]
+          target.write_text(source)
+          print(f"Added {coordinate} to {target} so native frame processor can compile.")
+          PY
+
       - name: Clean project
         run: flutter clean
 
