@@ -17,12 +17,12 @@ class ZoonlBeautyTrackProcessor extends TrackProcessor<VideoProcessorOptions> {
 
   static const MethodChannel _channel = MethodChannel('zoonl.live/beauty');
 
-  final String look;
-  final double intensity;
-  final double smoothing;
-  final double glow;
-  final double brightness;
-  final double warmth;
+  String look;
+  double intensity;
+  double smoothing;
+  double glow;
+  double brightness;
+  double warmth;
 
   String? _trackId;
 
@@ -46,6 +46,29 @@ class ZoonlBeautyTrackProcessor extends TrackProcessor<VideoProcessorOptions> {
     _trackId = options.track.id;
     await _channel.invokeMethod<void>('addBeauty', <String, Object>{
       'trackId': _trackId!,
+      ..._settings,
+    });
+  }
+
+
+  Future<void> update({
+    required String look,
+    required double intensity,
+    required double smoothing,
+    required double glow,
+    required double brightness,
+    required double warmth,
+  }) async {
+    this.look = look;
+    this.intensity = intensity;
+    this.smoothing = smoothing;
+    this.glow = glow;
+    this.brightness = brightness;
+    this.warmth = warmth;
+    final id = _trackId;
+    if (id == null) return;
+    await _channel.invokeMethod<void>('addBeauty', <String, Object>{
+      'trackId': id,
       ..._settings,
     });
   }
