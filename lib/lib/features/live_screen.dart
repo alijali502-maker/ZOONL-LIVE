@@ -1657,24 +1657,27 @@ class _LiveScreenState extends State<LiveScreen> {
     if (senderId.isEmpty || _chatBadges.containsKey(senderId)) return;
     _chatBadges[senderId] = 'LOADING';
     try {
+      Future<dynamic> safe(Future<dynamic> request) async {
+        try { return await request; } catch (_) { return null; }
+      }
       final results = await Future.wait<dynamic>([
-        _supabase.rpc(
+        safe(_supabase.rpc(
           'get_public_chat_badges',
           params: <String, dynamic>{'p_user_ids': <String>[senderId]},
-        ),
-        _supabase.rpc(
+        )),
+        safe(_supabase.rpc(
           'zoonl_level_for_user',
           params: <String, dynamic>{'p_user_id': senderId},
-        ),
-        _supabase.from('user_public_profiles')
-            .select('username').eq('user_id', senderId).maybeSingle(),
+        )),
+        safe(_supabase.from('user_public_profiles')
+            .select('username').eq('user_id', senderId).maybeSingle()),
       ]);
       final rows = results[0] is List ? results[0] as List : const [];
       final badge = rows.isNotEmpty && rows.first is Map
           ? (rows.first['badge_code'] ?? 'NONE').toString()
           : 'NONE';
       final level = ((results[1] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
-      final profile = results[2] as Map<String, dynamic>?;
+      final profile = results[2] is Map ? results[2] as Map<String, dynamic> : null;
       final username = profile?['username']?.toString().trim() ?? '';
       if (!mounted) return;
       setState(() {
