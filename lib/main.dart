@@ -3539,8 +3539,15 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     Map<String, dynamic>? activeBgItem;
     Map<String, dynamic>? activeFrameItem;
     for (final item in store.cosmeticsCatalog) {
-      if (item['zoonl_item_code']?.toString() == activeBgCode) activeBgItem = item;
-      if (item['zoonl_item_code']?.toString() == activeFrameCode) activeFrameItem = item;
+      final String itemCode = item['zoonl_item_code']?.toString() ?? '';
+      final String itemType = item['item_type']?.toString().toUpperCase() ?? '';
+      // Keep profile backgrounds and avatar frames strictly separate.
+      if (itemCode == activeBgCode && itemType == 'PROFILE_BG') {
+        activeBgItem = item;
+      }
+      if (itemCode == activeFrameCode && itemType == 'AVATAR_FRAME') {
+        activeFrameItem = item;
+      }
     }
     final hasEquippedBg = activeBgItem != null && store.userBaggage.any((item) {
       if (item['zoonl_item_code']?.toString() != activeBgCode || item['is_equipped'] != true) return false;
@@ -3613,19 +3620,11 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           clipBehavior: Clip.none,
                           alignment: Alignment.center,
                           children: [
-                            if (hasEquippedFrame && hasFrameImageMedia && frameMediaUrl.startsWith('http'))
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  child: Image.network(
-                                    frameMediaUrl,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                  ),
-                                ),
-                              ),
+                            // DP is the base layer. Transparent frame artwork is
+                            // painted above it so the full decorative border remains visible.
                             Container(
-                              width: hasEquippedFrame && hasFrameImageMedia ? 62 : 70,
-                              height: hasEquippedFrame && hasFrameImageMedia ? 62 : 70,
+                              width: hasEquippedFrame && hasFrameImageMedia ? 60 : 70,
+                              height: hasEquippedFrame && hasFrameImageMedia ? 60 : 70,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: const Color(0xFF293B49),
@@ -3659,6 +3658,16 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                                     )
                                   : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
                             ),
+                            if (hasEquippedFrame && hasFrameImageMedia && frameMediaUrl.startsWith('http'))
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Image.network(
+                                    frameMediaUrl,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
                             if (isSovereignOwnerFrame)
                               const Positioned(
                                 top: -2,
@@ -3981,7 +3990,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     );
   }
 
-  // Profile background is painted across the full profile card; the avatar image is layered above frame media so the DP stays visible.
+  // Profile background and avatar-frame catalog types are isolated; avatar frames overlay the DP using transparent artwork.
   Widget _luxuryCard({
     required String title,
     required Widget child,
