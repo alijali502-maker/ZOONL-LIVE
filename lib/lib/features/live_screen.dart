@@ -282,6 +282,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   RealtimeChannel? _channel;
   Room? _lk;
+  ZoonlBeautyTrackProcessor? _liveBeautyProcessor;
   Timer? _guestPoller;
   bool _isGuest = false;
   bool _guestAudioAllowed = true;
@@ -953,6 +954,57 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  ZoonlBeautyTrackProcessor _createLiveBeautyProcessor() {
+    final look = _previewFilter;
+    final strength = _filterStrength;
+    return ZoonlBeautyTrackProcessor(
+      look: look,
+      intensity: strength,
+      smoothing: look == 'Soft Glow' ? 0.42 : 0.12 + (strength * 0.12),
+      glow: look == 'Soft Glow'
+          ? 0.38
+          : look == 'Natural'
+              ? 0.08
+              : 0.16 * strength,
+      brightness: look == 'Cinema'
+          ? -0.035
+          : look == 'Peach' || look == 'Sunset'
+              ? 0.025
+              : 0.0,
+      warmth: look == 'Warm' || look == 'Sunset' || look == 'Peach'
+          ? 0.22 * strength
+          : look == 'Cool' || look == 'Ice'
+              ? -0.18 * strength
+              : 0.0,
+    );
+  }
+
+  Future<void> _updateLiveBeautyProcessor({
+    required String look,
+    required double strength,
+  }) async {
+    await _liveBeautyProcessor?.update(
+      look: look,
+      intensity: strength,
+      smoothing: look == 'Soft Glow' ? 0.42 : 0.12 + (strength * 0.12),
+      glow: look == 'Soft Glow'
+          ? 0.38
+          : look == 'Natural'
+              ? 0.08
+              : 0.16 * strength,
+      brightness: look == 'Cinema'
+          ? -0.035
+          : look == 'Peach' || look == 'Sunset'
+              ? 0.025
+              : 0.0,
+      warmth: look == 'Warm' || look == 'Sunset' || look == 'Peach'
+          ? 0.22 * strength
+          : look == 'Cool' || look == 'Ice'
+              ? -0.18 * strength
+              : 0.0,
+    );
+  }
+
   // ---------- LiveKit (video + audio) ----------
   Future<void> _connectLiveKit(String roomId) async {
     final response = await _supabase.functions.invoke(
@@ -995,6 +1047,8 @@ class _LiveScreenState extends State<LiveScreen> {
         _guestAudioAllowed && _microphoneEnabled,
       );
       if (_selectedRoomType == 'video') {
+        final beautyProcessor = _createLiveBeautyProcessor();
+        _liveBeautyProcessor = beautyProcessor;
         await room.localParticipant?.setCameraEnabled(
           _guestVideoAllowed && _cameraEnabled,
           cameraCaptureOptions: CameraCaptureOptions(
@@ -1002,30 +1056,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 ? CameraPosition.front
                 : CameraPosition.back,
             maxFrameRate: 24,
-            processor: ZoonlBeautyTrackProcessor(
-              look: _previewFilter,
-              intensity: _filterStrength,
-              smoothing: _previewFilter == 'Soft Glow'
-                  ? 0.42
-                  : 0.12 + (_filterStrength * 0.12),
-              glow: _previewFilter == 'Soft Glow'
-                  ? 0.38
-                  : _previewFilter == 'Natural'
-                      ? 0.08
-                      : 0.16 * _filterStrength,
-              brightness: _previewFilter == 'Cinema'
-                  ? -0.035
-                  : _previewFilter == 'Peach' || _previewFilter == 'Sunset'
-                      ? 0.025
-                      : 0.0,
-              warmth: _previewFilter == 'Warm' ||
-                      _previewFilter == 'Sunset' ||
-                      _previewFilter == 'Peach'
-                  ? 0.22 * _filterStrength
-                  : _previewFilter == 'Cool' || _previewFilter == 'Ice'
-                      ? -0.18 * _filterStrength
-                      : 0.0,
-            ),
+            processor: beautyProcessor,
           ),
         );
       }
@@ -1175,6 +1206,7 @@ class _LiveScreenState extends State<LiveScreen> {
       await room.disconnect();
     } catch (_) {}
     room.dispose();
+    _liveBeautyProcessor = null;
   }
 
   VideoTrack? _activeVideoTrack() {
@@ -2565,7 +2597,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   Text('${(strength * 100).round()}%', style: const TextStyle(color: Colors.white)),
                 ]),
                 const Text(
-                  '13 image and lighting presets adjust colour channels, contrast and saturation in the live video view for viewers. Face reshaping, skin retouch and eye enlargement are separate AI features and are not enabled in this build.',
+                  'ZOONL Beauty Studio processes camera frames before LiveKit publishing: subtle smoothing, glow, brightness and warm/cool tone. Face Studio avatar tracking and AR masks are a separate engine and are not active in this build.',
                   style: TextStyle(color: Colors.white60, fontSize: 11),
                 ),
                 const SizedBox(height: 14),
@@ -2587,6 +2619,10 @@ class _LiveScreenState extends State<LiveScreen> {
                         if (updated == null) {
                           throw StateError('Room filter could not be saved. Check live-room update permission.');
                         }
+                        await _updateLiveBeautyProcessor(
+                          look: selected,
+                          strength: strength,
+                        );
                         if (mounted) {
                           setState(() {
                             _previewFilter = selected;
