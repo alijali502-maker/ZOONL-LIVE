@@ -3999,7 +3999,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
         borderRadius: BorderRadius.circular(16),
         image: hasBackgroundImage
             ? DecorationImage(
-                image: NetworkImage(backgroundImageUrl),
+                image: NetworkImage(backgroundImageUrl!),
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
                   const Color(0xCC101923),
