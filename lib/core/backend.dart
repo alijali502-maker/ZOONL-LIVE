@@ -130,6 +130,24 @@ class Backend {
     }
   }
 
+  // Toggle owned profile backgrounds and avatar frames on/off.
+  // The server derives auth.uid(), verifies ownership/expiry, and updates
+  // both inventory state and the matching active-style field atomically.
+  static Future<bool> toggleZoonlProfileCosmetic({
+    required String itemCode,
+  }) async {
+    final String code = itemCode.trim();
+    if (code.isEmpty) throw ArgumentError('Item Code is required.');
+    if (currentUserId == null) throw StateError('Login is required.');
+
+    final dynamic response = await client.rpc(
+      'toggle_zoonl_profile_cosmetic',
+      params: <String, dynamic>{'p_item_code': code},
+    );
+    if (response is Map) return response['is_equipped'] == true;
+    throw StateError('Invalid cosmetic toggle response.');
+  }
+
   // Trusted role checks. These RPCs are authoritative; client IDs are not.
   static Future<bool> isZoonlOwner() async {
     if (currentUserId == null) return false;
