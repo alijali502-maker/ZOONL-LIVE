@@ -3412,6 +3412,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     });
     final profileBgColors = _cosmeticGradientColors(activeBgItem?['color_theme_hex']?.toString());
     final frameColors = _cosmeticGradientColors(activeFrameItem?['color_theme_hex']?.toString());
+    final isSovereignOwnerFrame = hasEquippedFrame && activeFrameCode == 'ZOONL_SOVEREIGN_OWNER_FRAME';
 
     Future<void> openProfileEditor() async {
       final bool? saved = await Navigator.of(context).push<bool>(
@@ -3485,24 +3486,58 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 82,
-                        height: 82,
-                        padding: EdgeInsets.all(hasEquippedFrame ? 3 : 0),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: hasEquippedFrame ? LinearGradient(colors: frameColors) : null,
-                          border: hasEquippedFrame
-                              ? Border.all(color: const Color(0xFF8CEBFF), width: 1)
-                              : null,
-                        ),
-                        child: CircleAvatar(
-                          radius: 36,
-                          backgroundColor: const Color(0xFF293B49),
-                          backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl.startsWith('http')
-                              ? null
-                              : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                      SizedBox(
+                        width: 90,
+                        height: 90,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 82,
+                              height: 82,
+                              padding: EdgeInsets.all(hasEquippedFrame ? (isSovereignOwnerFrame ? 4 : 3) : 0),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: hasEquippedFrame ? LinearGradient(
+                                  colors: frameColors,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ) : null,
+                                border: hasEquippedFrame
+                                    ? Border.all(
+                                        color: isSovereignOwnerFrame ? const Color(0xFFFFF3C1) : const Color(0xFF8CEBFF),
+                                        width: isSovereignOwnerFrame ? 2 : 1,
+                                      )
+                                    : null,
+                                boxShadow: hasEquippedFrame ? [
+                                  BoxShadow(
+                                    color: isSovereignOwnerFrame
+                                        ? const Color(0x99E6BE63)
+                                        : const Color(0x668CEBFF),
+                                    blurRadius: isSovereignOwnerFrame ? 24 : 14,
+                                    spreadRadius: isSovereignOwnerFrame ? 2 : 0,
+                                  ),
+                                ] : const [],
+                              ),
+                              child: CircleAvatar(
+                                radius: 36,
+                                backgroundColor: const Color(0xFF293B49),
+                                backgroundImage: avatarUrl.startsWith('http') ? NetworkImage(avatarUrl) : null,
+                                child: avatarUrl.startsWith('http')
+                                    ? null
+                                    : const Icon(Icons.person, size: 36, color: Color(0xFFB9AEFF)),
+                              ),
+                            ),
+                            if (isSovereignOwnerFrame)
+                              const Positioned(
+                                top: -2,
+                                child: Icon(Icons.workspace_premium, size: 25,
+                                  color: Color(0xFFFFE7A0),
+                                  shadows: [Shadow(color: Color(0xFFFFD45F), blurRadius: 14)],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 5),
