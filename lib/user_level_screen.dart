@@ -78,6 +78,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
         _db.from('user_prime_memberships').select('expires_at,is_active').eq('user_id',user.id).eq('is_active',true),
         _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,is_equipped,expires_at').eq('user_id',user.id).eq('project_name','ZOONL LIVE'),
         _db.from('zoonl_live_cosmetics').select('zoonl_item_code,zoonl_item_name,media_url,color_theme_hex,item_type').eq('project_name','ZOONL LIVE').eq('is_active',true),
+        _db.from('prime_tiers').select('id,tier_name').eq('is_active',true),
       ]);
       final now=DateTime.now();
       bool valid(Map e){final x=e['expires_at'];return x==null||(DateTime.tryParse(x.toString())?.isAfter(now)??false);}
@@ -90,6 +91,10 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
           .map((e)=>Map<String,dynamic>.from(e as Map))
           .where(valid).toList();
       final activePrime=activeMembership.isNotEmpty;
+      final primeNames=<int,String>{
+        for(final tier in (r[7] as List))
+          (tier['id'] as num).toInt():tier['tier_name'].toString(),
+      };
       final entries=inventory.where((e)=>e['item_type']=='ENTRY_EFFECT'&&valid(Map<String,dynamic>.from(e))).toList();
       if(!mounted)return;
       setState((){
@@ -98,7 +103,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
         _levels=(r[2] as List).map((e)=>Map<String,dynamic>.from(e as Map)).toList();
         _backpack=inventory.map((e){final item=Map<String,dynamic>.from(e as Map);item['_catalog']=catalogByCode[item['zoonl_item_code']?.toString()??''];return item;}).toList();
         _owner=r[3]==true;
-        _prime=activePrime?'PRIME ${activeMembership.first['prime_tier_id']??''}':'Not assigned';
+        _prime=activePrime?(primeNames[(activeMembership.first['prime_tier_id'] as num?)?.toInt()]??'ACTIVE'):'Not assigned';
         _entry=entries.isEmpty?'No active Entry':entries.map((e)=>e['zoonl_item_code'].toString()).join(', ');
         _frame=inventory.any((e)=>e['zoonl_item_code']=='ZOONL_SOVEREIGN_OWNER_FRAME'&&valid(Map<String,dynamic>.from(e)))?'Sovereign Crown ID Frame':'Not found';
         _badge=inventory.any((e)=>e['zoonl_item_code']=='ZOONL_OWNER_BADGE'&&valid(Map<String,dynamic>.from(e)))?'Sovereign VIP badge':'Not found';
