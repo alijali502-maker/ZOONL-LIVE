@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 /// Native frame processor used by the LiveKit camera track.
