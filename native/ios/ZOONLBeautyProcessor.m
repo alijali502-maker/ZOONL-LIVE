@@ -43,21 +43,21 @@
   NSString *look = [settings[@"look"] isKindOfClass:NSString.class] ? settings[@"look"] : @"Natural";
   int saturation = 1000;
   int contrast = 1000;
-  if ([look isEqualToString:@"Vivid"]) { saturation = 1000 + (int)lrint(280 * intensity); contrast = 1000 + (int)lrint(80 * intensity); }
-  else if ([look isEqualToString:@"Cinema"]) { saturation = 1000 - (int)lrint(160 * intensity); contrast = 1000 + (int)lrint(160 * intensity); }
-  else if ([look isEqualToString:@"Warm"]) { saturation = 1000 + (int)lrint(80 * intensity); warmth += 0.30 * intensity; }
-  else if ([look isEqualToString:@"Sunset"]) { saturation = 1000 + (int)lrint(160 * intensity); warmth += 0.55 * intensity; }
-  else if ([look isEqualToString:@"Cool"]) { warmth -= 0.32 * intensity; }
-  else if ([look isEqualToString:@"Ice"]) { saturation = 1000 - (int)lrint(60 * intensity); warmth -= 0.55 * intensity; }
-  else if ([look isEqualToString:@"Rose"]) { saturation = 1000 + (int)lrint(100 * intensity); warmth += 0.18 * intensity; }
-  else if ([look isEqualToString:@"Peach"]) { saturation = 1000 + (int)lrint(70 * intensity); warmth += 0.38 * intensity; }
-  else if ([look isEqualToString:@"Mint"]) { saturation = 1000 + (int)lrint(80 * intensity); warmth -= 0.12 * intensity; }
-  else if ([look isEqualToString:@"Lavender"]) { saturation = 1000 + (int)lrint(40 * intensity); warmth -= 0.20 * intensity; }
+  if ([look isEqualToString:@"Vivid"]) { saturation = 1000 + (int)lrint(780 * intensity); contrast = 1000 + (int)lrint(180 * intensity); }
+  else if ([look isEqualToString:@"Cinema"]) { saturation = 1000 - (int)lrint(280 * intensity); contrast = 1000 + (int)lrint(300 * intensity); }
+  else if ([look isEqualToString:@"Warm"]) { saturation = 1000 + (int)lrint(180 * intensity); warmth += 0.72 * intensity; }
+  else if ([look isEqualToString:@"Sunset"]) { saturation = 1000 + (int)lrint(300 * intensity); warmth += 1.10 * intensity; }
+  else if ([look isEqualToString:@"Cool"]) { saturation = 1000 + (int)lrint(100 * intensity); warmth -= 0.72 * intensity; }
+  else if ([look isEqualToString:@"Ice"]) { saturation = 1000 - (int)lrint(120 * intensity); warmth -= 1.15 * intensity; }
+  else if ([look isEqualToString:@"Rose"]) { saturation = 1000 + (int)lrint(240 * intensity); warmth += 0.48 * intensity; }
+  else if ([look isEqualToString:@"Peach"]) { saturation = 1000 + (int)lrint(200 * intensity); warmth += 0.82 * intensity; }
+  else if ([look isEqualToString:@"Mint"]) { saturation = 1000 + (int)lrint(200 * intensity); warmth -= 0.42 * intensity; }
+  else if ([look isEqualToString:@"Lavender"]) { saturation = 1000 + (int)lrint(160 * intensity); warmth -= 0.62 * intensity; }
   else if ([look isEqualToString:@"Mono"]) { saturation = 1000 - (int)lrint(1000 * intensity); }
-  else if ([look isEqualToString:@"Soft Glow"]) { glow += 0.30 * intensity; }
-  atomic_store(&_smoothing, (int)lrint(fmax(0, fmin(1, smoothing)) * 180));
+  else if ([look isEqualToString:@"Soft Glow"]) { glow += 0.62 * intensity; }
+  atomic_store(&_smoothing, (int)lrint(fmax(0, fmin(1, smoothing)) * 420));
   atomic_store(&_glow, (int)lrint(fmax(0, fmin(1, glow)) * 1000));
-  atomic_store(&_brightness, (int)lrint(fmax(-1, fmin(1, brightness)) * 22));
+  atomic_store(&_brightness, (int)lrint(fmax(-1, fmin(1, brightness)) * 34));
   atomic_store(&_warmth, (int)lrint(fmax(-1, fmin(1, warmth)) * 1000));
   atomic_store(&_saturation, saturation);
   atomic_store(&_contrast, contrast);
@@ -109,8 +109,8 @@
     uint8_t *outU = dst.mutableDataU + y * dst.strideU;
     uint8_t *outV = dst.mutableDataV + y * dst.strideV;
     for (int x = 0; x < chromaWidth; x++) {
-      double u = 128.0 + ((int)inU[x] - 128.0) * (saturation / 1000.0) - warm * 0.002;
-      double v = 128.0 + ((int)inV[x] - 128.0) * (saturation / 1000.0) + warm * 0.003;
+      double u = 128.0 + ((int)inU[x] - 128.0) * (saturation / 1000.0) - warm * 0.018;
+      double v = 128.0 + ((int)inV[x] - 128.0) * (saturation / 1000.0) + warm * 0.024;
       outU[x] = (uint8_t)fmax(0, fmin(255, lrint(u)));
       outV[x] = (uint8_t)fmax(0, fmin(255, lrint(v)));
     }
