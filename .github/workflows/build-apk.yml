@@ -92,9 +92,9 @@ jobs:
               }
 
               @Override public VideoFrame onFrame(VideoFrame input) {
-                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.22;
+                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.42;
                 double light = Math.max(0.0, Math.min(1.0, glow));
-                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 22.0;
+                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 34.0;
                 final double warm = Math.max(-1.0, Math.min(1.0, warmth));
 
                 VideoFrame.I420Buffer src = input.getBuffer().toI420();
@@ -106,18 +106,18 @@ jobs:
                 double saturation = 1.0;
                 double contrast = 1.0;
                 double toneWarmth = warm;
-                if ("Vivid".equals(look)) { saturation = 1.0 + 0.28 * amount; contrast = 1.0 + 0.08 * amount; }
-                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.16 * amount; contrast = 1.0 + 0.16 * amount; }
-                else if ("Warm".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth += 0.30 * amount; }
-                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth += 0.55 * amount; }
-                else if ("Cool".equals(look)) { toneWarmth -= 0.32 * amount; }
-                else if ("Ice".equals(look)) { saturation = 1.0 - 0.06 * amount; toneWarmth -= 0.55 * amount; }
-                else if ("Rose".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth += 0.18 * amount; }
-                else if ("Peach".equals(look)) { saturation = 1.0 + 0.07 * amount; toneWarmth += 0.38 * amount; }
-                else if ("Mint".equals(look)) { saturation = 1.0 + 0.08 * amount; toneWarmth -= 0.12 * amount; }
-                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.04 * amount; toneWarmth -= 0.20 * amount; }
+                if ("Vivid".equals(look)) { saturation = 1.0 + 0.78 * amount; contrast = 1.0 + 0.18 * amount; }
+                else if ("Cinema".equals(look)) { saturation = 1.0 - 0.28 * amount; contrast = 1.0 + 0.30 * amount; }
+                else if ("Warm".equals(look)) { saturation = 1.0 + 0.18 * amount; toneWarmth += 0.72 * amount; }
+                else if ("Sunset".equals(look)) { saturation = 1.0 + 0.30 * amount; toneWarmth += 1.10 * amount; }
+                else if ("Cool".equals(look)) { saturation = 1.0 + 0.10 * amount; toneWarmth -= 0.72 * amount; }
+                else if ("Ice".equals(look)) { saturation = 1.0 - 0.12 * amount; toneWarmth -= 1.15 * amount; }
+                else if ("Rose".equals(look)) { saturation = 1.0 + 0.24 * amount; toneWarmth += 0.48 * amount; }
+                else if ("Peach".equals(look)) { saturation = 1.0 + 0.20 * amount; toneWarmth += 0.82 * amount; }
+                else if ("Mint".equals(look)) { saturation = 1.0 + 0.20 * amount; toneWarmth -= 0.42 * amount; }
+                else if ("Lavender".equals(look)) { saturation = 1.0 + 0.16 * amount; toneWarmth -= 0.62 * amount; }
                 else if ("Mono".equals(look)) { saturation = 1.0 - amount; }
-                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.30 * amount); }
+                if ("Soft Glow".equals(look)) { light = Math.min(1.0, light + 0.62 * amount); }
 
                 ByteBuffer sy = src.getDataY(), dy = dst.getDataY();
                 int ss = src.getStrideY(), ds = dst.getStrideY();
@@ -147,8 +147,8 @@ jobs:
                 for (int row = 0; row < ch; row++) {
                   for (int col = 0; col < cw; col++) {
                     int ui = row * us + col, vi = row * vs + col;
-                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - toneWarmth * 3.0;
-                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + toneWarmth * 4.0;
+                    double u = 128.0 + ((su.get(ui) & 255) - 128.0) * saturation - toneWarmth * 18.0;
+                    double v = 128.0 + ((sv.get(vi) & 255) - 128.0) * saturation + toneWarmth * 24.0;
                     du.put(row * dus + col, (byte) Math.max(0, Math.min(255, (int) Math.round(u))));
                     dv.put(row * dvs + col, (byte) Math.max(0, Math.min(255, (int) Math.round(v))));
                   }
