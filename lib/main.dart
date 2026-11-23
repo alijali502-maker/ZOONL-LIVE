@@ -3695,11 +3695,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      ZoonlMiniLevelBadge(
-                        onTap: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(builder: (_) => const UserLevelScreen()),
-                        ),
-                      ),
+                      const ZoonlMiniLevelBadge(),
                     ],
                   ),
                   const SizedBox(width: 14),
@@ -3752,58 +3748,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ],
               ),
               const Divider(height: 24),
-              InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const UserLevelScreen(),
-                  ),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF29365E), Color(0xFF141E35)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF9B8CFF).withOpacity(.65)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [Color(0xFFB9AEFF), Color(0xFF58D6CE)]),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${store.currentUser['level'] ?? 1}',
-                            style: const TextStyle(color: Color(0xFF10182E), fontSize: 19, fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('ACCOUNT LEVEL', style: TextStyle(color: Color(0xFFC7D3F4), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
-                            Text('LEVEL ${store.currentUser['level'] ?? 1}',
-                              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-                            Text('VIP ${store.currentUser['vipTier'] ?? 'NONE'} • View level ladder',
-                              style: const TextStyle(color: Color(0xFFB9C7E8), fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right, color: Color(0xFFB9AEFF)),
-                    ],
-                  ),
-                ),
-              ),
               if (store.currentUser['activeBadgeCode']?.toString() == 'ZOONL_LUCKY_ID_01')
                 Container(
                   margin: const EdgeInsets.only(top: 10, bottom: 4),
@@ -3843,6 +3787,29 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height:10),
+        _luxuryCard(
+          title: 'PROFILE FOLDERS',
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal:4,vertical:3),
+            leading: Container(
+              width:48,height:48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors:[Color(0xFFFFE6A1),Color(0xFF9A6A24),Color(0xFF38200B)]),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color:const Color(0xFFFFE6A1),width:1),
+                boxShadow: const [BoxShadow(color:Color(0x668F641F),blurRadius:13)],
+              ),
+              child: const Icon(Icons.folder_special_rounded,color:Color(0xFF241707),size:27),
+            ),
+            title: const Text('LEVEL HISTORY',style:TextStyle(fontWeight:FontWeight.w900,letterSpacing:.7)),
+            subtitle: const Text('Level badges, rank designs and progress • 1–100'),
+            trailing: const Icon(Icons.chevron_right,color:Color(0xFFE6C47A)),
+            onTap:()=>Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(builder:(_)=>const UserLevelScreen()),
+            ),
           ),
         ),
         _ProfileSocialPanel(
