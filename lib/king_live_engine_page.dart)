@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'
         SupabaseClient;
 import 'package:video_player/video_player.dart'
     show VideoPlayer, VideoPlayerController;
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 
 // ============================================================================
 // COMPLETE UNIFIED KING LIVE ENGINE PAGE (lib/king_live_engine_page.dart)
@@ -101,7 +102,8 @@ class _LiveGiftModel {
   String category;
   String art;
   String songLabel;
-  String videoUrl; // 3D / video / animated image link (animation_3d_url)
+  String videoUrl; // Alpha video / animated media (animation_url)
+  String modelUrl; // GLB model (animation_3d_url)
   String imageUrl;
   String soundUrl;
   Color c1;
@@ -116,6 +118,7 @@ class _LiveGiftModel {
     required this.art,
     required this.songLabel,
     this.videoUrl = '',
+    this.modelUrl = '',
     this.imageUrl = '',
     this.soundUrl = '',
     required this.c1,
@@ -142,6 +145,7 @@ class _LiveGiftModel {
         'art': art,
         'songLabel': songLabel,
         'videoUrl': videoUrl,
+        'modelUrl': modelUrl,
         'imageUrl': imageUrl,
         'soundUrl': soundUrl,
         'c1': c1.value,
@@ -671,7 +675,8 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
           category: (r['category'] ?? 'General').toString(),
           art: _artFor(name),
           songLabel: snd.isNotEmpty ? 'Gift Sound' : '',
-          videoUrl: anim3d.isNotEmpty ? anim3d : anim,
+          videoUrl: anim,
+          modelUrl: anim3d,
           imageUrl: (r['image_url'] ?? '').toString(),
           soundUrl: snd,
           c1: pal[0],
@@ -1185,6 +1190,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
     final nameCtrl = TextEditingController(text: gift.name);
     final priceCtrl = TextEditingController(text: gift.coins.toString());
     final diaCtrl = TextEditingController(text: gift.diamonds.toString());
+    final modelCtrl = TextEditingController(text: gift.modelUrl);
     final videoCtrl = TextEditingController(text: gift.videoUrl);
     final soundCtrl = TextEditingController(text: gift.soundUrl);
     final imgCtrl = TextEditingController(text: gift.imageUrl);
@@ -1201,7 +1207,8 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
               TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Gift Name')),
               TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Coins Price')),
               TextField(controller: diaCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Host Diamonds')),
-              TextField(controller: videoCtrl, decoration: const InputDecoration(labelText: '3D / Video / Animated link')),
+              TextField(controller: modelCtrl, decoration: const InputDecoration(labelText: '3D Model URL (.glb)')),
+              TextField(controller: videoCtrl, decoration: const InputDecoration(labelText: 'Alpha Animation URL (.mp4 / .webm)')),
               TextField(controller: soundCtrl, decoration: const InputDecoration(labelText: 'Sound link (mp3)')),
               TextField(controller: imgCtrl, decoration: const InputDecoration(labelText: 'Image link')),
             ],
@@ -1219,11 +1226,15 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
               }
               Navigator.pop(ctx);
               try {
+                await _sb.rpc('owner_update_gift_price', params: {
+                  'p_gift_id': gift.id,
+                  'p_coin_price': price,
+                });
                 await _sb.from('gifts').update({
                   'gift_name': nameCtrl.text.trim(),
-                  'coin_price': price,
                   'diamond_value': dia,
-                  'animation_3d_url': videoCtrl.text.trim().isEmpty ? null : videoCtrl.text.trim(),
+                  'animation_3d_url': modelCtrl.text.trim().isEmpty ? null : modelCtrl.text.trim(),
+                  'animation_url': videoCtrl.text.trim().isEmpty ? null : videoCtrl.text.trim(),
                   'sound_url': soundCtrl.text.trim().isEmpty ? null : soundCtrl.text.trim(),
                   'image_url': imgCtrl.text.trim().isEmpty ? null : imgCtrl.text.trim(),
                 }).eq('id', gift.id);
@@ -1972,6 +1983,25 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
 
   Widget _buildGiftArt(_LiveGiftModel g) {
     final vc = _giftVideo;
+    if (g.modelUrl.isNotEmpty) {
+      return SizedBox(
+        height: 270,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: ModelViewer(
+            key: ValueKey(g.modelUrl),
+            src: g.modelUrl,
+            alt: g.name,
+            backgroundColor: Colors.transparent,
+            autoRotate: true,
+            cameraControls: true,
+            disableZoom: false,
+            ar: false,
+            autoPlay: true,
+          ),
+        ),
+      );
+    }
     if (g.hasVideo && vc != null && vc.value.isInitialized) {
       return SizedBox(
         height: 260,
