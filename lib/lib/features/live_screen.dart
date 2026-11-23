@@ -2574,10 +2574,33 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Future<void> _toggleCamera() async {
     final next = !_cameraEnabled;
+    final participant = _lk?.localParticipant;
+    if (participant == null) return;
+    ZoonlBeautyTrackProcessor? nextProcessor;
     try {
-      await _lk?.localParticipant?.setCameraEnabled(next);
+      if (next) {
+        // Recreate and attach the native processor whenever the camera is
+        // re-enabled. LiveKit may destroy the previous processor on disable.
+        nextProcessor = _createLiveBeautyProcessor();
+      }
+      await participant.setCameraEnabled(
+        next,
+        cameraCaptureOptions: next
+            ? CameraCaptureOptions(
+                cameraPosition: _frontLiveCamera
+                    ? CameraPosition.front
+                    : CameraPosition.back,
+                maxFrameRate: 24,
+                processor: nextProcessor,
+              )
+            : null,
+      );
+      _liveBeautyProcessor = nextProcessor;
       if (mounted) setState(() => _cameraEnabled = next);
     } catch (error) {
+      if (nextProcessor != null && !identical(nextProcessor, _liveBeautyProcessor)) {
+        try { await nextProcessor.destroy(); } catch (_) {}
+      }
       _showMessage('Camera बदल नहीं सका: ${_readable(error)}');
     }
   }
