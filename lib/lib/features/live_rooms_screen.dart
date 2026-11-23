@@ -28,7 +28,7 @@ class _LiveRoomsScreenState extends State<LiveRoomsScreen> {
 
     final base = _supabase
         .from('live_rooms')
-        .select('id, room_name, room_type, country')
+        .select('id, room_name, room_type, country, poster_url')
         .eq('is_live', true);
 
     final filtered = me == null ? base : base.neq('owner_id', me);
@@ -127,32 +127,54 @@ class _LiveRoomsScreenState extends State<LiveRoomsScreen> {
               itemBuilder: (context, index) {
                 final room = rooms[index];
 
-                return ListTile(
+                final poster = (room['poster_url'] ?? '').toString();
+                return InkWell(
                   onTap: () => _open(room['id'].toString()),
-                  tileColor: const Color(0xFF241630),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  leading: const Icon(
-                    Icons.circle,
-                    color: Colors.red,
-                    size: 14,
-                  ),
-                  title: Text(
-                    (room['room_name'] ?? '').toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    height: 112,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF241630),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0x665F3A88)),
                     ),
-                  ),
-                  subtitle: Text(
-                    (room['country'] ?? room['room_type'] ?? '')
-                        .toString(),
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    color: Color(0xFFE5BD70),
+                    clipBehavior: Clip.antiAlias,
+                    child: Row(children: [
+                      SizedBox(
+                        width: 126,
+                        height: double.infinity,
+                        child: poster.isNotEmpty
+                            ? Image.network(poster, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const ColoredBox(
+                                  color: Color(0xFF302044),
+                                  child: Icon(Icons.live_tv, color: Color(0xFFE5BD70), size: 36),
+                                ))
+                            : const ColoredBox(
+                                color: Color(0xFF302044),
+                                child: Icon(Icons.live_tv, color: Color(0xFFE5BD70), size: 36),
+                              ),
+                      ),
+                      Expanded(child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Row(children: [
+                            const Icon(Icons.circle, color: Colors.red, size: 9),
+                            const SizedBox(width: 6),
+                            const Text('LIVE NOW', style: TextStyle(color: Color(0xFFFF7777), fontSize: 9, fontWeight: FontWeight.w900)),
+                          ]),
+                          const SizedBox(height: 6),
+                          Text((room['room_name'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                          const SizedBox(height: 5),
+                          Text((room['country'] ?? room['room_type'] ?? '').toString(),
+                            style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                        ]),
+                      )),
+                      const Padding(
+                        padding: EdgeInsets.only(right: 10),
+                        child: Icon(Icons.chevron_right, color: Color(0xFFE5BD70)),
+                      ),
+                    ]),
                   ),
                 );
               },
