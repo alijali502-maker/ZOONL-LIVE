@@ -1230,14 +1230,15 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
                   'p_gift_id': gift.id,
                   'p_coin_price': price,
                 });
-                await _sb.from('gifts').update({
-                  'gift_name': nameCtrl.text.trim(),
-                  'diamond_value': dia,
-                  'animation_3d_url': modelCtrl.text.trim().isEmpty ? null : modelCtrl.text.trim(),
-                  'animation_url': videoCtrl.text.trim().isEmpty ? null : videoCtrl.text.trim(),
-                  'sound_url': soundCtrl.text.trim().isEmpty ? null : soundCtrl.text.trim(),
-                  'image_url': imgCtrl.text.trim().isEmpty ? null : imgCtrl.text.trim(),
-                }).eq('id', gift.id);
+                await _sb.rpc('owner_update_gift_assets', params: {
+                  'p_gift_id': gift.id,
+                  'p_gift_name': nameCtrl.text.trim(),
+                  'p_diamond_value': dia,
+                  'p_model_url': modelCtrl.text.trim(),
+                  'p_animation_url': videoCtrl.text.trim(),
+                  'p_sound_url': soundCtrl.text.trim(),
+                  'p_image_url': imgCtrl.text.trim(),
+                });
                 await _loadGifts();
                 _snack('Gift save ho gaya.');
               } catch (e) {
