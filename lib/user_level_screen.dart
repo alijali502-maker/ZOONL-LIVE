@@ -14,6 +14,8 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
   late final AnimationController _shine = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))..repeat();
   late final AnimationController _float = AnimationController(vsync: this, duration: const Duration(milliseconds: 5200))..repeat(reverse: true);
   bool _loading = true, _owner = false;
+  int _selectedBand = 0;
+  static const List<String> _levelBands = ['1–20','21–40','41–60','61–80','81–100'];
   String? _error;
   int _level = 1, _exp = 0;
   String _prime = 'Checking…', _entry = 'Checking…', _frame = 'Checking…', _badge = 'Checking…';
@@ -202,7 +204,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
 
   @override Widget build(BuildContext context){
     Map<String,dynamic>? current,next;
-    for(final r in _levels){final n=(r['level'] as num).toInt();if(n==100&&!_owner)continue;if(n==_level)current=r;if(n>_level&&next==null)next=r;}
+    for(final r in _levels){final n=(r['level'] as num).toInt();if(n==_level)current=r;if(n>_level&&next==null)next=r;}
     final start=(current?['required_exp'] as num?)?.toInt()??0;
     final target=(next?['required_exp'] as num?)?.toInt()??start;
     final remain=(target-_exp).clamp(0,target).toInt();
@@ -287,11 +289,28 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
               _status(Icons.military_tech,'VIP identity badge',_badge,const Color(0xFFFFE6A1)),
             ]),const Color(0xFFFFE6A1)),
           ],
-          const SizedBox(height:19),const Text('RANK LADDER',style:TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900,letterSpacing:1.2)),
-          const SizedBox(height:4),const Text('Lifetime EXP stays with your account. Every next rank has a higher target.',style:TextStyle(color:Colors.white54,fontSize:10)),
+          const SizedBox(height:19),
+          const Text('LEVEL HISTORY',style:TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900,letterSpacing:1.2)),
+          const SizedBox(height:4),
+          const Text('Choose a level range. Only that section is shown.',style:TextStyle(color:Colors.white54,fontSize:10)),
           const SizedBox(height:10),
-          for(final r in _levels.where((r)=>(r['level'] as num).toInt()<100))_row(r),
-          if(_owner&&_levels.any((r)=>(r['level'] as num).toInt()==100))_row(_levels.firstWhere((r)=>(r['level'] as num).toInt()==100)),
+          Wrap(spacing:7,runSpacing:7,children:List.generate(_levelBands.length,(i){
+            final selected=i==_selectedBand;
+            return ChoiceChip(
+              label:Text(_levelBands[i],style:TextStyle(color:selected?const Color(0xFF241707):Colors.white,fontSize:10,fontWeight:FontWeight.w900)),
+              selected:selected,
+              selectedColor:const Color(0xFFE6C47A),
+              backgroundColor:const Color(0xFF171126),
+              side:BorderSide(color:selected?const Color(0xFFFFE6A1):const Color(0x665E5277)),
+              onSelected:(_)=>setState(()=>_selectedBand=i),
+            );
+          })),
+          const SizedBox(height:12),
+          for(final r in _levels.where((r){
+            final n=(r['level'] as num).toInt();
+            final low=_selectedBand*20+1, high=(_selectedBand+1)*20;
+            return n>=low&&n<=high;
+          }))_row(r),
         ])));
   }
 }
