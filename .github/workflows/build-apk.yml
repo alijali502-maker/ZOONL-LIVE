@@ -433,11 +433,16 @@ jobs:
             echo "Installing Android NDK $NDK_VERSION (attempt $attempt/4)"
             rm -rf "$SDK_ROOT/ndk/$NDK_VERSION"
             rm -rf "$SDK_ROOT/.temp/"* "$SDK_ROOT/temp/"* 2>/dev/null || true
-            if yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;$NDK_VERSION"; then
-              if test -f "$SDK_ROOT/ndk/$NDK_VERSION/source.properties"; then
-                installed=1
-                break
-              fi
+            # sdkmanager closes stdin after accepting its license prompt;
+            # the 'yes' process can then report SIGPIPE (141) even when the
+            # NDK download and extraction succeeded. Do not let pipefail
+            # mistake that expected SIGPIPE for an installation failure.
+            set +o pipefail
+            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;$NDK_VERSION" || true
+            set -o pipefail
+            if test -f "$SDK_ROOT/ndk/$NDK_VERSION/source.properties"; then
+              installed=1
+              break
             fi
             sleep $((attempt * 12))
           done
