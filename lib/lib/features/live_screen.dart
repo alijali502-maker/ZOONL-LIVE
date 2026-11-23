@@ -795,6 +795,45 @@ class _LiveScreenState extends State<LiveScreen> {
     return ColorFilter.matrix(matrix);
   }
 
+  Future<void> _pickRoomPoster() async {
+    if (_busy || _posterUploading) return;
+    try {
+      final picked = await _roomPosterPicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 88,
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _roomPosterFile = picked;
+        _roomPosterUrl = null;
+      });
+    } catch (error) {
+      _showMessage('Poster select नहीं हुआ: ' + error.toString());
+    }
+  }
+
+  Future<String?> _uploadRoomPoster(String userId) async {
+    final file = _roomPosterFile;
+    if (file == null) return _roomPosterUrl;
+    setState(() => _posterUploading = true);
+    try {
+      final extension = file.path.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+      final path = userId + '/' + DateTime.now().microsecondsSinceEpoch.toString() + '.' + extension;
+      await _supabase.storage.from('live-room-posters').upload(
+        path,
+        File(file.path),
+        fileOptions: FileOptions(contentType: extension == 'png' ? 'image/png' : 'image/jpeg', upsert: false),
+      );
+      final url = _supabase.storage.from('live-room-posters').getPublicUrl(path);
+      _roomPosterUrl = url;
+      return url;
+    } finally {
+      if (mounted) setState(() => _posterUploading = false);
+    }
+  }
+
   // ---------- Host: go live ----------
   Future<void> _startLive() async {
     if (_busy) return;
@@ -812,6 +851,10 @@ class _LiveScreenState extends State<LiveScreen> {
       return;
     }
     if (_selectedRoomType == 'video') {
+      if (_roomPosterFile == null && (_roomPosterUrl ?? '').isEmpty) {
+        _showMessage('GO LIVE से पहले Room Poster चुनें।');
+        return;
+      }
       if (_previewCamera?.value.isInitialized != true) {
         _showMessage('पहले Camera Preview तैयार होने दें।');
         return;
@@ -837,8 +880,17 @@ class _LiveScreenState extends State<LiveScreen> {
 
     if (!mounted) return;
     setState(() => _busy = true);
+    String? uploadedPosterPath;
 
     try {
+      String? posterUrl = _roomPosterUrl;
+      if (_selectedRoomType == 'video' && _roomPosterFile != null) {
+        final before = _roomPosterUrl;
+        posterUrl = await _uploadRoomPoster(myId);
+        if (posterUrl != null && posterUrl != before) {
+          uploadedPosterPath = Uri.parse(posterUrl).pathSegments.skipWhile((part) => part != 'live-room-posters').skip(1).join('/');
+        }
+      }
       if (_selectedRoomType == 'video') await _disposePreviewCamera();
       // Close any old room of mine that is stuck as live.
       await _supabase
@@ -856,6 +908,7 @@ class _LiveScreenState extends State<LiveScreen> {
             'is_private': _privateRoom,
             'is_locked': _lockedRoom || _privateRoom,
             'is_live': true,
+            'poster_url': _selectedRoomType == 'video' ? posterUrl : null,
             'video_filter_code': _selectedRoomType == 'video' ? _previewFilter : 'Natural',
             'video_filter_strength': _selectedRoomType == 'video' ? _filterStrength : 0.35,
             'audio_theme_code': _selectedRoomType == 'audio' ? _audioThemeCode : 'aurora',
@@ -885,6 +938,9 @@ class _LiveScreenState extends State<LiveScreen> {
 
       _showMessage('आप Live हैं।');
     } catch (error) {
+      if (uploadedPosterPath != null) {
+        try { await _supabase.storage.from('live-room-posters').remove([uploadedPosterPath]); } catch (_) {}
+      }
       final roomId = _roomId;
       _roomId = null;
       if (roomId != null) await _markRoomEnded(roomId);
@@ -3071,6 +3127,54 @@ class _LiveScreenState extends State<LiveScreen> {
                       icon: const Icon(Icons.wallpaper, color: Colors.white),
                       label: const Text('ROOM BACKGROUND', style: TextStyle(color: Colors.white)),
                     )),
+                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xAA171126),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: const Color(0x88A45BFF)),
+                    ),
+                    child: Row(children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 76,
+                          height: 68,
+                          child: _roomPosterFile != null
+                              ? Image.file(File(_roomPosterFile!.path), fit: BoxFit.cover)
+                              : (_roomPosterUrl ?? '').isNotEmpty
+                                  ? Image.network(_roomPosterUrl!, fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const ColoredBox(
+                                        color: Color(0xFF2B1B40),
+                                        child: Icon(Icons.wallpaper, color: Color(0xFFE6C47A), size: 30),
+                                      ))
+                                  : const ColoredBox(
+                                      color: Color(0xFF2B1B40),
+                                      child: Icon(Icons.add_photo_alternate_outlined, color: Color(0xFFE6C47A), size: 30),
+                                    ),
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('LIVE ROOM POSTER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                        const SizedBox(height: 4),
+                        Text(_roomPosterFile != null || (_roomPosterUrl ?? '').isNotEmpty
+                            ? 'Poster ready • shown on Live cards'
+                            : 'Choose the cover image viewers will see',
+                          style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                        const SizedBox(height: 5),
+                        TextButton.icon(
+                          onPressed: _busy || _posterUploading ? null : _pickRoomPoster,
+                          icon: Icon(_roomPosterFile != null || (_roomPosterUrl ?? '').isNotEmpty ? Icons.edit : Icons.upload),
+                          label: Text(_posterUploading ? 'UPLOADING…' :
+                              (_roomPosterFile != null || (_roomPosterUrl ?? '').isNotEmpty ? 'CHANGE POSTER' : 'ADD POSTER')),
+                          style: TextButton.styleFrom(foregroundColor: const Color(0xFFE6C47A), padding: EdgeInsets.zero),
+                        ),
+                      ])),
+                    ]),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _titleController,
