@@ -276,8 +276,8 @@ class _LiveScreenState extends State<LiveScreen> {
   String _previewFilter = 'Natural';
   bool _filterConfirmed = true;
   double _filterStrength = 0.35;
-  double _beautySmoothing = 0.15;
-  double _beautyGlow = 0.15;
+  double _beautySmoothing = 0.45;
+  double _beautyGlow = 0.30;
   double _beautyBrightness = 0.0;
   double _beautyWarmth = 0.0;
   final ImagePicker _roomPosterPicker = ImagePicker();
@@ -2652,6 +2652,40 @@ class _LiveScreenState extends State<LiveScreen> {
                       else { selected='Natural'; strength=.65; smoothing=.25; glow=.2; }
                     })),
                 ]),
+                Container(
+                  height: 142,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF21152F),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: const Color(0x88A45BFF)),
+                  ),
+                  child: Stack(fit: StackFit.expand, children: [
+                    if (_isLive && _isHost && _activeVideoTrack() != null)
+                      ColorFiltered(
+                        colorFilter: _filterThumbnailEffect(selected),
+                        child: VideoTrackRenderer(_activeVideoTrack()!),
+                      )
+                    else if (_previewCamera != null && _previewCamera!.value.isInitialized)
+                      ColorFiltered(
+                        colorFilter: _filterThumbnailEffect(selected),
+                        child: CameraPreview(_previewCamera!),
+                      )
+                    else
+                      const ColoredBox(
+                        color: Color(0xFF21152F),
+                        child: Center(child: Icon(Icons.face_retouching_natural, color: Color(0xFFE6C47A), size: 48)),
+                      ),
+                    Positioned(left: 9, bottom: 8, child: DecoratedBox(
+                      decoration: BoxDecoration(color: Colors.black.withOpacity(.65), borderRadius: BorderRadius.circular(8)),
+                      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        child: Text('PREVIEW • ' + selected.toUpperCase(),
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
+                    )),
+                  ]),
+                ),
+                const SizedBox(height: 10),
                 Wrap(spacing: 6, children: tabs.map((item) => ChoiceChip(
                   label: Text(item), selected: tab == item, selectedColor: const Color(0xFF8F3BDB),
                   backgroundColor: const Color(0xFF21152F),
