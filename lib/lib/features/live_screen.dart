@@ -2284,11 +2284,29 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  String _resolveGiftAssetUrl(dynamic value) {
+    final raw = (value ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    final uri = Uri.tryParse(raw);
+    if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) return raw;
+    final path = raw.replaceFirst(RegExp(r'^/?zoonl-assets/'), '').replaceFirst(RegExp(r'^/?storage/v1/object/public/zoonl-assets/'), '');
+    return _supabase.storage.from('zoonl-assets').getPublicUrl(path);
+  }
+
   Future<List<Map<String, dynamic>>> _loadLiveGifts() async {
     final rows = await _supabase.from('gifts')
       .select('id, gift_name, image_url, animation_url, animation_3d_url, sound_url, preview_url, coin_price, diamond_value, category')
       .eq('is_active', true).order('coin_price', ascending: true);
-    return (rows as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+    return (rows as List).map((row) {
+      final gift = Map<String, dynamic>.from(row as Map);
+      for (final field in const ['image_url', 'animation_url', 'animation_3d_url', 'sound_url', 'preview_url']) {
+        final value = gift[field];
+        if (value != null && value.toString().trim().isNotEmpty) {
+          gift[field] = _resolveGiftAssetUrl(value);
+        }
+      }
+      return gift;
+    }).toList();
   }
 
   Future<void> _openGiftPanel() async {
@@ -2396,7 +2414,9 @@ class _LiveScreenState extends State<LiveScreen> {
                     final imageUrl = (gift['image_url'] ?? gift['preview_url'] ?? '').toString();
                     final animation3d = (gift['animation_3d_url'] ?? '').toString().trim();
                     final animation = (gift['animation_url'] ?? '').toString().trim();
-                    final mediaUrl = animation3d.isNotEmpty ? animation3d : animation.isNotEmpty ? animation : imageUrl;
+                    // GLB is model data, not a playable video/image. Use the
+                    // transparent animation when available, otherwise the thumbnail.
+                    final mediaUrl = animation.isNotEmpty ? animation : imageUrl;
                     return InkWell(
                       onTap: sending || _isHost ? null : () async {
                         setSheetState(() => sending = true);
