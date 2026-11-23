@@ -125,12 +125,30 @@ jobs:
                   for (int col = 0; col < width; col++) {
                     int center = sy.get(row * ss + col) & 255;
                     double value = center;
-                    if (smooth > 0.001) {
-                      int sum = center * 4, count = 4;
-                      if (col > 0) { sum += sy.get(row * ss + col - 1) & 255; count++; }
-                      if (col + 1 < width) { sum += sy.get(row * ss + col + 1) & 255; count++; }
-                      if (row > 0) { sum += sy.get((row - 1) * ss + col) & 255; count++; }
-                      if (row + 1 < height) { sum += sy.get((row + 1) * ss + col) & 255; count++; }
+                    int chromaIndex = (row / 2) * src.getStrideU() + (col / 2);
+                    int skinU = src.getDataU().get(chromaIndex) & 255;
+                    int skinV = src.getDataV().get(chromaIndex) & 255;
+                    boolean skinPixel = center > 48 && center < 238
+                        && skinU >= 72 && skinU <= 142 && skinV >= 128 && skinV <= 190;
+                    if (smooth > 0.001 && skinPixel) {
+                      // Edge-preserving local smoothing, limited to skin-toned pixels.
+                      int sum = center * 2, count = 2;
+                      if (col > 0) {
+                        int neighbor = sy.get(row * ss + col - 1) & 255;
+                        if (Math.abs(neighbor - center) < 22) { sum += neighbor; count++; }
+                      }
+                      if (col + 1 < width) {
+                        int neighbor = sy.get(row * ss + col + 1) & 255;
+                        if (Math.abs(neighbor - center) < 22) { sum += neighbor; count++; }
+                      }
+                      if (row > 0) {
+                        int neighbor = sy.get((row - 1) * ss + col) & 255;
+                        if (Math.abs(neighbor - center) < 22) { sum += neighbor; count++; }
+                      }
+                      if (row + 1 < height) {
+                        int neighbor = sy.get((row + 1) * ss + col) & 255;
+                        if (Math.abs(neighbor - center) < 22) { sum += neighbor; count++; }
+                      }
                       value = center * (1.0 - smooth) + (sum / (double) count) * smooth;
                     }
                     value += lift;
