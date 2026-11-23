@@ -274,7 +274,7 @@ class _LiveScreenState extends State<LiveScreen> {
     'aurora', 'rose_garden', 'moonlight', 'golden_palace',
   };
   String _previewFilter = 'Natural';
-  bool _filterConfirmed = false;
+  bool _filterConfirmed = true;
   double _filterStrength = 0.35;
   double _beautySmoothing = 0.15;
   double _beautyGlow = 0.15;
@@ -859,11 +859,7 @@ class _LiveScreenState extends State<LiveScreen> {
         _showMessage('पहले Camera Preview तैयार होने दें।');
         return;
       }
-      if (!_filterConfirmed) {
-        _showMessage('पहले Preview Filter चुनें, फिर Live शुरू करें।');
-        return;
-      }
-    }
+          }
     if ((_privateRoom || _lockedRoom) && !_canUsePrivateRooms) {
       _showMessage('Private and locked rooms unlock at Level 10.');
       return;
@@ -3104,16 +3100,51 @@ class _LiveScreenState extends State<LiveScreen> {
                         ),
                       ),
                     ),
-                    Wrap(spacing: 6, runSpacing: 6, children: _previewFilters.map((filter) =>
-                      ChoiceChip(
-                        label: Text(filter, style: const TextStyle(fontSize: 10)),
-                        selected: _previewFilter == filter,
-                        onSelected: _busy ? null : (_) => setState(() { _previewFilter = filter; _filterConfirmed = true; }),
-                        selectedColor: Colors.white,
-                        backgroundColor: const Color(0x44000000),
-                        side: const BorderSide(color: Color(0x66FFFFFF)),
-                        labelStyle: TextStyle(color: _previewFilter == filter ? Colors.black : Colors.white),
-                      )).toList()),
+                    SizedBox(
+                      height: 82,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _previewFilters.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final filter = _previewFilters[index];
+                          final active = _previewFilter == filter;
+                          final tint = switch (filter) {
+                            'Warm' => const Color(0xFFFFA45C), 'Sunset' => const Color(0xFFFF806B),
+                            'Cool' => const Color(0xFF70BFFF), 'Rose' => const Color(0xFFFF78B7),
+                            'Peach' => const Color(0xFFFFB58D), 'Mint' => const Color(0xFF78D9B2),
+                            'Lavender' => const Color(0xFFB69AFF), 'Ice' => const Color(0xFFB8E6FF),
+                            'Vivid' => const Color(0xFFFFC85A), 'Cinema' => const Color(0xFF6C9FC6),
+                            'Mono' => const Color(0xFFB8BEC8), _ => const Color(0xFFE6C47A),
+                          };
+                          return InkWell(
+                            onTap: _busy ? null : () => setState(() { _previewFilter = filter; _filterConfirmed = true; }),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 76,
+                              decoration: BoxDecoration(
+                                color: const Color(0xCC21152F),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: active ? const Color(0xFFE6C47A) : Colors.white24, width: active ? 2 : 1),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(children: [
+                                Expanded(child: ClipRect(child: Stack(fit: StackFit.expand, children: [
+                                  if (camera != null && camera.value.isInitialized)
+                                    ColorFiltered(colorFilter: _filterThumbnailEffect(filter), child: CameraPreview(camera))
+                                  else
+                                    ColoredBox(color: tint.withOpacity(.45), child: const Icon(Icons.face, color: Colors.white, size: 28)),
+                                  if (active) const Positioned(right: 3, top: 3, child: Icon(Icons.check_circle, color: Color(0xFFE6C47A), size: 15)),
+                                ]))),
+                                Padding(padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+                                  child: Text(filter, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: active ? const Color(0xFFFFD98B) : Colors.white, fontSize: 9, fontWeight: FontWeight.w800))),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     Row(children: [
                       const Text('Strength', style: TextStyle(color: Colors.white70, fontSize: 10)),
                       Expanded(child: Slider(value: _filterStrength, onChanged: _busy ? null : (v) => setState(() => _filterStrength = v))),
@@ -3214,7 +3245,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     SizedBox(
                       height: 46,
                       child: ElevatedButton.icon(
-                        onPressed: _busy || (_selectedRoomType == 'video' && (!_filterConfirmed || camera?.value.isInitialized != true)) ? null : _startLive,
+                        onPressed: _busy || (_selectedRoomType == 'video' && camera?.value.isInitialized != true) ? null : _startLive,
                         icon: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering),
                         label: Text(_busy ? 'CONNECTING' : 'GO LIVE'),
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
