@@ -48,6 +48,7 @@ jobs:
 
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
+          s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
           permissions = [
               '<uses-permission android:name="android.permission.INTERNET"/>',
               '<uses-permission android:name="android.permission.CAMERA"/>',
@@ -75,6 +76,24 @@ jobs:
 
           p.write_text(s)
           print("Internet, Camera, Microphone, audio permissions, and Supabase OAuth deep link configured.")
+          PY
+
+      - name: Configure Model Viewer Android requirements
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          if p.exists():
+              s = p.read_text()
+              s = s.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+              p.write_text(s)
+          else:
+              p = Path("android/app/build.gradle")
+              if p.exists():
+                  s = p.read_text()
+                  s = s.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
+                  p.write_text(s)
+          print("Model Viewer Android minSdk configured.")
           PY
 
       - name: Clean project
