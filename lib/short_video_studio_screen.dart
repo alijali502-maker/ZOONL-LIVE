@@ -122,23 +122,77 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   }
 
   ColorFilter get _previewFilter {
-    switch (_filter) {
-      case 'Warm':
-        return const ColorFilter.mode(Color(0x55FF9A50), BlendMode.softLight);
-      case 'Cool':
-        return const ColorFilter.mode(Color(0x5573B9FF), BlendMode.softLight);
-      case 'Rose':
-        return const ColorFilter.mode(Color(0x55FF78B7), BlendMode.softLight);
-      case 'Mono':
-        return const ColorFilter.matrix(<double>[
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0.2126, 0.7152, 0.0722, 0, 0,
-          0, 0, 0, 1, 0,
-        ]);
-      default:
-        return const ColorFilter.mode(Colors.transparent, BlendMode.dst);
+    final amount = _filterStrength.clamp(0.0, 1.0);
+    if (_filter == 'Mono') {
+      const r = 0.2126, g = 0.7152, b = 0.0722;
+      return ColorFilter.matrix(<double>[
+        1 - amount * (1 - r), amount * g, amount * b, 0, 0,
+        amount * r, 1 - amount * (1 - g), amount * b, 0, 0,
+        amount * r, amount * g, 1 - amount * (1 - b), 0, 0,
+        0, 0, 0, 1, 0,
+      ]);
     }
+    final tint = switch (_filter) {
+      'Warm' => const Color(0xFFFF9A50),
+      'Cool' => const Color(0xFF73B9FF),
+      'Rose' => const Color(0xFFFF78B7),
+      _ => Colors.transparent,
+    };
+    if (tint == Colors.transparent || amount == 0) {
+      return const ColorFilter.mode(Colors.transparent, BlendMode.dst);
+    }
+    return ColorFilter.mode(
+      tint.withOpacity(0.42 * amount),
+      BlendMode.softLight,
+    );
+  }
+
+  Widget _filteredPreview(Widget child) {
+    final lut = _activeLut;
+    final withLut = lut == null
+        ? child
+        : LutFilter(lut: lut, intensity: _filterStrength, child: child);
+    return ColorFiltered(colorFilter: _previewFilter, child: withLut);
+  }
+
+  Widget _cameraSurface(CameraController camera, Size viewport) {
+    final previewSize = camera.value.previewSize;
+    if (previewSize == null) {
+      return Center(child: AspectRatio(
+        aspectRatio: camera.value.aspectRatio,
+        child: _filteredPreview(CameraPreview(camera)),
+      ));
+    }
+    final portraitWidth = previewSize.height;
+    final portraitHeight = previewSize.width;
+    return ClipRect(
+      child: SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: portraitWidth,
+            height: portraitHeight,
+            child: _filteredPreview(CameraPreview(camera)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _videoSurface(VideoPlayerController preview) {
+    final videoSize = preview.value.size;
+    return ClipRect(
+      child: SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: videoSize.width,
+            height: videoSize.height,
+            child: _filteredPreview(VideoPlayer(preview)),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _initializeCamera({CameraLensDirection? preferredDirection}) async {
@@ -365,11 +419,9 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
         if (_cameraLoading)
           const Center(child: CircularProgressIndicator())
         else if (preview != null && preview.value.isInitialized)
-          Center(child: AspectRatio(aspectRatio: preview.value.aspectRatio,
-            child: _activeLut == null ? VideoPlayer(preview) : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: VideoPlayer(preview))))
+          _videoSurface(preview)
         else if (camera != null && camera.value.isInitialized)
-          Center(child: AspectRatio(aspectRatio: camera.value.aspectRatio,
-            child: _activeLut == null ? CameraPreview(camera) : LutFilter(lut: _activeLut!, intensity: _filterStrength, child: CameraPreview(camera))))
+          _cameraSurface(camera, size)
         else
           Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.no_photography, color: Color(0xFFB9AEFF), size: 48),
@@ -394,12 +446,64 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                     Text(_filterLoading?'Preparing LUT…':_filter,style:const TextStyle(color:Color(0xFFE6C47A),fontSize:10,fontWeight:FontWeight.w800)),
                   ]),
                   const SizedBox(height:8),
-                  Wrap(spacing:7,runSpacing:7,children:_filters.map((filter)=>ChoiceChip(
-                    label:Text(filter),selected:_filter==filter,
-                    onSelected:_recording||_uploading?null:(_){setState(()=>_filter=filter);_loadFilterLut();},
-                    selectedColor:const Color(0xFFE6C47A),backgroundColor:const Color(0xFF252B3A),
-                    labelStyle:TextStyle(color:_filter==filter?Colors.black:Colors.white,fontSize:10,fontWeight:FontWeight.w800),
-                  )).toList()),
+                  SizedBox(
+                    height: 54,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _filters.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 9),
+                      itemBuilder: (context, index) {
+                        final filter = _filters[index];
+                        final selected = _filter == filter;
+                        final swatch = switch (filter) {
+                          'Warm' => const Color(0xFFFFA45C),
+                          'Cool' => const Color(0xFF70BFFF),
+                          'Rose' => const Color(0xFFFF78B7),
+                          'Mono' => const Color(0xFFB9C0CC),
+                          _ => const Color(0xFFE6C47A),
+                        };
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(15),
+                          onTap: _recording || _uploading ? null : () {
+                            setState(() => _filter = filter);
+                            _loadFilterLut();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: 68,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: selected ? const Color(0xFF3A2B43) : const Color(0xFF202638),
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: selected ? const Color(0xFFE6C47A) : Colors.white12,
+                                width: selected ? 1.6 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 23, height: 23,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: RadialGradient(colors: [swatch, swatch.withOpacity(.28)]),
+                                  ),
+                                  child: selected ? const Icon(Icons.check, size: 14, color: Colors.black) : null,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(filter, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: selected ? const Color(0xFFE6C47A) : Colors.white70,
+                                    fontSize: 9, fontWeight: FontWeight.w800,
+                                  )),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                   Row(children:[
                     const Text('Intensity',style:TextStyle(color:Colors.white70,fontSize:10)),
                     Expanded(child:Slider(value:_filterStrength,min:0,max:1,onChanged:_recording||_uploading?null:(v)=>setState(()=>_filterStrength=v))),
