@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../camera_studio/zoonl_beauty_track_processor.dart';
 import '../../event_control_screen.dart';
 import '../../streamer_progress_screen.dart';
@@ -274,6 +276,14 @@ class _LiveScreenState extends State<LiveScreen> {
   String _previewFilter = 'Natural';
   bool _filterConfirmed = false;
   double _filterStrength = 0.35;
+  double _beautySmoothing = 0.15;
+  double _beautyGlow = 0.15;
+  double _beautyBrightness = 0.0;
+  double _beautyWarmth = 0.0;
+  final ImagePicker _roomPosterPicker = ImagePicker();
+  XFile? _roomPosterFile;
+  String? _roomPosterUrl;
+  bool _posterUploading = false;
   static const List<String> _previewFilters = <String>['Natural', 'Soft Glow', 'Vivid', 'Cinema', 'Warm', 'Sunset', 'Cool', 'Ice', 'Rose', 'Peach', 'Mint', 'Lavender', 'Mono'];
 
   String? _roomId;
@@ -960,22 +970,10 @@ class _LiveScreenState extends State<LiveScreen> {
     return ZoonlBeautyTrackProcessor(
       look: look,
       intensity: strength,
-      smoothing: look == 'Soft Glow' ? 0.42 : 0.12 + (strength * 0.12),
-      glow: look == 'Soft Glow'
-          ? 0.38
-          : look == 'Natural'
-              ? 0.08
-              : 0.16 * strength,
-      brightness: look == 'Cinema'
-          ? -0.035
-          : look == 'Peach' || look == 'Sunset'
-              ? 0.025
-              : 0.0,
-      warmth: look == 'Warm' || look == 'Sunset' || look == 'Peach'
-          ? 0.22 * strength
-          : look == 'Cool' || look == 'Ice'
-              ? -0.18 * strength
-              : 0.0,
+      smoothing: _beautySmoothing,
+      glow: _beautyGlow,
+      brightness: _beautyBrightness,
+      warmth: _beautyWarmth,
     );
   }
 
@@ -986,22 +984,10 @@ class _LiveScreenState extends State<LiveScreen> {
     await _liveBeautyProcessor?.update(
       look: look,
       intensity: strength,
-      smoothing: look == 'Soft Glow' ? 0.42 : 0.12 + (strength * 0.12),
-      glow: look == 'Soft Glow'
-          ? 0.38
-          : look == 'Natural'
-              ? 0.08
-              : 0.16 * strength,
-      brightness: look == 'Cinema'
-          ? -0.035
-          : look == 'Peach' || look == 'Sunset'
-              ? 0.025
-              : 0.0,
-      warmth: look == 'Warm' || look == 'Sunset' || look == 'Peach'
-          ? 0.22 * strength
-          : look == 'Cool' || look == 'Ice'
-              ? -0.18 * strength
-              : 0.0,
+      smoothing: _beautySmoothing,
+      glow: _beautyGlow,
+      brightness: _beautyBrightness,
+      warmth: _beautyWarmth,
     );
   }
 
@@ -2544,108 +2530,173 @@ class _LiveScreenState extends State<LiveScreen> {
     }
   }
 
+  ColorFilter _filterThumbnailEffect(String filter) {
+    final tint = switch (filter) {
+      'Soft Glow' => const Color(0xFFFFD0B0), 'Vivid' => const Color(0xFFFFC85A),
+      'Cinema' => const Color(0xFF6C9FC6), 'Warm' => const Color(0xFFFFA45C),
+      'Sunset' => const Color(0xFFFF806B), 'Cool' => const Color(0xFF70BFFF),
+      'Ice' => const Color(0xFFB8E6FF), 'Rose' => const Color(0xFFFF78B7),
+      'Peach' => const Color(0xFFFFB58D), 'Mint' => const Color(0xFF78D9B2),
+      'Lavender' => const Color(0xFFB69AFF), 'Mono' => const Color(0xFFB8BEC8),
+      _ => Colors.transparent,
+    };
+    if (filter == 'Mono') {
+      const r = .2126, g = .7152, b = .0722;
+      return const ColorFilter.matrix(<double>[r,g,b,0,0,r,g,b,0,0,r,g,b,0,0,0,0,0,1,0]);
+    }
+    return ColorFilter.mode(tint.withOpacity(.34), BlendMode.softLight);
+  }
+
+  Widget _beautySliderRow(String label, double value, ValueChanged<double> onChanged, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Icon(icon, color: const Color(0xFFE6C47A), size: 22),
+        const SizedBox(width: 9),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700))),
+            Text((value * 100).round().toString() + '%', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          ]),
+          Slider(value: value.clamp(0.0, 1.0), onChanged: onChanged, activeColor: const Color(0xFFB65CFF)),
+        ])),
+      ]),
+    );
+  }
+
   Future<void> _openLiveFilterSettings() async {
     final roomId = _roomId;
     final userId = _myId;
     final liveNow = _isLive;
     if (!_isHost || _selectedRoomType != 'video') return;
     if (liveNow && (roomId == null || userId == null)) return;
-
     var selected = _previewFilter;
     var strength = _filterStrength;
+    var smoothing = _beautySmoothing;
+    var glow = _beautyGlow;
+    var brightness = _beautyBrightness;
+    var warmth = _beautyWarmth;
+    var tab = 'Filters';
     var saving = false;
+    const tabs = <String>['Beauty', 'Filters', 'Makeup', 'AR'];
 
     await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF171126),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
+      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF10091D),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('LIVE VIDEO FILTERS',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+          child: SizedBox(height: MediaQuery.of(context).size.height * .88,
+            child: Padding(padding: const EdgeInsets.fromLTRB(15, 12, 15, 18),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Center(child: Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white30, borderRadius: BorderRadius.circular(8)))),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _previewFilters.map((filter) => ChoiceChip(
-                    label: Text(filter),
-                    selected: selected == filter,
-                    selectedColor: Colors.white,
-                    backgroundColor: const Color(0xFF202020),
-                    side: const BorderSide(color: Color(0x66FFFFFF)),
-                    labelStyle: TextStyle(color: selected == filter ? Colors.black : Colors.white, fontWeight: FontWeight.w700),
-                    onSelected: saving ? null : (_) => setSheetState(() => selected = filter),
-                  )).toList(),
-                ),
-                const SizedBox(height: 10),
                 Row(children: [
-                  const Text('Intensity', style: TextStyle(color: Colors.white70)),
-                  Expanded(child: Slider(
-                    value: strength,
-                    min: 0,
-                    max: 1,
-                    onChanged: saving ? null : (value) => setSheetState(() => strength = value),
-                  )),
-                  Text('${(strength * 100).round()}%', style: const TextStyle(color: Colors.white)),
+                  const Icon(Icons.auto_awesome, color: Color(0xFFE6C47A)),
+                  const SizedBox(width: 8),
+                  const Expanded(child: Text('ZOONL BEAUTY ENGINE', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900))),
+                  Switch(value: selected != 'Natural' || smoothing > 0 || glow > 0,
+                    onChanged: saving ? null : (v) => setSheetState(() {
+                      if (!v) { selected='Natural'; strength=0; smoothing=0; glow=0; brightness=0; warmth=0; }
+                      else { selected='Natural'; strength=.65; smoothing=.25; glow=.2; }
+                    })),
                 ]),
-                const Text(
-                  'ZOONL Beauty Studio processes camera frames before LiveKit publishing: subtle smoothing, glow, brightness and warm/cool tone. Face Studio avatar tracking and AR masks are a separate engine and are not active in this build.',
-                  style: TextStyle(color: Colors.white60, fontSize: 11),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
+                Wrap(spacing: 6, children: tabs.map((item) => ChoiceChip(
+                  label: Text(item), selected: tab == item, selectedColor: const Color(0xFF8F3BDB),
+                  backgroundColor: const Color(0xFF21152F),
+                  labelStyle: TextStyle(color: tab == item ? Colors.white : Colors.white70),
+                  onSelected: saving ? null : (_) => setSheetState(() => tab = item),
+                )).toList()),
+                const SizedBox(height: 10),
+                Expanded(child: tab == 'Filters'
+                  ? GridView.builder(
+                      itemCount: _previewFilters.length,
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 9, childAspectRatio: .82),
+                      itemBuilder: (context, index) {
+                        final filter = _previewFilters[index];
+                        final camera = _previewCamera;
+                        final tint = switch (filter) {
+                          'Warm' => const Color(0xFFFFA45C), 'Sunset' => const Color(0xFFFF806B),
+                          'Cool' => const Color(0xFF70BFFF), 'Rose' => const Color(0xFFFF78B7),
+                          'Peach' => const Color(0xFFFFB58D), 'Mint' => const Color(0xFF78D9B2),
+                          'Lavender' => const Color(0xFFB69AFF), 'Ice' => const Color(0xFFB8E6FF),
+                          'Vivid' => const Color(0xFFFFC85A), 'Cinema' => const Color(0xFF6C9FC6),
+                          'Mono' => const Color(0xFFB8BEC8), _ => const Color(0xFFE6C47A),
+                        };
+                        final active = selected == filter;
+                        return InkWell(
+                          onTap: saving ? null : () => setSheetState(() => selected = filter),
+                          borderRadius: BorderRadius.circular(13),
+                          child: Container(
+                            decoration: BoxDecoration(color: const Color(0xFF21152F), borderRadius: BorderRadius.circular(13),
+                              border: Border.all(color: active ? const Color(0xFFE6C47A) : Colors.white24, width: active ? 2 : 1)),
+                            child: Column(children: [
+                              Expanded(child: ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+                                child: Stack(fit: StackFit.expand, children: [
+                                  if (camera != null && camera.value.isInitialized)
+                                    ColorFiltered(colorFilter: _filterThumbnailEffect(filter), child: CameraPreview(camera))
+                                  else
+                                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [tint, const Color(0xFF241638), const Color(0xFF080510)])),
+                                      child: const Center(child: Icon(Icons.face_retouching_natural, color: Colors.white, size: 32))),
+                                  if (active) const Positioned(right: 5, top: 5, child: CircleAvatar(radius: 10, backgroundColor: Color(0xFFE6C47A), child: Icon(Icons.check, size: 13, color: Colors.black))),
+                                ]))),
+                              Padding(padding: const EdgeInsets.all(6), child: Text(filter, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: active ? const Color(0xFFFFD98B) : Colors.white, fontSize: 10, fontWeight: FontWeight.w800))),
+                            ]),
+                          ),
+                        );
+                      },
+                    )
+                  : tab == 'Beauty'
+                    ? ListView(children: [
+                        _beautySliderRow('Skin Smoothing', smoothing, (v) => setSheetState(() => smoothing=v), Icons.face_retouching_natural),
+                        _beautySliderRow('Skin Glow', glow, (v) => setSheetState(() => glow=v), Icons.water_drop),
+                        _beautySliderRow('Brightness', (brightness+1)/2, (v) => setSheetState(() => brightness=v*2-1), Icons.wb_sunny),
+                        _beautySliderRow('Warm / Cool', (warmth+1)/2, (v) => setSheetState(() => warmth=v*2-1), Icons.thermostat),
+                        _beautySliderRow('Filter Intensity', strength, (v) => setSheetState(() => strength=v), Icons.palette),
+                        const Text('Controls are processed on the outgoing Android camera frames. Face-aware tracking and AR masks require a separate engine.',
+                          style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      ])
+                    : Center(child: Container(width: double.infinity, padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(color: const Color(0xFF21152F), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0x66A45BFF))),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(tab == 'Makeup' ? Icons.brush : Icons.face_3, color: const Color(0xFFE6C47A), size: 40),
+                          const SizedBox(height: 8),
+                          Text(tab + ' engine is not connected yet', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                          const Text('No fake effect is applied. This option will activate after its real engine is installed.',
+                            textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 11)),
+                        ])))),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: OutlinedButton.icon(onPressed: saving ? null : () => setSheetState(() {
+                    selected='Natural'; strength=.35; smoothing=.15; glow=.15; brightness=0; warmth=0;
+                  }), icon: const Icon(Icons.refresh), label: const Text('RESET'))),
+                  const SizedBox(width: 8),
+                  Expanded(child: FilledButton.icon(
                     onPressed: saving ? null : () async {
-                      setSheetState(() => saving = true);
+                      setSheetState(() => saving=true);
                       try {
                         if (liveNow) {
-                          final updated = await _supabase.from('live_rooms')
-                            .update({
-                              'video_filter_code': selected,
-                              'video_filter_strength': strength,
-                            })
-                            .eq('id', roomId!)
-                            .eq('owner_id', userId!)
-                            .select('id')
-                            .maybeSingle();
-                          if (updated == null) {
-                            throw StateError('Room filter could not be saved. Check live-room update permission.');
-                          }
-                          await _updateLiveBeautyProcessor(
-                            look: selected,
-                            strength: strength,
-                          );
+                          final updated = await _supabase.from('live_rooms').update({
+                            'video_filter_code': selected, 'video_filter_strength': strength,
+                          }).eq('id', roomId!).eq('owner_id', userId!).select('id').maybeSingle();
+                          if (updated == null) throw StateError('Room filter could not be saved. Check live-room update permission.');
                         }
-                        if (mounted) {
-                          setState(() {
-                            _previewFilter = selected;
-                            _filterStrength = strength;
-                            _filterConfirmed = true;
-                          });
-                        }
+                        if (mounted) setState(() {
+                          _previewFilter=selected; _filterStrength=strength; _beautySmoothing=smoothing;
+                          _beautyGlow=glow; _beautyBrightness=brightness; _beautyWarmth=warmth; _filterConfirmed=true;
+                        });
+                        if (liveNow) await _updateLiveBeautyProcessor(look: selected, strength: strength);
                         if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                        _showMessage(liveNow ? 'Beauty filter applied to the live camera.' : 'Beauty filter saved for your next live.');
+                        _showMessage(liveNow ? 'Beauty settings applied to live camera.' : 'Beauty settings saved for your next live.');
                       } catch (error) {
-                        setSheetState(() => saving = false);
-                        _showMessage('Filter update failed: ${_readable(error)}');
+                        setSheetState(() => saving=false);
+                        _showMessage('Beauty update failed: ' + _readable(error));
                       }
                     },
-                    child: Text(saving ? 'SAVING...' : 'APPLY TO LIVE'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+                    icon: const Icon(Icons.check), label: Text(saving ? 'APPLYING…' : 'APPLY'))),
+                ]),
+              ]),
+            )),
         ),
       ),
     );
