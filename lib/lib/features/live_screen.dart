@@ -557,93 +557,47 @@ class _LiveScreenState extends State<LiveScreen> {
         : ((_hostStarDailyCoins - previous) / (next - previous))
             .clamp(0.0, 1.0)
             .toDouble();
-    final color = stars == 0 ? const Color(0xFF9AA6B8) : _starColors[stars - 1];
-    return Container(
-      width: 190,
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xCC101426),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(.72), width: 1),
-        boxShadow: [BoxShadow(color: color.withOpacity(.22), blurRadius: 9)],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                stars == 0 ? '0 STAR' : '$stars STAR',
-                style: TextStyle(
-                  color: color,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: .7,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                stars >= 5 ? 'MAX' : '${_hostStarDailyCoins} / $next',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              height: 5,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  const ColoredBox(color: Colors.white12),
-                  FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: stars == 0
-                              ? const [Color(0xFF7D8797), Color(0xFFB7C1D2)]
-                              : [color.withOpacity(.55), color, Colors.white],
-                        ),
-                        boxShadow: [
-                          BoxShadow(color: color.withOpacity(.7), blurRadius: 7),
+    return SizedBox(
+      width: 92,
+      height: 7,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Colors.white12),
+            Row(
+              children: List.generate(5, (index) {
+                final tierColor = _starColors[index];
+                final completed = index < stars;
+                final current = index == stars && stars < 5;
+                final fill = completed ? 1.0 : current ? progress : 0.0;
+                return Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(right: index == 4 ? 0 : 2),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          tierColor.withOpacity(completed || current ? .55 : .12),
+                          tierColor.withOpacity(completed || current ? 1 : .22),
+                          Colors.white.withOpacity(completed ? .85 : .08),
                         ],
                       ),
+                      borderRadius: BorderRadius.circular(5),
+                      boxShadow: completed || current
+                          ? [BoxShadow(color: tierColor.withOpacity(.65), blurRadius: 5)]
+                          : const [],
+                    ),
+                    foregroundDecoration: BoxDecoration(
+                      color: Colors.black.withOpacity((1 - fill) * .72),
+                      borderRadius: BorderRadius.circular(5),
                     ),
                   ),
-                ],
-              ),
+                );
+              }),
             ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: List.generate(5, (index) {
-              final active = index < stars;
-              final tierColor = _starColors[index];
-              return Expanded(
-                child: Container(
-                  height: 2,
-                  margin: EdgeInsets.only(right: index == 4 ? 0 : 3),
-                  decoration: BoxDecoration(
-                    color: active ? tierColor : Colors.white12,
-                    borderRadius: BorderRadius.circular(3),
-                    boxShadow: active
-                        ? [BoxShadow(color: tierColor.withOpacity(.65), blurRadius: 5)]
-                        : const [],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -730,18 +684,23 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _loadMyLevel() async {
-    final userId = _myId;
-    if (userId == null) return;
+    if (_myId == null) return;
     try {
-      final profile = await _supabase.from('profiles')
-          .select('user_level').eq('id', userId).maybeSingle();
-      final owner = await _supabase.rpc('is_zoonl_owner') == true;
+      // Keep Live on the exact same authoritative level source as Level Screen.
+      final values = await Future.wait<dynamic>([
+        _supabase.rpc('zoonl_my_level'),
+        _supabase.rpc('is_zoonl_owner'),
+      ]);
+      final level = (values[0] as num?)?.toInt() ?? 1;
+      final owner = values[1] == true;
       if (!mounted) return;
       setState(() {
-        _hostLevel = (profile?['user_level'] as num?)?.toInt() ?? 1;
+        _hostLevel = level.clamp(1, 100);
         _isTrustedOwner = owner;
       });
-    } catch (_) {}
+    } catch (error) {
+      if (mounted) _showMessage('Live level could not load: ${_readable(error)}');
+    }
   }
 
   Future<void> _initializePreviewCamera() async {
@@ -973,9 +932,8 @@ class _LiveScreenState extends State<LiveScreen> {
       _roomId = roomId;
       _roomOwnerId = myId;
       unawaited(_loadHostIdentity(myId));
-      final hostProfile = await _supabase.from('profiles')
-          .select('user_level').eq('id', myId).maybeSingle();
-      _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
+      final liveLevel = await _supabase.rpc('zoonl_my_level');
+      _hostLevel = ((liveLevel as num?)?.toInt() ?? 1).clamp(1, 100);
       unawaited(_loadHostStarProgress(myId));
 
       await _connectLiveKit(roomId);
