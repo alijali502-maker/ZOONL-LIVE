@@ -1937,7 +1937,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
                   final pulse = math.sin(t * math.pi).clamp(0.0, 1.0);
                   final rotY = math.sin(t * math.pi * 2) * 0.22;
                   final g = activeGift!;
-                  final media = g.hasVideo || g.hasAnimatedImage || g.imageUrl.isNotEmpty;
+                  final media = g.modelUrl.isNotEmpty || g.hasVideo || g.hasAnimatedImage || g.imageUrl.isNotEmpty;
                   return Container(
                     color: Colors.black.withOpacity(0.55 * pulse),
                     child: Center(
