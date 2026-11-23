@@ -1,5 +1,6 @@
 
 name: Build ZOONL LIVE APK
+# Trigger a fresh verification build for the current beauty-engine changes.
 
 on:
   workflow_dispatch:
