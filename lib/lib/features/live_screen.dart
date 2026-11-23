@@ -552,42 +552,99 @@ class _LiveScreenState extends State<LiveScreen> {
     final stars = _hostStarCount.clamp(0, 5);
     final next = stars >= 5 ? _starThresholds.last : _starThresholds[stars];
     final previous = stars == 0 ? 0 : _starThresholds[stars - 1];
-    final progress = stars >= 5 ? 1.0 : ((_hostStarDailyCoins - previous) / (next - previous)).clamp(0.0, 1.0).toDouble();
+    final progress = stars >= 5
+        ? 1.0
+        : ((_hostStarDailyCoins - previous) / (next - previous))
+            .clamp(0.0, 1.0)
+            .toDouble();
     final color = stars == 0 ? const Color(0xFF9AA6B8) : _starColors[stars - 1];
-    final label = stars == 0 ? '0 STAR' : '$stars STAR';
     return Container(
-      width: 238,
-      margin: const EdgeInsets.only(top: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      width: 190,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xF5101728), color.withOpacity(.34), const Color(0xF50A1020)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(.9), width: 1.2),
-        boxShadow: [BoxShadow(color: color.withOpacity(.28), blurRadius: 16), const BoxShadow(color: Colors.black54, blurRadius: 7, offset: Offset(0, 4))],
+        color: const Color(0xCC101426),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(.72), width: 1),
+        boxShadow: [BoxShadow(color: color.withOpacity(.22), blurRadius: 9)],
       ),
-      child: Row(children: [
-        Container(
-          width: 43, height: 43,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(colors: [color.withOpacity(.95), const Color(0xFF172033), color.withOpacity(.65)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            border: Border.all(color: Colors.white.withOpacity(.72), width: 1.1),
-            boxShadow: [BoxShadow(color: color.withOpacity(.55), blurRadius: 12)],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                stars == 0 ? '0 STAR' : '$stars STAR',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: .7,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                stars >= 5 ? 'MAX' : '${_hostStarDailyCoins} / $next',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
-          child: Center(child: Text('$stars', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black87, blurRadius: 5, offset: Offset(0, 2))]))),
-        ),
-        const SizedBox(width: 10),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: .8)), const Spacer(), Text(' / 5', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w800))]),
-          const SizedBox(height: 6),
-          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.white12, valueColor: AlwaysStoppedAnimation<Color>(color))),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const ColoredBox(color: Colors.white12),
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: stars == 0
+                              ? const [Color(0xFF7D8797), Color(0xFFB7C1D2)]
+                              : [color.withOpacity(.55), color, Colors.white],
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: color.withOpacity(.7), blurRadius: 7),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(stars >= 5 ? 'Daily star target completed' : '$_hostStarDailyCoins / $next coins today', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 8)),
-        ])),
-      ]),
+          Row(
+            children: List.generate(5, (index) {
+              final active = index < stars;
+              final tierColor = _starColors[index];
+              return Expanded(
+                child: Container(
+                  height: 2,
+                  margin: EdgeInsets.only(right: index == 4 ? 0 : 3),
+                  decoration: BoxDecoration(
+                    color: active ? tierColor : Colors.white12,
+                    borderRadius: BorderRadius.circular(3),
+                    boxShadow: active
+                        ? [BoxShadow(color: tierColor.withOpacity(.65), blurRadius: 5)]
+                        : const [],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 
