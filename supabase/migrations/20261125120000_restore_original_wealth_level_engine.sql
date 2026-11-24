@@ -84,3 +84,9 @@ REVOKE ALL ON FUNCTION public.zoonl_level_for_user(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.zoonl_level_for_user(uuid) TO authenticated;
 REVOKE ALL ON FUNCTION public.zoonl_my_lifetime_gift_exp() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.zoonl_my_lifetime_gift_exp() TO authenticated;
+
+-- Repair the current Owner row after installing the corrected trigger.
+UPDATE public.profiles p
+SET wealth_level = 100
+FROM public.owner_control_settings o
+WHERE o.id = 1 AND p.id = o.owner_user_id;
