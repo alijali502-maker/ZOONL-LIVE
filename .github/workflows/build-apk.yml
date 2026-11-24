@@ -47,6 +47,24 @@ jobs:
         run: |
           flutter create --platforms=android --project-name zoonl_live --org com.zoonllive /tmp/zoonl-live-scaffold
           cp -R /tmp/zoonl-live-scaffold/android "$GITHUB_WORKSPACE/android"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          for path in (Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")):
+              if not path.exists():
+                  continue
+              source = path.read_text()
+              if path.suffix == ".kts":
+                  source, count = re.subn(r"minSdk\s*=\s*flutter\.minSdkVersion", "minSdk = 23", source)
+              else:
+                  source, count = re.subn(r"minSdkVersion\s+flutter\.minSdkVersion", "minSdkVersion 23", source)
+              if count:
+                  path.write_text(source)
+                  print(f"Set ML Kit minimum Android SDK to 23 in {path}")
+                  break
+          else:
+              raise SystemExit("Could not locate generated Android minSdk setting.")
+          PY
 
       - name: Install ZOONL native outgoing-video Beauty processor
         run: |
@@ -63,9 +81,16 @@ jobs:
           import org.webrtc.JavaI420Buffer;
           import org.webrtc.VideoFrame;
           import org.webrtc.YuvHelper;
+          import com.google.mlkit.vision.common.InputImage;
+          import com.google.mlkit.vision.face.Face;
+          import com.google.mlkit.vision.face.FaceDetection;
+          import com.google.mlkit.vision.face.FaceDetector;
+          import com.google.mlkit.vision.face.FaceDetectorOptions;
+          import android.graphics.Rect;
           import java.nio.ByteBuffer;
           import java.util.Arrays;
           import java.util.HashMap;
+          import java.util.concurrent.atomic.AtomicBoolean;
           import java.util.Map;
           import io.flutter.plugin.common.BinaryMessenger;
           import io.flutter.plugin.common.MethodCall;
@@ -76,7 +101,68 @@ jobs:
             private static final class BeautyProcessor implements LocalVideoTrack.ExternalVideoFrameProcessing {
               volatile double smoothing, glow, brightness, warmth, intensity;
               volatile String look = "Natural";
-              private byte[] neutralChroma = new byte[0];
+              private final FaceDetector faceDetector;
+              private final AtomicBoolean faceDetectionBusy = new AtomicBoolean(false);
+              private volatile float faceLeft = -1f, faceTop = -1f, faceRight = -1f, faceBottom = -1f;
+              private volatile long lastFaceDetectionNs = 0L;
+
+              BeautyProcessor() {
+                FaceDetectorOptions options = new FaceDetectorOptions.Builder()
+                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                    .enableTracking()
+                    .build();
+                faceDetector = FaceDetection.getClient(options);
+              }
+
+              private void detectFace(VideoFrame.I420Buffer src, int width, int height, long timestampNs) {
+                if (faceDetectionBusy.get() || timestampNs - lastFaceDetectionNs < 120_000_000L) return;
+                if (!faceDetectionBusy.compareAndSet(false, true)) return;
+                lastFaceDetectionNs = timestampNs;
+                try {
+                  int cw = (width + 1) / 2, ch = (height + 1) / 2;
+                  byte[] nv21 = new byte[width * height + 2 * cw * ch];
+                  ByteBuffer y = src.getDataY(), u = src.getDataU(), v = src.getDataV();
+                  int yi = 0;
+                  for (int row = 0; row < height; row++)
+                    for (int col = 0; col < width; col++)
+                      nv21[yi++] = y.get(row * src.getStrideY() + col);
+                  int ci = width * height;
+                  for (int row = 0; row < ch; row++) {
+                    for (int col = 0; col < cw; col++) {
+                      nv21[ci++] = v.get(row * src.getStrideV() + col);
+                      nv21[ci++] = u.get(row * src.getStrideU() + col);
+                    }
+                  }
+                  InputImage image = InputImage.fromByteArray(
+                      nv21, width, height, 0, InputImage.IMAGE_FORMAT_NV21);
+                  faceDetector.process(image)
+                      .addOnSuccessListener(faces -> {
+                        Face largest = null;
+                        int largestArea = 0;
+                        for (Face face : faces) {
+                          Rect bounds = face.getBoundingBox();
+                          int area = Math.max(0, bounds.width()) * Math.max(0, bounds.height());
+                          if (area > largestArea) { largestArea = area; largest = face; }
+                        }
+                        if (largest == null) {
+                          faceLeft = faceTop = faceRight = faceBottom = -1f;
+                        } else {
+                          Rect bounds = largest.getBoundingBox();
+                          faceLeft = Math.max(0f, bounds.left / (float) width);
+                          faceTop = Math.max(0f, bounds.top / (float) height);
+                          faceRight = Math.min(1f, bounds.right / (float) width);
+                          faceBottom = Math.min(1f, bounds.bottom / (float) height);
+                        }
+                      })
+                      .addOnCompleteListener(task -> faceDetectionBusy.set(false));
+                } catch (Exception error) {
+                  faceDetectionBusy.set(false);
+                }
+              }
+
+              void close() { faceDetector.close(); }
 
               void configure(MethodCall call) {
                 smoothing = number(call, "smoothing", 0.15);
@@ -102,7 +188,10 @@ jobs:
                 VideoFrame.I420Buffer src = input.getBuffer().toI420();
                 if (src == null) return input;
                 final int width = src.getWidth(), height = src.getHeight();
+                detectFace(src, width, height, input.getTimestampNs());
                 final int cw = (width + 1) / 2, ch = (height + 1) / 2;
+                final float detectedLeft = faceLeft, detectedTop = faceTop;
+                final float detectedRight = faceRight, detectedBottom = faceBottom;
                 JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
                 double amount = Math.max(0.0, Math.min(1.0, intensity));
                 double saturation = 1.0;
@@ -130,7 +219,18 @@ jobs:
                     int chromaIndex = (row / 2) * src.getStrideU() + (col / 2);
                     int skinU = src.getDataU().get(chromaIndex) & 255;
                     int skinV = src.getDataV().get(chromaIndex) & 255;
-                    boolean skinPixel = center > 48 && center < 238
+                    float nx = col / (float) width, ny = row / (float) height;
+                    boolean inFace = detectedLeft >= 0f
+                        && nx >= detectedLeft && nx <= detectedRight
+                        && ny >= detectedTop && ny <= detectedBottom;
+                    if (inFace) {
+                      float fx = (nx - (detectedLeft + detectedRight) * 0.5f)
+                          / Math.max(0.001f, (detectedRight - detectedLeft) * 0.5f);
+                      float fy = (ny - (detectedTop + detectedBottom) * 0.5f)
+                          / Math.max(0.001f, (detectedBottom - detectedTop) * 0.5f);
+                      inFace = (fx * fx) + (fy * fy) <= 1.12f;
+                    }
+                    boolean skinPixel = inFace && center > 48 && center < 238
                         && skinU >= 72 && skinU <= 142 && skinV >= 128 && skinV <= 190;
                     if (smooth > 0.001 && skinPixel) {
                       // Edge-preserving local smoothing, limited to skin-toned pixels.
@@ -154,6 +254,10 @@ jobs:
                       value = center * (1.0 - smooth) + (sum / (double) count) * smooth;
                     }
                     value += lift;
+                    if (skinPixel) {
+                      // Face-only skin brightening: never lift the whole frame to fake whitening.
+                      value += (255.0 - value) * Math.min(0.16, amount * 0.12);
+                    }
                     value += Math.max(0.0, value - 112.0) * light * 0.075;
                     value = 128.0 + (value - 128.0) * contrast;
                     dy.put(row * ds + col, (byte) Math.max(0, Math.min(255, (int) Math.round(value))));
@@ -210,6 +314,7 @@ jobs:
                 BeautyProcessor processor = processors.remove(id);
                 LocalVideoTrack track = findTrack(id);
                 if (processor != null && track != null) track.removeProcessor(processor);
+                if (processor != null) processor.close();
                 result.success(processor != null);
               } else {
                 result.notImplemented();
@@ -220,6 +325,7 @@ jobs:
               for (Map.Entry<String, BeautyProcessor> entry : processors.entrySet()) {
                 LocalVideoTrack track = findTrack(entry.getKey());
                 if (track != null) track.removeProcessor(entry.getValue());
+                entry.getValue().close();
               }
               processors.clear();
               channel.setMethodCallHandler(null);
@@ -383,21 +489,26 @@ jobs:
           if target is None:
               raise SystemExit("Android app Gradle file was not generated.")
           source = target.read_text()
-          coordinate = "io.github.webrtc-sdk:android:137.7151.04"
-          if coordinate in source:
-              print("WebRTC native dependency already exposed to app compile classpath.")
-              raise SystemExit(0)
-          line = (f'    implementation("{coordinate}")' if target.suffix == ".kts"
-                  else f"    implementation '{coordinate}'")
-          match = re.search(r"dependencies\s*\{", source)
-          if match:
-              source = source[:match.end()] + "\n" + line + "\n" + source[match.end():]
-          else:
-              source = source.rstrip() + "\n\ndependencies {\n" + line + "\n}\n"
+          coordinates = [
+              "io.github.webrtc-sdk:android:137.7151.04",
+              "com.google.mlkit:face-detection:16.1.7",
+          ]
+          for coordinate in coordinates:
+              if coordinate in source:
+                  print(f"Dependency already present: {coordinate}")
+                  continue
+              line = (f'    implementation("{coordinate}")' if target.suffix == ".kts"
+                      else f"    implementation '{coordinate}'")
+              match = re.search(r"dependencies\s*\{", source)
+              if match:
+                  source = source[:match.end()] + "\n" + line + "\n" + source[match.end():]
+              else:
+                  source = source.rstrip() + "\n\ndependencies {\n" + line + "\n}\n"
           target.write_text(source)
-          if coordinate not in target.read_text():
-              raise SystemExit("WebRTC dependency injection did not persist.")
-          print(f"Added {coordinate} to {target} so native frame processor can compile.")
+          for coordinate in coordinates:
+              if coordinate not in target.read_text():
+                  raise SystemExit(f"Dependency injection did not persist: {coordinate}")
+          print(f"Added WebRTC and bundled ML Kit face detection dependencies to {target}.")
           PY
 
       - name: Clean project
