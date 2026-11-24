@@ -422,10 +422,11 @@ jobs:
           print("Gradle plugin resolution repositories verified.")
           PY
 
-      - name: Set Android minimum SDK for native video filters
+      - name: Verify Android minimum SDK for native video filters
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           candidates = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
           target = next((p for p in candidates if p.exists()), None)
@@ -433,13 +434,14 @@ jobs:
               raise SystemExit("Android app Gradle file was not generated.")
           source = target.read_text()
           if target.suffix == ".kts":
-              source = source.replace("minSdk = flutter.minSdkVersion", "minSdk = 24")
+              source, count = re.subn(r"minSdk\\s*=\\s*(?:flutter\\.minSdkVersion|\\d+)", "minSdk = 23", source, count=1)
           else:
-              source = source.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 24")
-          target.write_text(source)
-          if "minSdk = 24" not in source and "minSdkVersion 24" not in source:
-              raise SystemExit("Could not set Android minSdkVersion to 24.")
-          print(f"Android minSdkVersion set to 24 in {target}")
+              source, count = re.subn(r"minSdkVersion\\s+(?:flutter\\.minSdkVersion|\\d+)", "minSdkVersion 23", source, count=1)
+          if count:
+              target.write_text(source)
+          if not re.search(r"minSdk\\s*=\\s*23", source) and not re.search(r"minSdkVersion\\s+23", source):
+              raise SystemExit(f"Could not verify minSdkVersion 23 in {target}")
+          print(f"Android minSdkVersion verified at 23 in {target}")
           PY
 
       - name: Add Android Internet Permission
