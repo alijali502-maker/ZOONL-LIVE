@@ -141,8 +141,9 @@ jobs:
                   }
                   int rotation = ((rotationDegrees % 360) + 360) % 360;
                   if (rotation != 0 && rotation != 90 && rotation != 180 && rotation != 270) rotation = 0;
+                  final int frameRotation = rotation;
                   InputImage image = InputImage.fromByteArray(
-                      nv21, width, height, rotation, InputImage.IMAGE_FORMAT_NV21);
+                      nv21, width, height, frameRotation, InputImage.IMAGE_FORMAT_NV21);
                   faceDetector.process(image)
                       .addOnSuccessListener(faces -> {
                         Face largest = null;
@@ -162,14 +163,14 @@ jobs:
                           // ML Kit reports contour points in the rotated image space.
                           // Convert them back to the unrotated I420 buffer coordinate space
                           // before the skin mask is applied to the outgoing frame.
-                          final float rotatedWidth = (rotation == 90 || rotation == 270) ? height : width;
-                          final float rotatedHeight = (rotation == 90 || rotation == 270) ? width : height;
+                          final float rotatedWidth = (frameRotation == 90 || frameRotation == 270) ? height : width;
+                          final float rotatedHeight = (frameRotation == 90 || frameRotation == 270) ? width : height;
                           for (int i = 0; i < points.size(); i++) {
                             float rx = points.get(i).x / rotatedWidth;
                             float ry = points.get(i).y / rotatedHeight;
-                            if (rotation == 90) { xs[i] = ry; ys[i] = 1.0f - rx; }
-                            else if (rotation == 180) { xs[i] = 1.0f - rx; ys[i] = 1.0f - ry; }
-                            else if (rotation == 270) { xs[i] = 1.0f - ry; ys[i] = rx; }
+                            if (frameRotation == 90) { xs[i] = ry; ys[i] = 1.0f - rx; }
+                            else if (frameRotation == 180) { xs[i] = 1.0f - rx; ys[i] = 1.0f - ry; }
+                            else if (frameRotation == 270) { xs[i] = 1.0f - ry; ys[i] = rx; }
                             else { xs[i] = rx; ys[i] = ry; }
                           }
                           faceContourX = xs;
