@@ -53,9 +53,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
   String _rankName(int level) {
     for (final row in _levels) {
       if ((row['level'] as num?)?.toInt() == level) {
-        final tier = row['tier_name']?.toString().trim() ?? '';
-        final title = row['title']?.toString().trim() ?? '';
-        if (tier.isNotEmpty) return '$tier • $level';
+        final title = row['level_name']?.toString().trim() ?? '';
         if (title.isNotEmpty) return title;
       }
     }
@@ -77,7 +75,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
       final r=await Future.wait<dynamic>([
         _db.rpc('zoonl_my_level'),
         _db.rpc('zoonl_my_lifetime_gift_exp'),
-        _db.from('wealth_levels').select('level,tier_bracket,tier_name,title,required_exp,badge_gradient,badge_border,badge_glow,chat_ribbon_theme,chat_ribbon_bg,chat_ribbon_border,chat_ribbon_shadow,unlocked_perk,is_milestone').order('level'),
+        _db.from('level_definitions').select('level,required_exp,level_name,level_config').order('level'),
         _db.rpc('is_zoonl_owner'),
         _db.from('user_prime_memberships').select('expires_at,is_active').eq('user_id',user.id).eq('is_active',true),
         _db.from('zoonl_live_user_baggage').select('zoonl_item_code,item_type,is_equipped,expires_at').eq('user_id',user.id).eq('project_name','ZOONL LIVE'),
@@ -196,7 +194,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
       const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text(_rankName(n),style:TextStyle(color:reached?Colors.white:Colors.white38,fontSize:9,fontWeight:FontWeight.w900,letterSpacing:.5)),
         const SizedBox(height:3),
-        Text(data['title']?.toString() ?? '',maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70,fontSize:8)),
+        Text(((data['level_config'] as Map?)?['tier'] ?? 'Lifetime gift EXP').toString().toUpperCase(),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70,fontSize:8)),
         const SizedBox(height:4),Text('Lifetime target  ${_fmt(goal)} EXP',style:const TextStyle(color:Colors.white54,fontSize:9))])),
       Icon(active?Icons.auto_awesome:reached?Icons.verified:Icons.lock_outline,color:active||reached?c[1]:Colors.white24,size:18),
     ]),active?c[1]:reached?c[0]:Colors.white24,padding:const EdgeInsets.symmetric(horizontal:11,vertical:8)));
