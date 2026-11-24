@@ -62,7 +62,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
 
       final profile = await Backend.client
           .from('profiles')
-          .select('username, display_name, avatar_url, user_level, is_verified')
+          .select('username, display_name, avatar_url, is_verified')
           .eq('id', userId)
           .maybeSingle();
 
@@ -72,6 +72,11 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .eq('user_id', userId)
           .maybeSingle();
       final owner = await Backend.isZoonlOwner();
+      final dynamic serverLevelRaw = await Backend.client.rpc('zoonl_my_level');
+      if (serverLevelRaw is! num) {
+        throw StateError('Supabase did not return the current wealth level.');
+      }
+      final serverLevel = serverLevelRaw.toInt().clamp(1, 100);
       var roomQuery = Backend.client
           .from('live_rooms')
           .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
@@ -120,6 +125,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
         _profile = <String, dynamic>{
           ..._map(profile),
           'zoonl_id': publicProfile?['zoonl_id'],
+          'server_level': serverLevel,
         };
         _canHost = owner || profile?['is_verified'] == true;
         _rooms = (roomsRaw as List)
@@ -314,7 +320,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   Widget build(BuildContext context) {
     final name = (_profile['display_name'] ?? 'ZOONL Member').toString();
     final publicId = (_profile['zoonl_id'] ?? '').toString();
-    final level = (_profile['user_level'] as num?)?.toInt() ?? 1;
+    final level = (_profile['server_level'] as num?)?.toInt() ?? 1;
 
     return Scaffold(
       backgroundColor: _bg,
