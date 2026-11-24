@@ -438,13 +438,11 @@ class ZoonlAuthGate extends StatelessWidget {
         .maybeSingle();
 
     final zoonlId = publicProfile?['zoonl_id']?.toString().trim() ?? '';
-    int serverLevel = (profile['user_level'] as num?)?.toInt() ?? 1;
-    try {
-      final dynamic resolvedLevel = await client.rpc('zoonl_my_level');
-      if (resolvedLevel is num) serverLevel = resolvedLevel.toInt();
-    } catch (_) {
-      // Keep the stored profile level if the trusted level RPC is unavailable.
+    final dynamic resolvedLevel = await client.rpc('zoonl_my_level');
+    if (resolvedLevel is! num) {
+      throw StateError('Supabase did not return the current wealth level.');
     }
+    final int serverLevel = resolvedLevel.toInt().clamp(1, 100);
     if (zoonlId.isEmpty) {
       throw StateError(
         'ZOONL ID is missing from user_public_profiles for this account.',
