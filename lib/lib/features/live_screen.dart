@@ -1003,9 +1003,11 @@ class _LiveScreenState extends State<LiveScreen> {
       _filterStrength = ((room['video_filter_strength'] as num?)?.toDouble() ?? 0.35)
           .clamp(0.0, 1.0).toDouble();
       _filterConfirmed = true;
-      final hostProfile = await _supabase.from('profiles')
-          .select('user_level').eq('id', _roomOwnerId!).maybeSingle();
-      _hostLevel = (hostProfile?['user_level'] as num?)?.toInt() ?? 1;
+      final dynamic hostLevel = await _supabase.rpc(
+        'zoonl_user_level',
+        params: <String, dynamic>{'p_user_id': _roomOwnerId},
+      );
+      _hostLevel = (hostLevel as num?)?.toInt().clamp(1, 100) ?? 1;
 
       await _connectLiveKit(roomId);
       _subscribeRealtime(roomId);
