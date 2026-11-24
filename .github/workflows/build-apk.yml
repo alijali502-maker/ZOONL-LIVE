@@ -434,12 +434,12 @@ jobs:
               raise SystemExit("Android app Gradle file was not generated.")
           source = target.read_text()
           if target.suffix == ".kts":
-              source, count = re.subn(r"minSdk\\s*=\\s*(?:flutter\\.minSdkVersion|\\d+)", "minSdk = 23", source, count=1)
+              source, count = re.subn(r"minSdk\s*=\s*(?:flutter\.minSdkVersion|\d+)", "minSdk = 23", source, count=1)
           else:
-              source, count = re.subn(r"minSdkVersion\\s+(?:flutter\\.minSdkVersion|\\d+)", "minSdkVersion 23", source, count=1)
+              source, count = re.subn(r"minSdkVersion\s+(?:flutter\.minSdkVersion|\d+)", "minSdkVersion 23", source, count=1)
           if count:
               target.write_text(source)
-          if not re.search(r"minSdk\\s*=\\s*23", source) and not re.search(r"minSdkVersion\\s+23", source):
+          if not re.search(r"minSdk\s*=\s*23", source) and not re.search(r"minSdkVersion\s+23", source):
               raise SystemExit(f"Could not verify minSdkVersion 23 in {target}")
           print(f"Android minSdkVersion verified at 23 in {target}")
           PY
