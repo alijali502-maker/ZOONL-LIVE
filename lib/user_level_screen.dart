@@ -50,6 +50,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
     return 'LEVEL $n';
   }
   String _rankName(int level) {
+    if (level >= 100) return 'SOVEREIGN OWNER';
     for (final row in _levels) {
       if ((row['level'] as num?)?.toInt() == level) {
         final title = row['level_name']?.toString().trim() ?? '';
