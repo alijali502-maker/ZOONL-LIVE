@@ -1004,7 +1004,7 @@ class _LiveScreenState extends State<LiveScreen> {
           .clamp(0.0, 1.0).toDouble();
       _filterConfirmed = true;
       final dynamic hostLevel = await _supabase.rpc(
-        'zoonl_user_level',
+        'zoonl_level_for_user',
         params: <String, dynamic>{'p_user_id': _roomOwnerId},
       );
       _hostLevel = (hostLevel as num?)?.toInt().clamp(1, 100) ?? 1;
