@@ -10,7 +10,7 @@ SECURITY DEFINER
 SET search_path TO 'pg_catalog', 'public', 'auth'
 AS $function$
   SELECT CASE
-    WHEN auth.uid() IS NULL OR p_user_id IS NULL THEN 1
+    WHEN auth.uid() IS NULL OR p_user_id IS NULL OR p_user_id <> auth.uid() THEN 1
     WHEN EXISTS (
       SELECT 1
       FROM public.owner_control_settings o
