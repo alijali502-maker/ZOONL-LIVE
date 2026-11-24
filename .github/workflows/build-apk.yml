@@ -87,6 +87,8 @@ jobs:
           import com.google.mlkit.vision.face.FaceDetector;
           import com.google.mlkit.vision.face.FaceDetectorOptions;
           import android.graphics.Rect;
+          import android.graphics.PointF;
+          import com.google.mlkit.vision.face.FaceContour;
           import java.nio.ByteBuffer;
           import java.util.Arrays;
           import java.util.HashMap;
@@ -103,13 +105,15 @@ jobs:
               volatile String look = "Natural";
               private final FaceDetector faceDetector;
               private final AtomicBoolean faceDetectionBusy = new AtomicBoolean(false);
-              private volatile float faceLeft = -1f, faceTop = -1f, faceRight = -1f, faceBottom = -1f;
+              private volatile float[] faceContourX = new float[0];
+              private volatile float[] faceContourY = new float[0];
               private volatile long lastFaceDetectionNs = 0L;
 
               BeautyProcessor() {
                 FaceDetectorOptions options = new FaceDetectorOptions.Builder()
                     .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
                     .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                    .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
                     .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
                     .enableTracking()
                     .build();
@@ -146,20 +150,37 @@ jobs:
                           int area = Math.max(0, bounds.width()) * Math.max(0, bounds.height());
                           if (area > largestArea) { largestArea = area; largest = face; }
                         }
-                        if (largest == null) {
-                          faceLeft = faceTop = faceRight = faceBottom = -1f;
+                        if (largest == null || largest.getContour(FaceContour.FACE) == null) {
+                          faceContourX = new float[0];
+                          faceContourY = new float[0];
                         } else {
-                          Rect bounds = largest.getBoundingBox();
-                          faceLeft = Math.max(0f, bounds.left / (float) width);
-                          faceTop = Math.max(0f, bounds.top / (float) height);
-                          faceRight = Math.min(1f, bounds.right / (float) width);
-                          faceBottom = Math.min(1f, bounds.bottom / (float) height);
+                          java.util.List<PointF> points = largest.getContour(FaceContour.FACE).getPoints();
+                          float[] xs = new float[points.size()];
+                          float[] ys = new float[points.size()];
+                          for (int i = 0; i < points.size(); i++) {
+                            xs[i] = points.get(i).x / (float) width;
+                            ys[i] = points.get(i).y / (float) height;
+                          }
+                          faceContourX = xs;
+                          faceContourY = ys;
                         }
                       })
                       .addOnCompleteListener(task -> faceDetectionBusy.set(false));
                 } catch (Exception error) {
                   faceDetectionBusy.set(false);
                 }
+              }
+
+              private static boolean insideFaceContour(float x, float y, float[] xs, float[] ys) {
+                if (xs.length < 3 || xs.length != ys.length) return false;
+                boolean inside = false;
+                for (int i = 0, j = xs.length - 1; i < xs.length; j = i++) {
+                  boolean crosses = ((ys[i] > y) != (ys[j] > y))
+                      && (x < (xs[j] - xs[i]) * (y - ys[i])
+                          / ((ys[j] - ys[i]) + 0.000001f) + xs[i]);
+                  if (crosses) inside = !inside;
+                }
+                return inside;
               }
 
               void close() { faceDetector.close(); }
@@ -190,8 +211,8 @@ jobs:
                 final int width = src.getWidth(), height = src.getHeight();
                 detectFace(src, width, height, input.getTimestampNs());
                 final int cw = (width + 1) / 2, ch = (height + 1) / 2;
-                final float detectedLeft = faceLeft, detectedTop = faceTop;
-                final float detectedRight = faceRight, detectedBottom = faceBottom;
+                final float[] contourX = faceContourX;
+                final float[] contourY = faceContourY;
                 JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
                 double amount = Math.max(0.0, Math.min(1.0, intensity));
                 double saturation = 1.0;
@@ -220,16 +241,7 @@ jobs:
                     int skinU = src.getDataU().get(chromaIndex) & 255;
                     int skinV = src.getDataV().get(chromaIndex) & 255;
                     float nx = col / (float) width, ny = row / (float) height;
-                    boolean inFace = detectedLeft >= 0f
-                        && nx >= detectedLeft && nx <= detectedRight
-                        && ny >= detectedTop && ny <= detectedBottom;
-                    if (inFace) {
-                      float fx = (nx - (detectedLeft + detectedRight) * 0.5f)
-                          / Math.max(0.001f, (detectedRight - detectedLeft) * 0.5f);
-                      float fy = (ny - (detectedTop + detectedBottom) * 0.5f)
-                          / Math.max(0.001f, (detectedBottom - detectedTop) * 0.5f);
-                      inFace = (fx * fx) + (fy * fy) <= 1.12f;
-                    }
+                    boolean inFace = insideFaceContour(nx, ny, contourX, contourY);
                     boolean skinPixel = inFace && center > 48 && center < 238
                         && skinU >= 72 && skinU <= 142 && skinV >= 128 && skinV <= 190;
                     if (smooth > 0.001 && skinPixel) {
