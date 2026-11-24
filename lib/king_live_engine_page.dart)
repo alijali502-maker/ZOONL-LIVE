@@ -736,7 +736,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
     final xpValue = await _sb.rpc('zoonl_my_lifetime_gift_exp');
     final levelValue = await _sb.rpc('zoonl_my_level');
     if (xpValue is! num || levelValue is! num) {
-      throw StateError('Supabase wealth-level service returned invalid data.');
+      throw StateError('Supabase level service returned invalid data.');
     }
     final xp = xpValue.toInt();
     final lv = levelValue.toInt();
