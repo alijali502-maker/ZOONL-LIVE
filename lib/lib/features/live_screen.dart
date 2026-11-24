@@ -2799,7 +2799,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         _beautySliderRow('Brightness', (brightness+1)/2, (v) => setSheetState(() => brightness=v*2-1), Icons.wb_sunny),
                         _beautySliderRow('Warm / Cool', (warmth+1)/2, (v) => setSheetState(() => warmth=v*2-1), Icons.thermostat),
                         _beautySliderRow('Filter Intensity', strength, (v) => setSheetState(() => strength=v), Icons.palette),
-                        const Text('Controls are processed on the outgoing Android camera frames. Face-aware tracking and AR masks require a separate engine.',
+                        const Text('Live face detection now keeps skin smoothing and skin brightening inside the detected face area. AR masks and virtual makeup are separate features and are not active yet.',
                           style: TextStyle(color: Colors.white54, fontSize: 11)),
                       ])
                     : Center(child: Container(width: double.infinity, padding: const EdgeInsets.all(22),
