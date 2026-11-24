@@ -47,8 +47,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
   }
   String _name(int n) {
     if(n>=100) return 'SOVEREIGN OWNER';
-    const titles=['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
-    return '${titles[_tier(n)]} • LEVEL $n';
+    return 'LEVEL $n';
   }
   String _rankName(int level) {
     for (final row in _levels) {
