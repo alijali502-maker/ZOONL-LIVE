@@ -326,7 +326,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
   bool showEntryAlerts = true;
   bool ownerEditMode = true;
 
-  // Visual palette only. All rank names and progression come from Supabase wealth_levels.
+  // Visual palette only. All rank names and progression come from Supabase level_definitions.
   final List<_LevelTier> levelTiers = const [
     _LevelTier(level: 1, sticker: '🌱', title: 'ROOKIE', pattiStart: Color(0xFF2E7D32), pattiEnd: Color(0xFF00E676), bgTint: Color(0xFF09130E)),
     _LevelTier(level: 2, sticker: '💠', title: 'RISING', pattiStart: Color(0xFF0277BD), pattiEnd: Color(0xFF00E5FF), bgTint: Color(0xFF08121E)),
@@ -608,14 +608,14 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
 
   Future<void> _loadLevels() async {
     final rows = await _sb
-        .from('wealth_levels')
-        .select('level, tier_name, title, required_exp')
+        .from('level_definitions')
+        .select('level, level_name, required_exp, level_config')
         .order('level');
     final titles = <int, String>{};
     for (final row in List<Map<String, dynamic>>.from(rows)) {
       final level = (row['level'] as num?)?.toInt();
       if (level == null) continue;
-      final title = (row['title'] ?? row['tier_name'] ?? '').toString().trim();
+      final title = (row['level_name'] ?? '').toString().trim();
       if (title.isNotEmpty) titles[level] = title;
     }
     if (mounted) {
