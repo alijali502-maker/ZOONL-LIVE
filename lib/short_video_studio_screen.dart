@@ -148,11 +148,12 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
   }
 
   Widget _filteredPreview(Widget child) {
+    // Use the same LUT in the camera preview and the exported MP4.
+    // Applying an additional ColorFiltered tint here doubled the selected
+    // look in the preview, so the preview no longer matched the uploaded file.
     final lut = _activeLut;
-    final withLut = lut == null
-        ? child
-        : LutFilter(lut: lut, intensity: _filterStrength, child: child);
-    return ColorFiltered(colorFilter: _previewFilter, child: withLut);
+    if (lut == null) return child;
+    return LutFilter(lut: lut, intensity: _filterStrength, child: child);
   }
 
   Widget _cameraSurface(CameraController camera, Size viewport) {
@@ -357,7 +358,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
         'video_url': publicUrl,
         'caption': _caption.text.trim(),
         'filter_name': _filter,
-        'is_filter_baked': true,
+        'is_filter_baked': _filter != 'Natural',
         'duration_seconds': _recordingSeconds,
         'is_public': true,
       });
