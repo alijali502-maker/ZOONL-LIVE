@@ -57,7 +57,6 @@ class KingLiveEnginePage extends StatefulWidget {
 
 class _LevelTier {
   final int level;
-  final int minCoins;
   final String sticker;
   final String title;
   final Color pattiStart;
@@ -66,7 +65,6 @@ class _LevelTier {
 
   const _LevelTier({
     required this.level,
-    required this.minCoins,
     required this.sticker,
     required this.title,
     required this.pattiStart,
@@ -74,23 +72,14 @@ class _LevelTier {
     required this.bgTint,
   });
 
-  _LevelTier withLevel(int lv) => _LevelTier(
+  _LevelTier withLevel(int lv, {String? title}) => _LevelTier(
         level: lv,
-        minCoins: minCoins,
         sticker: sticker,
-        title: title,
+        title: title ?? this.title,
         pattiStart: pattiStart,
         pattiEnd: pattiEnd,
         bgTint: bgTint,
       );
-}
-
-class _LevelDef {
-  final int level;
-  final int exp;
-  final String name;
-
-  const _LevelDef({required this.level, required this.exp, required this.name});
 }
 
 class _LiveGiftModel {
@@ -337,39 +326,25 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
   bool showEntryAlerts = true;
   bool ownerEditMode = true;
 
-  // Visual tiers (each tier covers 10 real levels from level_definitions)
+  // Visual palette only. All rank names and progression come from Supabase wealth_levels.
   final List<_LevelTier> levelTiers = const [
-    _LevelTier(level: 1, minCoins: 0, sticker: '🌱', title: 'ROOKIE', pattiStart: Color(0xFF2E7D32), pattiEnd: Color(0xFF00E676), bgTint: Color(0xFF09130E)),
-    _LevelTier(level: 2, minCoins: 50000, sticker: '💠', title: 'RISING', pattiStart: Color(0xFF0277BD), pattiEnd: Color(0xFF00E5FF), bgTint: Color(0xFF08121E)),
-    _LevelTier(level: 3, minCoins: 200000, sticker: '🦅', title: 'FALCON', pattiStart: Color(0xFF4527A0), pattiEnd: Color(0xFFB388FF), bgTint: Color(0xFF100B20)),
-    _LevelTier(level: 4, minCoins: 500000, sticker: '🦁', title: 'JUNGLE LORD', pattiStart: Color(0xFFEF6C00), pattiEnd: Color(0xFFFFD180), bgTint: Color(0xFF1B1007)),
-    _LevelTier(level: 5, minCoins: 800000, sticker: '🏰', title: 'PALACE DUKE', pattiStart: Color(0xFFAD1457), pattiEnd: Color(0xFFFF80AB), bgTint: Color(0xFF1D0915)),
-    _LevelTier(level: 6, minCoins: 1000000, sticker: '💎', title: 'MILLIONAIRE', pattiStart: Color(0xFF00838F), pattiEnd: Color(0xFF84FFFF), bgTint: Color(0xFF07191D)),
-    _LevelTier(level: 7, minCoins: 1500000, sticker: '🔥', title: 'SULTAN FIRE', pattiStart: Color(0xFFC62828), pattiEnd: Color(0xFFFF8A80), bgTint: Color(0xFF20080B)),
-    _LevelTier(level: 8, minCoins: 2000000, sticker: '👑', title: 'ROYAL KING', pattiStart: Color(0xFFFF8F00), pattiEnd: Color(0xFFFFF59D), bgTint: Color(0xFF211806)),
-    _LevelTier(level: 9, minCoins: 3500000, sticker: '💖', title: 'HEART EMPEROR', pattiStart: Color(0xFFC2185B), pattiEnd: Color(0xFFFF4081), bgTint: Color(0xFF200914)),
-    _LevelTier(level: 10, minCoins: 6000000, sticker: '🏆', title: 'SUPREME LEGEND', pattiStart: Color(0xFFFF6F00), pattiEnd: Color(0xFFFFD700), bgTint: Color(0xFF231307)),
+    _LevelTier(level: 1, sticker: '🌱', title: 'ROOKIE', pattiStart: Color(0xFF2E7D32), pattiEnd: Color(0xFF00E676), bgTint: Color(0xFF09130E)),
+    _LevelTier(level: 2, sticker: '💠', title: 'RISING', pattiStart: Color(0xFF0277BD), pattiEnd: Color(0xFF00E5FF), bgTint: Color(0xFF08121E)),
+    _LevelTier(level: 3, sticker: '🦅', title: 'FALCON', pattiStart: Color(0xFF4527A0), pattiEnd: Color(0xFFB388FF), bgTint: Color(0xFF100B20)),
+    _LevelTier(level: 4, sticker: '🦁', title: 'JUNGLE LORD', pattiStart: Color(0xFFEF6C00), pattiEnd: Color(0xFFFFD180), bgTint: Color(0xFF1B1007)),
+    _LevelTier(level: 5, sticker: '🏰', title: 'PALACE DUKE', pattiStart: Color(0xFFAD1457), pattiEnd: Color(0xFFFF80AB), bgTint: Color(0xFF1D0915)),
+    _LevelTier(level: 6, sticker: '💎', title: 'MILLIONAIRE', pattiStart: Color(0xFF00838F), pattiEnd: Color(0xFF84FFFF), bgTint: Color(0xFF07191D)),
+    _LevelTier(level: 7, sticker: '🔥', title: 'SULTAN FIRE', pattiStart: Color(0xFFC62828), pattiEnd: Color(0xFFFF8A80), bgTint: Color(0xFF20080B)),
+    _LevelTier(level: 8, sticker: '👑', title: 'ROYAL KING', pattiStart: Color(0xFFFF8F00), pattiEnd: Color(0xFFFFF59D), bgTint: Color(0xFF211806)),
+    _LevelTier(level: 9, sticker: '💖', title: 'HEART EMPEROR', pattiStart: Color(0xFFC2185B), pattiEnd: Color(0xFFFF4081), bgTint: Color(0xFF200914)),
+    _LevelTier(level: 10, sticker: '🏆', title: 'SUPREME LEGEND', pattiStart: Color(0xFFFF6F00), pattiEnd: Color(0xFFFFD700), bgTint: Color(0xFF231307)),
   ];
 
-  List<_LevelDef> levelDefs = [];
+  final Map<int, String> _levelTitles = <int, String>{};
 
   _LevelTier get currentLevelTier {
     final idx = math.min(levelTiers.length - 1, math.max(0, (myLevel - 1) ~/ 10));
-    return levelTiers[idx].withLevel(myLevel);
-  }
-
-  int _levelFromXp(int xp) {
-    var lv = 1;
-    if (levelDefs.isNotEmpty) {
-      for (final d in levelDefs) {
-        if (d.exp <= xp) lv = d.level;
-      }
-    } else {
-      for (final t in levelTiers) {
-        if (xp >= t.minCoins) lv = t.level;
-      }
-    }
-    return lv;
+    return levelTiers[idx].withLevel(myLevel, title: _rankTitle(myLevel));
   }
 
   static const List<List<Color>> _giftPalette = [
@@ -633,18 +608,21 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
 
   Future<void> _loadLevels() async {
     final rows = await _sb
-        .from('level_definitions')
-        .select('level, required_exp, level_name')
+        .from('wealth_levels')
+        .select('level, tier_name, title, required_exp')
         .order('level');
-    final list = List<Map<String, dynamic>>.from(rows);
-    final defs = list
-        .map((r) => _LevelDef(
-              level: (r['level'] as num).toInt(),
-              exp: (r['required_exp'] as num?)?.toInt() ?? 0,
-              name: (r['level_name'] ?? '').toString(),
-            ))
-        .toList();
-    if (mounted) setState(() => levelDefs = defs);
+    final titles = <int, String>{};
+    for (final row in List<Map<String, dynamic>>.from(rows)) {
+      final level = (row['level'] as num?)?.toInt();
+      if (level == null) continue;
+      final title = (row['title'] ?? row['tier_name'] ?? '').toString().trim();
+      if (title.isNotEmpty) titles[level] = title;
+    }
+    if (mounted) {
+      setState(() => _levelTitles
+        ..clear()
+        ..addAll(titles));
+    }
   }
 
   Future<void> _loadGifts() async {
@@ -755,16 +733,13 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
     if (uid == null) return;
     final w = await _sb.from('wallets').select('coins').eq('user_id', uid).maybeSingle();
     final newCoins = (w?['coins'] as num?)?.toInt() ?? 0;
-    var xp = 0;
-    try {
-      final value = await _sb.rpc('zoonl_my_lifetime_gift_exp');
-      if (value is num) xp = value.toInt();
-    } catch (_) {}
-    var lv = _levelFromXp(xp);
-    try {
-      final value = await _sb.rpc('zoonl_my_level');
-      if (value is num) lv = value.toInt();
-    } catch (_) {}
+    final xpValue = await _sb.rpc('zoonl_my_lifetime_gift_exp');
+    final levelValue = await _sb.rpc('zoonl_my_level');
+    if (xpValue is! num || levelValue is! num) {
+      throw StateError('Supabase wealth-level service returned invalid data.');
+    }
+    final xp = xpValue.toInt();
+    final lv = levelValue.toInt();
     if (!mounted) return;
     setState(() {
       coins = newCoins;
@@ -869,9 +844,7 @@ class _KingLiveEnginePageState extends State<KingLiveEnginePage>
 
   String _rankTitle(int level) {
     if (level >= 100) return 'SOVEREIGN OWNER';
-    const names = ['ROOKIE','RISING','FALCON','LIONHEART','PALACE','MILLIONAIRE','SULTAN','ROYAL','EMPEROR','LEGEND'];
-    final tier = level <= 10 ? level - 1 : ((level - 1) ~/ 10).clamp(1, 9).toInt();
-    return names[tier];
+    return _levelTitles[level] ?? 'LEVEL $level';
   }
 
   Color _rankColor(int level) {
