@@ -390,32 +390,6 @@ class ZoonlStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  int resolveUserLevel(int sentCoins) {
-    const List<int> thresholds = <int>[
-      0, 50000, 100000, 160000, 230000,
-      310000, 400000, 500000, 620000, 750000,
-      1000000, 1300000, 1600000, 1900000, 2200000,
-      2700000, 3200000, 3700000, 4200000, 4700000,
-    ];
-
-    if (sentCoins <= 0) return 1;
-
-    for (int i = 1; i < thresholds.length; i++) {
-      if (sentCoins < thresholds[i]) return i;
-    }
-
-    int level = 20;
-    int accumulated = thresholds.last;
-
-    while (level < 100) {
-      final int step = level < 50 ? 1500000 : 3500000;
-      if (sentCoins < accumulated + step) break;
-      accumulated += step;
-      level++;
-    }
-
-    return min(100, level);
-  }
 
   Map<String, dynamic> resolveColorStar(int sentCoins) {
     if (sentCoins >= 2000000) {
@@ -533,13 +507,7 @@ class ZoonlStore extends ChangeNotifier {
 
     currentUser['coins'] = currentCoins - giftCoins;
 
-    final int senderSentCoins =
-        (currentUser['sentCoins'] as num?)?.toInt() ?? 0;
-    currentUser['sentCoins'] = senderSentCoins + giftCoins;
-    currentUser['level'] =
-        resolveUserLevel(senderSentCoins + giftCoins);
-
-    final int received =
+final int received =
         (streamer['receivedCoins'] as num?)?.toInt() ?? 0;
     streamer['receivedCoins'] = received + giftCoins;
 
