@@ -118,12 +118,6 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     try { await _levelFuture; } catch (_) {}
   }
 
-  void _openHistory() {
-    widget.onTap?.call();
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => const LevelHistoryScreen(),
-    ));
-  }
 
   @override
   void dispose() {
@@ -142,14 +136,8 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
           gradient: [Color(0xFF5D3A91), Color(0xFFB78BFA)],
           border: Color(0xFFD6B46A),
         );
-        final isApex = data.level >= 91;
-        final colors = data.level >= 96
-            ? const [Color(0xFFFFD36A), Color(0xFFB86A28), Color(0xFF3C235F)]
-            : data.level >= 86
-                ? const [Color(0xFF42E6F2), Color(0xFF167D9B)]
-                : data.level >= 81
-                    ? const [Color(0xFFFFA6D7), Color(0xFFB83E83)]
-                    : data.gradient;
+        final colors = data.gradient;
+        final isApex = false;
         return GestureDetector(
           onTap: widget.onTap,
           child: AnimatedBuilder(
@@ -157,7 +145,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
             builder: (context, _) {
               final glow = .35 + (_shine.value * .65);
               return Tooltip(
-                message: 'Level ${data.level} • ${data.title} • Tap to view all levels',
+                message: 'Level ${data.level} • ${data.title}',
                 child: Container(
                   constraints: const BoxConstraints(minWidth: 142, maxWidth: 190),
                   height: 48,
@@ -203,11 +191,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
                             BoxShadow(color: Color(0x99FFD65A), blurRadius: 7),
                           ],
                         ),
-                        child: Icon(
-                          data.level >= 96 ? Icons.workspace_premium : Icons.stars,
-                          color: const Color(0xFF40220A),
-                          size: 19,
-                        ),
+                        child: const Icon(Icons.stars, color: Color(0xFF40220A), size: 19),
                       ),
                       const SizedBox(width: 9),
                       Expanded(
