@@ -20,8 +20,8 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   static const Color _teal = Color(0xFF4BC2B0);
   static const Color _muted = Color(0xFFAAB5BE);
 
-  // 1-50 Talent / Gift Progression Tiers (ہر 5 لیول پر نیا رنگ اور شیپ)
-  static const List> _talentTiers = [
+  // 1-50 Talent / Gift Progression Tiers (every 5 levels a new colour and shape)
+  static const List<Map<String, dynamic>> _talentTiers = [
     {'tier': 1, 'min': 1, 'max': 5, 'name': 'Rose Heart', 'shape': 'heart', 'pill': Color(0xFFC81E4E), 'gradA': Color(0xFFFB7185), 'gradB': Color(0xFFE11D48), 'rim': Color(0xFFFDE047)},
     {'tier': 2, 'min': 6, 'max': 10, 'name': 'Sky Diamond', 'shape': 'diamond', 'pill': Color(0xFF0369A1), 'gradA': Color(0xFF38BDF8), 'gradB': Color(0xFF0284C7), 'rim': Color(0xFFFDE047)},
     {'tier': 3, 'min': 11, 'max': 15, 'name': 'Emerald Diamond', 'shape': 'diamond', 'pill': Color(0xFF047857), 'gradA': Color(0xFF34D399), 'gradB': Color(0xFF059669), 'rim': Color(0xFFFDE047)},
@@ -34,7 +34,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
     {'tier': 10, 'min': 46, 'max': 50, 'name': 'Celestial Crown', 'shape': 'crown', 'pill': Color(0xFF5B21B6), 'gradA': Color(0xFFC084FC), 'gradB': Color(0xFF6D28D9), 'rim': Color(0xFFFEF08A)},
   ];
 
-  // 1-100 User Level Tiger Colors (ہر 5 لیول پر رنگ بدلتا ہے)
+  // 1-100 User Level colours (colour changes every 5 levels)
   static const List<Color> _userLevelColors = [
     Color(0xFFD6B46A),
     Color(0xFF4BC2B0),
@@ -50,13 +50,13 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
 
   bool _loading = true;
   bool _canHost = false;
-  bool _sendingGift = false;
   String? _error;
+  String? _optionalNote;
   Map<String, dynamic> _profile = {};
-  List> _rooms = [];
-  List> _gifts = [];
-  List> _talentLevels = [];
-  List> _userLevels = [];
+  List<Map<String, dynamic>> _rooms = [];
+  List<Map<String, dynamic>> _gifts = [];
+  List<Map<String, dynamic>> _talentLevels = [];
+  List<Map<String, dynamic>> _userLevels = [];
 
   @override
   void initState() {
@@ -70,6 +70,11 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       return value.map((key, value) => MapEntry(key.toString(), value));
     }
     return <String, dynamic>{};
+  }
+
+  List<Map<String, dynamic>> _rows(dynamic raw) {
+    if (raw is! List) return <Map<String, dynamic>>[];
+    return raw.map((row) => _map(row)).toList();
   }
 
   Map<String, dynamic> _tierForTalentLevel(int level) {
@@ -115,6 +120,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _optionalNote = null;
     });
 
     try {
@@ -123,13 +129,15 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
         throw StateError('Login required.');
       }
 
+      // ---- Core data: if this fails the dashboard cannot work ----
       final profile = await Backend.client
           .from('profiles')
-          .select('username, display_name, avatar_url, user_level, is_verified, talent_exp, talent_level, gift_send_exp')
+          .select('username, display_name, avatar_url, user_level, is_verified')
           .eq('id', userId)
           .maybeSingle();
 
       final owner = await Backend.isZoonlOwner();
+
       final roomsRaw = await Backend.client
           .from('live_rooms')
           .select('id, owner_id, room_name, room_type, viewer_count, is_private, is_locked')
@@ -146,36 +154,68 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
           .order('coin_price', ascending: true)
           .limit(8);
 
-      final levelsRaw = await Backend.client
-          .from('talent_levels')
-          .select('level, tier, required_exp, required_coins')
-          .order('level', ascending: true);
+      // ---- Optional data: a failure here must not blank the dashboard ----
+      final notes = <String>[];
 
-      List> parsedUserLevels = [];
+      Map<String, dynamic> extra = <String, dynamic>{};
+      try {
+        final e = await Backend.client
+            .from('profiles')
+            .select('talent_exp, talent_level, gift_send_exp')
+            .eq('id', userId)
+            .maybeSingle();
+        extra = _map(e);
+      } catch (_) {
+        notes.add('talent columns');
+      }
+
+      String zoonlId = '';
+      try {
+        final z = await Backend.client
+            .from('user_public_profiles')
+            .select('zoonl_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+        zoonlId = (z?['zoonl_id'] ?? '').toString();
+      } catch (_) {}
+
+      List<Map<String, dynamic>> talentLevels = <Map<String, dynamic>>[];
+      try {
+        final levelsRaw = await Backend.client
+            .from('talent_levels')
+            .select('level, tier, required_exp, required_coins')
+            .order('level', ascending: true);
+        talentLevels = _rows(levelsRaw);
+      } catch (_) {
+        notes.add('talent_levels');
+      }
+
+      List<Map<String, dynamic>> userLevels = <Map<String, dynamic>>[];
       try {
         final userLvlRaw = await Backend.client
             .from('wealth_levels')
             .select()
             .order('level', ascending: true);
-        parsedUserLevels = (userLvlRaw as List).map((row) => _map(row)).toList();
+        userLevels = _rows(userLvlRaw);
       } catch (_) {
-        parsedUserLevels = [];
+        notes.add('wealth_levels');
       }
 
       if (!mounted) return;
       setState(() {
-        _profile = _map(profile);
+        _profile = {
+          ..._map(profile),
+          ...extra,
+          'zoonl_id': zoonlId,
+        };
         _canHost = owner || profile?['is_verified'] == true;
-        _rooms = (roomsRaw as List)
-            .map((row) => _map(row))
-            .toList();
-        _gifts = (giftsRaw as List)
-            .map((row) => _map(row))
-            .toList();
-        _talentLevels = (levelsRaw as List)
-            .map((row) => _map(row))
-            .toList();
-        _userLevels = parsedUserLevels;
+        _rooms = _rows(roomsRaw);
+        _gifts = _rows(giftsRaw);
+        _talentLevels = talentLevels;
+        _userLevels = userLevels;
+        _optionalNote = notes.isEmpty
+            ? null
+            : 'Some level data is not available yet: ${notes.join(', ')}';
         _loading = false;
       });
     } catch (error) {
@@ -187,47 +227,20 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
     }
   }
 
-  Future<void> _sendGiftAndUpdateExp(Map<String, dynamic> gift) async {
-    if (_sendingGift) return;
-    final senderId = Backend.currentUserId;
-    if (senderId == null) {
-      _notice('Login required.');
-      return;
-    }
-
-    final coins = (gift['coin_price'] as num?)?.toInt() ?? 0;
-    if (coins <= 0) {
-      _notice('Invalid gift coin price.');
-      return;
-    }
-
-    final receiverId = _rooms.isNotEmpty && _rooms.first['owner_id'] != null
-        ? _rooms.first['owner_id']
-        : senderId;
-
-    setState(() => _sendingGift = true);
-    try {
-      await Backend.client.rpc('process_gift_exp', params: {
-        'p_sender_id': senderId,
-        'p_receiver_id': receiverId,
-        'p_coins': coins,
-      });
-      _notice('Sent ${gift['gift_name']} (+$coins EXP)');
-      await _loadDashboard();
-    } catch (error) {
-      _notice('Gift EXP update failed: $error');
-    } finally {
-      if (mounted) {
-        setState(() => _sendingGift = false);
-      }
-    }
-  }
-
   void _notice(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // Gifts are sent only inside a live room, through the server function
+  // send_live_gift. The home page never changes coins or EXP by itself.
+  void _giftInfo(Map<String, dynamic> gift) {
+    _notice(
+      '${gift['gift_name']} (${gift['coin_price']} Coins): '
+      'gift भेजने के लिए किसी live room में जाइए।',
+    );
   }
 
   Future<void> _startLive({required String roomType}) async {
@@ -240,7 +253,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL Host').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: _publicId(),
           roomType: roomType,
         ),
       ),
@@ -253,13 +266,20 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
       MaterialPageRoute<void>(
         builder: (_) => LiveScreen(
           userName: (_profile['display_name'] ?? 'ZOONL User').toString(),
-          userId: (_profile['username'] ?? '').toString(),
+          userId: _publicId(),
           joinRoomId: room['id'].toString(),
           roomType: (room['room_type'] ?? 'video').toString(),
         ),
       ),
     );
     _loadDashboard();
+  }
+
+  // The public ZOONL ID: prefer the protected zoonl_id, fall back to username.
+  String _publicId() {
+    final zid = (_profile['zoonl_id'] ?? '').toString();
+    if (zid.isNotEmpty) return zid;
+    return (_profile['username'] ?? '').toString();
   }
 
   Widget _panelCard({required Widget child, EdgeInsets padding = const EdgeInsets.all(15)}) {
@@ -432,7 +452,9 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
 
     double progress = 1.0;
     if (talentLevel < 50 && nextTarget > currentFloor) {
-      progress = ((talentExp - currentFloor) / (nextTarget - currentFloor)).clamp(0.0, 1.0);
+      progress = ((talentExp - currentFloor) / (nextTarget - currentFloor))
+          .clamp(0.0, 1.0)
+          .toDouble();
     }
 
     return _panelCard(
@@ -556,7 +578,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
   @override
   Widget build(BuildContext context) {
     final name = (_profile['display_name'] ?? 'ZOONL Member').toString();
-    final publicId = (_profile['username'] ?? '').toString();
+    final publicId = _publicId();
     final avatarUrl = _profile['avatar_url']?.toString();
     final userLevel = (_profile['user_level'] as num?)?.toInt() ?? 1;
     final talentExp = (_profile['talent_exp'] as num?)?.toInt() ?? 0;
@@ -657,14 +679,24 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                 ],
               ),
             ),
+            if (_optionalNote != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  _optionalNote!,
+                  style: const TextStyle(color: _muted, fontSize: 10),
+                ),
+              ),
             _sectionTitle('User Level (1–100)'),
             _userLevelCard(userLevel: userLevel),
-            _sectionTitle('Talent & Gift Progression (1–50)'),
-            _talentProgressionSection(
-              talentLevel: talentLevel,
-              talentExp: talentExp,
-              giftSendExp: giftSendExp,
-            ),
+            if (_talentLevels.isNotEmpty) ...[
+              _sectionTitle('Talent & Gift Progression (1–50)'),
+              _talentProgressionSection(
+                talentLevel: talentLevel,
+                talentExp: talentExp,
+                giftSendExp: giftSendExp,
+              ),
+            ],
             _sectionTitle('Live Now', trailing: 'REFRESH', onTap: _loadDashboard),
             if (_loading)
               const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: _gold)))
@@ -720,7 +752,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                     return ActionChip(
                       backgroundColor: _panelRaised,
                       side: const BorderSide(color: Color(0xFF354653)),
-                      onPressed: _sendingGift ? null : () => _sendGiftAndUpdateExp(gift),
+                      onPressed: () => _giftInfo(gift),
                       label: Text(
                         '${gift['gift_name']}  •  ${gift['coin_price']} Coins',
                         style: const TextStyle(color: _gold, fontSize: 10),
