@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Compact metallic level insignia shown directly beneath the profile avatar.
-/// The level is always read from the trusted server RPC, never from a client ID.
+/// The profile badge reads the canonical wealth_levels design and the
+/// authenticated user's server-calculated wealth level.
 class ZoonlMiniLevelBadge extends StatefulWidget {
   final VoidCallback? onTap;
   const ZoonlMiniLevelBadge({super.key, this.onTap});
@@ -11,125 +13,261 @@ class ZoonlMiniLevelBadge extends StatefulWidget {
   State<ZoonlMiniLevelBadge> createState() => _ZoonlMiniLevelBadgeState();
 }
 
+class _LevelBadgeData {
+  final int level;
+  final int exp;
+  final int nextExp;
+  final String title;
+  final String tier;
+  final List<Color> gradient;
+  final Color border;
+
+  const _LevelBadgeData({
+    required this.level,
+    required this.exp,
+    required this.nextExp,
+    required this.title,
+    required this.tier,
+    required this.gradient,
+    required this.border,
+  });
+
+  double get progress {
+    if (level >= 100 || nextExp <= 0) return 1;
+    return (exp / nextExp).clamp(0.0, 1.0);
+  }
+}
+
 class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     with SingleTickerProviderStateMixin {
   late final AnimationController _shine = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2600),
   )..repeat();
-  late Future<int> _levelFuture;
+  late Future<_LevelBadgeData> _levelFuture;
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  String? _subscribedUserId;
 
   @override
   void initState() {
     super.initState();
     _levelFuture = _loadLevel();
+    _subscribeToOwnProfile();
   }
 
-  Future<int> _loadLevel() async {
+  Color _readHex(String? raw, Color fallback) {
+    if (raw == null) return fallback;
+    final match = RegExp(r'#[0-9a-fA-F]{6}').firstMatch(raw);
+    if (match == null) return fallback;
+    final value = int.tryParse(match.group(0)!.substring(1), radix: 16);
+    return value == null ? fallback : Color(0xFF000000 | value);
+  }
+
+  List<Color> _readGradient(String? raw, int level) {
+    final matches = RegExp(r'#[0-9a-fA-F]{6}').allMatches(raw ?? '');
+    final colors = matches
+        .map((m) => _readHex(m.group(0), const Color(0xFF8A5A22)))
+        .toList(growable: false);
+    if (colors.length >= 2) return colors;
+    if (level >= 100) {
+      return const [Color(0xFF312E81), Color(0xFFFBBF24), Color(0xFF34D399)];
+    }
+    if (level >= 10) {
+      return const [Color(0xFF064E3B), Color(0xFF059669), Color(0xFF34D399)];
+    }
+    return const [Color(0xFF451A03), Color(0xFF78350F), Color(0xFFB45309)];
+  }
+
+  Future<_LevelBadgeData> _loadLevel() async {
     final client = Supabase.instance.client;
-    if (client.auth.currentUser == null) return 1;
-    final result = await client.rpc('zoonl_my_level');
-    final level = (result as num?)?.toInt() ?? 1;
-    return level.clamp(1, 100).toInt();
+    if (client.auth.currentUser == null) {
+      return const _LevelBadgeData(
+        level: 1, exp: 0, nextExp: 5000, title: 'Bronze Initiate',
+        tier: 'Novice Bronze (1-5)',
+        gradient: [Color(0xFF451A03), Color(0xFF78350F), Color(0xFFB45309)],
+        border: Color(0xFFD97706),
+      );
+    }
+
+    final results = await Future.wait<dynamic>([
+      client.rpc('zoonl_my_level'),
+      client.rpc('zoonl_my_lifetime_gift_exp'),
+    ]);
+    final levelValue = results[0];
+    final expValue = results[1];
+    final level = (levelValue is num ? levelValue.toInt() : 1)
+        .clamp(1, 100).toInt();
+    final exp = expValue is num ? expValue.toInt().clamp(0, 1 << 62) : 0;
+
+    final currentRow = await client
+        .from('wealth_levels')
+        .select('title,tier_name,badge_gradient,badge_border,required_exp')
+        .eq('level', level)
+        .maybeSingle();
+    final nextRow = level >= 100
+        ? null
+        : await client
+            .from('wealth_levels')
+            .select('required_exp')
+            .eq('level', level + 1)
+            .maybeSingle();
+
+    final title = (currentRow?['title'] ?? 'Level $level').toString();
+    final tier = (currentRow?['tier_name'] ?? '').toString();
+    final nextExp = (nextRow?['required_exp'] as num?)?.toInt() ?? 0;
+    return _LevelBadgeData(
+      level: level,
+      exp: exp,
+      nextExp: nextExp,
+      title: title,
+      tier: tier,
+      gradient: _readGradient(currentRow?['badge_gradient']?.toString(), level),
+      border: _readHex(currentRow?['badge_border']?.toString(),
+          const Color(0xFFD97706)),
+    );
+  }
+
+  void _subscribeToOwnProfile() {
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId == null || userId == _subscribedUserId) return;
+    _subscribedUserId = userId;
+    _profileSubscription = client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((_) {
+          if (!mounted) return;
+          setState(() => _levelFuture = _loadLevel());
+        });
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    setState(() => _levelFuture = _loadLevel());
+    try {
+      await _levelFuture;
+    } catch (_) {
+      // Keep the last usable badge layout; the next refresh can retry.
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _subscribeToOwnProfile();
   }
 
   @override
   void dispose() {
+    _profileSubscription?.cancel();
     _shine.dispose();
     super.dispose();
   }
 
-  List<Color> _metal(int level) {
-    if (level >= 100) {
-      return const [Color(0xFFFFF5C6), Color(0xFFE5B84D), Color(0xFF75420D)];
-    }
-    if (level >= 81) {
-      return const [Color(0xFFE9DFFF), Color(0xFF9C7BDE), Color(0xFF39245F)];
-    }
-    if (level >= 51) {
-      return const [Color(0xFFFFE7A0), Color(0xFFB98226), Color(0xFF59350B)];
-    }
-    if (level >= 21) {
-      return const [Color(0xFFD8F5FF), Color(0xFF6C9FC0), Color(0xFF1C3C58)];
-    }
-    return const [Color(0xFFE4E9F2), Color(0xFF7C8DA5), Color(0xFF283447)];
-  }
-
-  List<Color> _levelMetal(int level) {
-    final base = _metal(level);
-    final hueShift = (level * 3.7) % 360;
-    return base.map((color) {
-      final hsv = HSVColor.fromColor(color);
-      return hsv.withHue((hsv.hue + hueShift) % 360).toColor();
-    }).toList(growable: false);
-  }
-
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<int>(
+    return FutureBuilder<_LevelBadgeData>(
       future: _levelFuture,
       builder: (context, snapshot) {
-        final level = snapshot.data ?? 1;
-        final colors = _levelMetal(level);
-        final pulse = .68 + ((_shine.value * 2 - 1).abs() * .32);
+        final data = snapshot.data ??
+            const _LevelBadgeData(
+              level: 1, exp: 0, nextExp: 5000,
+              title: 'Bronze Initiate', tier: 'Novice Bronze (1-5)',
+              gradient: [Color(0xFF451A03), Color(0xFF78350F), Color(0xFFB45309)],
+              border: Color(0xFFD97706),
+            );
+        final pulse = .72 + ((_shine.value * 2 - 1).abs() * .28);
         return GestureDetector(
-          onTap: widget.onTap,
+          onTap: () {
+            widget.onTap?.call();
+            _refresh();
+          },
           child: AnimatedBuilder(
             animation: _shine,
             builder: (context, child) => Container(
-              height: 27,
-              constraints: const BoxConstraints(minWidth: 78, maxWidth: 100),
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              constraints: const BoxConstraints(minWidth: 92, maxWidth: 126),
+              padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: colors,
+                  colors: data.gradient,
                 ),
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: const Color(0xFFFFF4C5), width: 1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: data.border, width: 1.25),
                 boxShadow: [
-                  BoxShadow(color: colors.first.withOpacity(pulse * .78), blurRadius: 13 + pulse * 5, spreadRadius: .7),
-                  BoxShadow(color: colors[1].withOpacity(.32), blurRadius: 20, spreadRadius: 1),
-                  const BoxShadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 2)),
+                  BoxShadow(
+                    color: data.gradient.last.withOpacity(pulse * .58),
+                    blurRadius: 13 + pulse * 4,
+                    spreadRadius: .6,
+                  ),
+                  const BoxShadow(
+                    color: Colors.black87,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
                 ],
               ),
-              child: Stack(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Align(
-                        alignment: Alignment(-1 + _shine.value * 2, 0),
-                        child: Container(
-                          width: 15,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.transparent, Color(0xCCFFFFFF), Colors.transparent],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(level >= 91 ? Icons.workspace_premium : level >= 51 ? Icons.military_tech : Icons.shield,
-                        size: 14, color: const Color(0xFF241707)),
+                      Icon(
+                        data.level >= 100
+                            ? Icons.workspace_premium
+                            : Icons.shield,
+                        size: 14,
+                        color: const Color(0xFFFFF0C2),
+                      ),
                       const SizedBox(width: 4),
-                      Text(
-                        level >= 100 ? 'OWNER 100' : 'LEVEL ${level.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                          color: Color(0xFF241707),
-                          fontSize: 8,
-                          letterSpacing: .45,
-                          fontWeight: FontWeight.w900,
-                          shadows: [Shadow(color: Colors.white70, blurRadius: 2)],
+                      Flexible(
+                        child: Text(
+                          data.level >= 100
+                              ? 'OWNER 100'
+                              : 'LEVEL ${data.level.toString().padLeft(2, '0')}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFFFF4D6),
+                            fontSize: 9,
+                            letterSpacing: .45,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (data.level < 100) ...[
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(5),
+                      child: SizedBox(
+                        height: 3,
+                        width: double.infinity,
+                        child: LinearProgressIndicator(
+                          value: data.progress,
+                          backgroundColor: Colors.black38,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFFFFE7A0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
