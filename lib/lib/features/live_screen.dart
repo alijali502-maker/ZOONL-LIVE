@@ -1924,6 +1924,14 @@ class _LiveScreenState extends State<LiveScreen> {
       final chatColor = (style['chat_color_hex'] ?? '').toString();
       final frameMedia = (style['frame_media_url'] ?? '').toString();
       final level = ((results[2] as num?)?.toInt() ?? 1).clamp(1, 100).toInt();
+      final levelDesignRaw = await safe(_supabase.from('wealth_levels')
+          .select('chat_ribbon_bg,chat_ribbon_border,badge_gradient')
+          .eq('level', level).maybeSingle());
+      final levelDesign = levelDesignRaw is Map
+          ? Map<String, dynamic>.from(levelDesignRaw) : <String, dynamic>{};
+      final levelRibbon = RegExp(r'#[0-9a-fA-F]{6}')
+          .allMatches((levelDesign['chat_ribbon_bg'] ?? levelDesign['badge_gradient'] ?? '').toString())
+          .map((m) => m.group(0)!.substring(1)).join(',');
       final publicProfile = results[3] is Map ? results[3] as Map<String, dynamic> : null;
       final privateProfile = results[4] is Map ? results[4] as Map<String, dynamic> : null;
       final publicName = publicProfile?['username']?.toString().trim() ?? '';
@@ -1937,6 +1945,7 @@ class _LiveScreenState extends State<LiveScreen> {
         _chatColorHex[senderId] = chatColor;
         _chatFrameMedia[senderId] = frameMedia;
         _chatLevels[senderId] = level;
+        if (levelRibbon.isNotEmpty) _chatColorHex[senderId] = levelRibbon;
         if (username.isNotEmpty) _chatNames[senderId] = username;
         if (avatar.startsWith('http')) _chatAvatars[senderId] = avatar;
         for (final item in _messages) {
@@ -1945,6 +1954,7 @@ class _LiveScreenState extends State<LiveScreen> {
             item['tier'] = tier;
             item['chatColor'] = chatColor;
             item['frameMedia'] = frameMedia;
+            if (levelRibbon.isNotEmpty) item['levelRibbon'] = levelRibbon;
             item['level'] = '$level';
             if (username.isNotEmpty) item['name'] = username;
             if (avatar.startsWith('http')) item['avatar'] = avatar;
@@ -1971,7 +1981,8 @@ class _LiveScreenState extends State<LiveScreen> {
     final badge = tier == 'VIP' || tier == 'SVIP' || tier == 'VVIP'
         ? tier : (item['badge'] ?? 'NONE');
     final level = int.tryParse(item['level'] ?? '') ?? 1;
-    final rawPalette = (item['chatColor'] ?? '').split(',');
+    final rawPalette = ((item['levelRibbon']?.isNotEmpty == true)
+        ? item['levelRibbon']! : (item['chatColor'] ?? '')).split(',');
     final customColors = <Color>[];
     for (final raw in rawPalette.take(3)) {
       final hex = raw.trim().replaceFirst('#', '');
