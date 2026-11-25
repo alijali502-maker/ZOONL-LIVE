@@ -11,6 +11,7 @@ import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
+import 'backup_vault_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_feed_screen.dart';
@@ -1221,6 +1222,11 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
             icon: const Icon(Icons.person_outline),
             onPressed: () => setState(() => bottomIndex = 4),
           ),
+          IconButton(
+            tooltip: 'Backup Vault',
+            icon: const Icon(Icons.inventory_2_outlined, color: Color(0xFFE6C47A)),
+            onPressed: () => setState(() => bottomIndex = 5),
+          ),
         ],
       ),
     );
@@ -1890,6 +1896,9 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     if (widget.bottomIndex == 3) return _buildSupportAiScreen();
     if (widget.bottomIndex == 4) {
       return _buildProfileAndSettingsScreen();
+    }
+    if (widget.bottomIndex == 5) {
+      return const BackupVaultScreen();
     }
 
     switch (widget.topTabIndex) {
