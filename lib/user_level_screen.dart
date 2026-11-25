@@ -287,28 +287,7 @@ class _UserLevelScreenState extends State<UserLevelScreen> with TickerProviderSt
               _status(Icons.military_tech,'VIP identity badge',_badge,const Color(0xFFFFE6A1)),
             ]),const Color(0xFFFFE6A1)),
           ],
-          const SizedBox(height:19),
-          const Text('LEVEL HISTORY',style:TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.w900,letterSpacing:1.2)),
-          const SizedBox(height:4),
-          const Text('Choose a level range. Only that section is shown.',style:TextStyle(color:Colors.white54,fontSize:10)),
-          const SizedBox(height:10),
-          Wrap(spacing:7,runSpacing:7,children:List.generate(_levelBands.length,(i){
-            final selected=i==_selectedBand;
-            return ChoiceChip(
-              label:Text(_levelBands[i],style:TextStyle(color:selected?const Color(0xFF241707):Colors.white,fontSize:10,fontWeight:FontWeight.w900)),
-              selected:selected,
-              selectedColor:const Color(0xFFE6C47A),
-              backgroundColor:const Color(0xFF171126),
-              side:BorderSide(color:selected?const Color(0xFFFFE6A1):const Color(0x665E5277)),
-              onSelected:(_)=>setState(()=>_selectedBand=i),
-            );
-          })),
-          const SizedBox(height:12),
-          for(final r in _levels.where((r){
-            final n=(r['level'] as num).toInt();
-            final low=_selectedBand*20+1, high=(_selectedBand+1)*20;
-            return n>=low&&n<=high;
-          }))_row(r),
+
         ])));
   }
 }
