@@ -761,12 +761,9 @@ class _LiveScreenState extends State<LiveScreen> {
       0, 0, 0, 1, 0,
     ];
     final strength = _filterStrength.clamp(0.0, 1.0);
-    if (_previewFilter == 'Natural' || strength == 0) {
-      return const ColorFilter.matrix(identity);
-    }
-
-    // Real per-channel tone, contrast and saturation transforms. These are
-    // rendered over the published LiveKit track for host and viewers.
+    // Pre-live preview color controls mirror the color settings sent to
+    // the native face-aware LiveKit processor. Face smoothing itself is
+    // performed on the outgoing native video frames.
     final presets = <String, ({double saturation, double contrast, double brightness, double red, double green, double blue})>{
       'Soft Glow': (saturation: .92, contrast: .96, brightness: 9, red: 3, green: 2, blue: 0),
       'Vivid': (saturation: 1.34, contrast: 1.12, brightness: 1, red: 0, green: 0, blue: 0),
@@ -781,8 +778,9 @@ class _LiveScreenState extends State<LiveScreen> {
       'Lavender': (saturation: .98, contrast: 1.08, brightness: 4, red: 5, green: 0, blue: 10),
       'Mono': (saturation: 0, contrast: 1.08, brightness: 0, red: 0, green: 0, blue: 0),
     };
-    final preset = presets[_previewFilter];
-    if (preset == null) return const ColorFilter.matrix(identity);
+    final preset = presets[_previewFilter] ??
+        (saturation: 1.0, contrast: 1.0, brightness: 0.0,
+         red: 0.0, green: 0.0, blue: 0.0);
 
     const lr = .2126;
     const lg = .7152;
@@ -790,9 +788,15 @@ class _LiveScreenState extends State<LiveScreen> {
     final sat = preset.saturation;
     final contrast = 1 + (preset.contrast - 1) * strength;
     final saturation = 1 + (sat - 1) * strength;
-    final red = (preset.red * strength) + 128 * (1 - contrast);
-    final green = (preset.green * strength) + 128 * (1 - contrast);
-    final blue = (preset.blue * strength) + 128 * (1 - contrast);
+    final beautyLift = _beautyBrightness.clamp(-1.0, 1.0) * strength * 34.0;
+    final beautyGlow = _beautyGlow.clamp(0.0, 1.0) * strength * 5.0;
+    final beautyWarmth = _beautyWarmth.clamp(-1.0, 1.0) * strength * 18.0;
+    final red = (preset.red * strength) + 128 * (1 - contrast) +
+        preset.brightness * strength + beautyLift + beautyGlow + beautyWarmth;
+    final green = (preset.green * strength) + 128 * (1 - contrast) +
+        preset.brightness * strength + beautyLift + beautyGlow;
+    final blue = (preset.blue * strength) + 128 * (1 - contrast) +
+        preset.brightness * strength + beautyLift + beautyGlow - beautyWarmth;
     final matrix = <double>[
       (lr * (1 - saturation) + saturation) * contrast,
       (lg * (1 - saturation)) * contrast,
