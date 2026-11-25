@@ -86,7 +86,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
         .clamp(1, 100).toInt();
     final exp = values[1] is num ? (values[1] as num).toInt() : 0;
     final current = await client.from('wealth_levels')
-        .select('title,badge_gradient,badge_border')
+        .select('level,tier_bracket,tier_name,title,required_exp,badge_gradient,badge_border,badge_glow,chat_ribbon_theme,chat_ribbon_bg,chat_ribbon_border,chat_ribbon_shadow,unlocked_perk,is_milestone')
         .eq('level', level).maybeSingle();
     final next = level == 100 ? null : await client.from('wealth_levels')
         .select('required_exp').eq('level', level + 1).maybeSingle();
