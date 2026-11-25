@@ -11,15 +11,28 @@ class BackupVaultScreen extends StatefulWidget {
 class _BackupVaultScreenState extends State<BackupVaultScreen> {
   final _client = Supabase.instance.client;
   late Future<Map<String, dynamic>> _future;
+  final _ownerLookup = TextEditingController();
+  bool _isOwner = false;
+  String? _lookupError;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _checkOwner();
   }
 
-  Future<Map<String, dynamic>> _load() async {
-    final result = await _client.rpc('zoonl_backup_vault');
+  Future<void> _checkOwner() async {
+    try {
+      final value = await _client.rpc('is_zoonl_owner');
+      if (mounted) setState(() => _isOwner = value == true);
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> _load([String? targetUserId]) async {
+    final result = await _client.rpc('zoonl_backup_vault', params: targetUserId == null
+        ? <String, dynamic>{}
+        : <String, dynamic>{'p_user_id': targetUserId});
     if (result is! Map) throw const FormatException('Backup response is invalid.');
     return Map<String, dynamic>.from(result);
   }
@@ -91,6 +104,12 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
   }
 
   @override
+  void dispose() {
+    _ownerLookup.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF080611),
@@ -147,6 +166,64 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
           return ListView(
             padding: const EdgeInsets.all(14),
             children: [
+              if (_isOwner) Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF12101E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0x66E6C47A)),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('OWNER BACKUP LOOKUP', style: TextStyle(
+                    color: Color(0xFFE6C47A), fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: TextField(
+                      controller: _ownerLookup,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Enter user ZOONL ID',
+                        hintStyle: TextStyle(color: Colors.white38),
+                        isDense: true,
+                      ),
+                    )),
+                    IconButton(
+                      icon: const Icon(Icons.search, color: Color(0xFFE6C47A)),
+                      onPressed: () async {
+                        final zid = _ownerLookup.text.trim();
+                        if (zid.isEmpty) return;
+                        try {
+                          final row = await _client.from('user_public_profiles')
+                              .select('user_id').eq('zoonl_id', zid).maybeSingle();
+                          final target = row?['user_id']?.toString();
+                          if (target == null || target.isEmpty) {
+                            setState(() => _lookupError = 'User ID not found.');
+                            return;
+                          }
+                          setState(() {
+                            _lookupError = null;
+                            _future = _load(target);
+                          });
+                        } catch (e) {
+                          setState(() => _lookupError = 'Backup lookup failed: $e');
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'My backup',
+                      icon: const Icon(Icons.person, color: Colors.white70),
+                      onPressed: () => setState(() {
+                        _lookupError = null;
+                        _ownerLookup.clear();
+                        _future = _load();
+                      }),
+                    ),
+                  ]),
+                  if (_lookupError != null) Text(_lookupError!,
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+                ]),
+              ),
               Container(
                 padding: const EdgeInsets.all(15),
                 margin: const EdgeInsets.only(bottom: 14),
