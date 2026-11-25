@@ -143,6 +143,14 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
           gradient: [Color(0xFF5D3A91), Color(0xFFB78BFA)],
           border: Color(0xFFD6B46A),
         );
+        final isApex = data.level >= 91;
+        final colors = data.level >= 96
+            ? const [Color(0xFFFFD36A), Color(0xFFB86A28), Color(0xFF3C235F)]
+            : data.level >= 86
+                ? const [Color(0xFF42E6F2), Color(0xFF167D9B)]
+                : data.level >= 81
+                    ? const [Color(0xFFFFA6D7), Color(0xFFB83E83)]
+                    : data.gradient;
         return GestureDetector(
           onTap: _openHistory,
           child: AnimatedBuilder(
@@ -152,71 +160,94 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
               return Tooltip(
                 message: 'Level ${data.level} • ${data.title} • Tap to view all levels',
                 child: Container(
-                  width: 58,
-                  height: 58,
+                  constraints: const BoxConstraints(minWidth: 142, maxWidth: 190),
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: data.gradient,
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: colors,
                     ),
-                    border: Border.all(color: data.border, width: 2.2),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: isApex ? const Color(0xFFFFE28A) : data.border,
+                      width: 1.8,
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: data.border.withOpacity(glow * .62),
-                        blurRadius: 13,
+                        color: (isApex ? const Color(0xFFFFC94D) : data.border)
+                            .withOpacity(glow * .55),
+                        blurRadius: 15,
                         spreadRadius: 1,
                       ),
                       const BoxShadow(
                         color: Colors.black87,
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
+                        blurRadius: 5,
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Positioned(
-                        top: 5,
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFF1B8), Color(0xFFD69B27), Color(0xFF70420F)],
+                          ),
+                          border: Border.all(color: const Color(0xFFFFF4C7), width: 1.5),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x99FFD65A), blurRadius: 7),
+                          ],
+                        ),
                         child: Icon(
-                          data.level >= 100
-                              ? Icons.workspace_premium
-                              : Icons.shield,
-                          size: 14,
-                          color: const Color(0xFFFFF4D0),
+                          data.level >= 96 ? Icons.workspace_premium : Icons.stars,
+                          color: const Color(0xFF40220A),
+                          size: 19,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '${data.level}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                            shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 5,
-                        left: 7,
-                        right: 7,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: LinearProgressIndicator(
-                            minHeight: 3,
-                            value: data.progress,
-                            backgroundColor: Colors.black45,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFFFF0B0),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'LV ${data.level}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                height: 1,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .5,
+                                shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 3),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: LinearProgressIndicator(
+                                minHeight: 3,
+                                value: data.progress,
+                                backgroundColor: Colors.black45,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFFFFF0B0),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      if (data.level >= 96) ...[
+                        const SizedBox(width: 5),
+                        const Icon(Icons.diamond, size: 14, color: Color(0xFFFFF0B0)),
+                      ],
                     ],
                   ),
                 ),
