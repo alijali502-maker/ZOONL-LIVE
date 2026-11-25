@@ -12,7 +12,6 @@ import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'level_badge_widget.dart';
-import 'level/level_history_screen.dart';
 import 'backup_vault_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
@@ -3764,20 +3763,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
               ),
             ],
-          ),
-        ),
-        _luxuryCard(
-          title: 'WEALTH LEVELS',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.workspace_premium, color: Color(0xFFE6C47A), size: 28),
-            title: const Text('LEVEL BADGES & CHAT RIBBONS',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-            subtitle: const Text('All 100 levels • Five level folders • Live chat styles'),
-            trailing: const Icon(Icons.folder_open, color: Color(0xFFE6C47A)),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const LevelHistoryScreen()),
-            ),
           ),
         ),
         _ProfileSocialPanel(
