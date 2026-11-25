@@ -11,8 +11,6 @@ import 'core/app_config.dart';
 import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
-import 'user_level_screen.dart';
-import 'level_badge_widget.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_feed_screen.dart';
@@ -3663,7 +3661,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      const ZoonlMiniLevelBadge(),
                     ],
                   ),
                   const SizedBox(width: 14),
@@ -3755,29 +3752,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height:10),
-        _luxuryCard(
-          title: 'PROFILE FOLDERS',
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal:4,vertical:3),
-            leading: Container(
-              width:48,height:48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors:[Color(0xFFFFE6A1),Color(0xFF9A6A24),Color(0xFF38200B)]),
-                borderRadius: BorderRadius.circular(13),
-                border: Border.all(color:const Color(0xFFFFE6A1),width:1),
-                boxShadow: const [BoxShadow(color:Color(0x668F641F),blurRadius:13)],
-              ),
-              child: const Icon(Icons.folder_special_rounded,color:Color(0xFF241707),size:27),
-            ),
-            title: const Text('LEVEL HISTORY',style:TextStyle(fontWeight:FontWeight.w900,letterSpacing:.7)),
-            subtitle: const Text('Level badges, rank designs and progress • 1–100'),
-            trailing: const Icon(Icons.chevron_right,color:Color(0xFFE6C47A)),
-            onTap:()=>Navigator.of(context).push<void>(
-              MaterialPageRoute<void>(builder:(_)=>const UserLevelScreen()),
-            ),
           ),
         ),
         _ProfileSocialPanel(
