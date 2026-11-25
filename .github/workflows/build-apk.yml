@@ -213,10 +213,11 @@ jobs:
               }
 
               @Override public VideoFrame onFrame(VideoFrame input) {
-                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * 0.42;
-                double light = Math.max(0.0, Math.min(1.0, glow));
-                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * 34.0;
-                final double warm = Math.max(-1.0, Math.min(1.0, warmth));
+                final double amount = Math.max(0.0, Math.min(1.0, intensity));
+                final double smooth = Math.max(0.0, Math.min(1.0, smoothing)) * amount * 0.42;
+                double light = Math.max(0.0, Math.min(1.0, glow)) * amount;
+                final double lift = Math.max(-1.0, Math.min(1.0, brightness)) * amount * 34.0;
+                final double warm = Math.max(-1.0, Math.min(1.0, warmth)) * amount;
 
                 VideoFrame.I420Buffer src = input.getBuffer().toI420();
                 if (src == null) return input;
@@ -226,7 +227,6 @@ jobs:
                 final float[] contourX = faceContourX;
                 final float[] contourY = faceContourY;
                 JavaI420Buffer dst = JavaI420Buffer.allocate(width, height);
-                double amount = Math.max(0.0, Math.min(1.0, intensity));
                 double saturation = 1.0;
                 double contrast = 1.0;
                 double toneWarmth = warm;
