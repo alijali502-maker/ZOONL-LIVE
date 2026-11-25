@@ -34,7 +34,7 @@ class _LevelBadgeData {
 
   double get progress {
     if (level >= 100 || nextExp <= 0) return 1;
-    return (exp / nextExp).clamp(0.0, 1.0);
+    return (exp / nextExp).clamp(0.0, 1.0).toDouble();
   }
 }
 
@@ -97,7 +97,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     final expValue = results[1];
     final level = (levelValue is num ? levelValue.toInt() : 1)
         .clamp(1, 100).toInt();
-    final exp = expValue is num ? expValue.toInt().clamp(0, 1 << 62) : 0;
+    final exp = expValue is num ? expValue.toInt().clamp(0, 1 << 62).toInt() : 0;
 
     final currentRow = await client
         .from('wealth_levels')
