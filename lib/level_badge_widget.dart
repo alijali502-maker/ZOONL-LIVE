@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'level/level_history_screen.dart';
 
 class ZoonlMiniLevelBadge extends StatefulWidget {
   final VoidCallback? onTap;
@@ -152,7 +151,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
                     ? const [Color(0xFFFFA6D7), Color(0xFFB83E83)]
                     : data.gradient;
         return GestureDetector(
-          onTap: _openHistory,
+          onTap: widget.onTap,
           child: AnimatedBuilder(
             animation: _shine,
             builder: (context, _) {
