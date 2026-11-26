@@ -220,7 +220,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
                   subtitle: Text('Level $frameLevel • $tier • $motif',
                     style: const TextStyle(color: Colors.white38, fontSize: 10)),
                   trailing: unlocked
-                      ? const Text('UNLOCKED', style: TextStyle(color: Color(0xFFFFD77A), fontSize: 9))
+                      ? const Text('LEVEL REACHED', style: TextStyle(color: Color(0xFFFFD77A), fontSize: 9))
                       : const Icon(Icons.lock_outline, color: Colors.white30, size: 16),
                 );
               }).toList(),
