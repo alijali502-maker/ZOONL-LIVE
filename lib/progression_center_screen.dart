@@ -168,7 +168,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     final tierStyles = _orderedTierStyles(data);
     final currentTier = (current['tier'] as num?)?.toInt() ?? 1;
     final crownStyle = !isWealth && tierStyles.isNotEmpty
-        ? tierStyles[(currentTier - 1).clamp(0, tierStyles.length - 1)]
+        ? tierStyles[(currentTier - 1).clamp(0, tierStyles.length - 1).toInt()]
         : current;
     final colors = _gradient(crownStyle['badge_gradient']?.toString(),
         fallback: isWealth ? const Color(0xFF7655A0) : const Color(0xFF8E4568));
@@ -323,7 +323,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     final unlocked = n <= currentLevel;
     final tier = (row['tier'] as num?)?.toInt() ?? 1;
     final tierStyles = _orderedTierStyles(data);
-    final style = wealth ? row : (tierStyles.isEmpty ? row : tierStyles[(tier - 1).clamp(0, tierStyles.length - 1)]);
+    final style = wealth ? row : (tierStyles.isEmpty ? row : tierStyles[(tier - 1).clamp(0, tierStyles.length - 1).toInt()]);
     final colors = _gradient(style['badge_gradient']?.toString(),
         fallback: wealth ? const Color(0xFF7655A0) : const Color(0xFF8E4568));
     final border = _hex(style['badge_border']?.toString());
