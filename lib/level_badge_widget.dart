@@ -135,7 +135,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
       future: _levelFuture,
       builder: (context, snapshot) {
         final data = snapshot.data ?? const _LevelBadgeData(
-          level: 1, exp: 0, nextExp: 0, title: 'LEVEL 01',
+          level: 1, exp: 0, currentExp: 0, nextExp: 0, title: 'LEVEL 01',
           gradient: [Color(0xFF5D3A91), Color(0xFFB78BFA)],
           border: Color(0xFFD6B46A),
         );
