@@ -16,12 +16,12 @@ class FeatureHubScreen extends StatefulWidget {
 }
 
 class _FeatureHubScreenState extends State<FeatureHubScreen> {
-  static const Color _bg = Color(0xFF050505);
-  static const Color _panel = Color(0xCC111111);
-  static const Color _panelRaised = Color(0xCC202020);
-  static const Color _gold = Color(0xFFF5F5F5);
-  static const Color _teal = Color(0xFFBDBDBD);
-  static const Color _muted = Color(0xFFBDBDBD);
+  static const Color _bg = Color(0xFFFFF8F2);
+  static const Color _panel = Color(0xFFFDFBFF);
+  static const Color _panelRaised = Color(0xFFF4ECF8);
+  static const Color _gold = Color(0xFFB8874B);
+  static const Color _teal = Color(0xFF9470B6);
+  static const Color _muted = Color(0xFF786E7D);
 
   bool _loading = true;
   bool _canHost = false;
@@ -361,7 +361,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                   const SizedBox(height: 7),
                   Text(
                     'Welcome, $name',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                    style: const TextStyle(color: const Color(0xFF352B3D), fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -415,7 +415,7 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                 children: [
                   const Text(
                     'Public videos from ZOONL LIVE creators',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    style: TextStyle(color: const Color(0xFF786E7D), fontSize: 12),
                   ),
                   if (_shortVideos.isEmpty)
                     const Padding(
