@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,10 +12,25 @@ class ZoonlCrownDemonBadge extends StatefulWidget {
 
 class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
   late Future<_TalentProgress> _future;
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
   @override
   void initState() {
     super.initState();
     _future = _load();
+    final client = Supabase.instance.client;
+    final userId = client.auth.currentUser?.id;
+    if (userId != null) {
+      _profileSubscription = client.from('profiles')
+          .stream(primaryKey: ['id']).eq('id', userId).listen((_) {
+        if (mounted) setState(() => _future = _load());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    super.dispose();
   }
 
   Future<_TalentProgress> _load() async {
