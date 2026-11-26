@@ -89,7 +89,7 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
         ?? (profile['talent_level'] as num?)?.toInt() ?? 1;
     final tier = (current?['tier'] as num?)?.toInt() ?? 1;
     final style = styles.isEmpty ? <String, dynamic>{}
-        : styles[(tier - 1).clamp(0, styles.length - 1)];
+        : styles[(tier - 1).clamp(0, styles.length - 1).toInt()];
     return _TalentProgress(
       level: level,
       tier: tier,
