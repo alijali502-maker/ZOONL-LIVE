@@ -3805,6 +3805,19 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                   ),
                 ),
               ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.crop_portrait, color: Color(0xFFE6C47A)),
+                title: const Text('Profile Frames'),
+                subtitle: const Text('50 frame records from Supabase • view by level'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProgressionCenterScreen(),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
