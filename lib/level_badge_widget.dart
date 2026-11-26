@@ -15,6 +15,7 @@ class ZoonlMiniLevelBadge extends StatefulWidget {
 class _LevelBadgeData {
   final int level;
   final int exp;
+  final int currentExp;
   final int nextExp;
   final String title;
   final List<Color> gradient;
@@ -23,15 +24,16 @@ class _LevelBadgeData {
   const _LevelBadgeData({
     required this.level,
     required this.exp,
+    required this.currentExp,
     required this.nextExp,
     required this.title,
     required this.gradient,
     required this.border,
   });
 
-  double get progress => level >= 100 || nextExp <= 0
+  double get progress => level >= 100 || nextExp <= currentExp
       ? 1
-      : (exp / nextExp).clamp(0.0, 1.0).toDouble();
+      : ((exp - currentExp) / (nextExp - currentExp)).clamp(0.0, 1.0).toDouble();
 }
 
 class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
@@ -73,7 +75,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     final client = Supabase.instance.client;
     if (client.auth.currentUser == null) {
       return const _LevelBadgeData(
-        level: 1, exp: 0, nextExp: 0, title: 'LEVEL 01',
+        level: 1, exp: 0, currentExp: 0, nextExp: 0, title: 'LEVEL 01',
         gradient: [Color(0xFF5D3A91), Color(0xFFB78BFA)],
         border: Color(0xFFD6B46A),
       );
@@ -93,6 +95,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
     return _LevelBadgeData(
       level: level,
       exp: exp,
+      currentExp: (current?['required_exp'] as num?)?.toInt() ?? 0,
       nextExp: (next?['required_exp'] as num?)?.toInt() ?? 0,
       title: (current?['title'] ?? 'LEVEL $level').toString(),
       gradient: _gradient(current?['badge_gradient']?.toString(), level),
