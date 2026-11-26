@@ -351,8 +351,8 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
         ),
         title: Text(title, style: TextStyle(color: active ? Colors.white : (unlocked ? Colors.white70 : Colors.white54), fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w600)),
         subtitle: Text(
-          '$expLabel\n${wealth ? 'Frame/store price' : 'Required coins'}: $coins Coins'
-          '${wealth ? ' • ${row['tier_name'] ?? ''} • ${row['unlocked_perk'] ?? ''}' : ''}',
+          '$expLabel\n${wealth ? 'Gift coin total needed' : 'Required coins'}: ${wealth ? requiredExp : coins} Coins'
+          '${wealth ? ' • Frame/store price: $coins Coins • ${row['tier_name'] ?? ''} • ${row['unlocked_perk'] ?? ''}' : ''}',
           style: const TextStyle(color: Colors.white54, fontSize: 9, height: 1.45),
         ),
         isThreeLine: true,
