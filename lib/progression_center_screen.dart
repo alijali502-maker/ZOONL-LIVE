@@ -157,7 +157,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
             color: const Color(0xFF171126),
             child: ExpansionTile(
               initiallyExpanded: level >= range[0] && level <= range[1],
-              title: Text('LEVELS ${range.$1}–${range.$2}',
+              title: Text('LEVELS ${range[0]}–${range[1]}',
                 style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w800)),
               children: rows.where((r) {
                 final n = (r['level'] as num).toInt();
