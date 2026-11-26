@@ -143,102 +143,39 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
         final isApex = data.level >= 100;
         return GestureDetector(
           onTap: widget.onTap,
-          child: AnimatedBuilder(
-            animation: _shine,
-            builder: (context, _) {
-              final glow = .35 + (_shine.value * .65);
-              return Tooltip(
-                message: 'Level ${data.level} • ${data.title}',
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 142, maxWidth: 190),
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: colors,
-                    ),
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: isApex ? const Color(0xFFFFE28A) : data.border,
-                      width: 1.8,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isApex ? const Color(0xFFFFC94D) : data.border)
-                            .withOpacity(glow * .55),
-                        blurRadius: 15,
-                        spreadRadius: 1,
-                      ),
-                      const BoxShadow(
-                        color: Colors.black87,
-                        blurRadius: 5,
-                        offset: Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFFF1B8), Color(0xFFD69B27), Color(0xFF70420F)],
-                          ),
-                          border: Border.all(color: const Color(0xFFFFF4C7), width: 1.5),
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x99FFD65A), blurRadius: 7),
-                          ],
-                        ),
-                        child: const Icon(Icons.stars, color: Color(0xFF40220A), size: 19),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'LV ${data.level}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                height: 1,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: .5,
-                                shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(5),
-                              child: LinearProgressIndicator(
-                                minHeight: 3,
-                                value: data.progress,
-                                backgroundColor: Colors.black45,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  Color(0xFFFFF0B0),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (data.level >= 96) ...[
-                        const SizedBox(width: 5),
-                        const Icon(Icons.diamond, size: 14, color: Color(0xFFFFF0B0)),
-                      ],
-                    ],
-                  ),
+          child: Tooltip(
+            message: 'Level ${data.level} • ${data.title}',
+            child: Container(
+              width: 104,
+              height: 27,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: colors),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isApex ? const Color(0xFFFFE28A) : data.border,
+                  width: 1.1,
                 ),
-              );
-            },
+                boxShadow: [
+                  BoxShadow(color: data.border.withOpacity(.22), blurRadius: 5),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.stars, color: Color(0xFFFFE7A0), size: 15),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text('LV ${data.level}',
+                      maxLines: 1, overflow: TextOverflow.clip,
+                      style: const TextStyle(color: Colors.white, fontSize: 11,
+                        height: 1, fontWeight: FontWeight.w900)),
+                  ),
+                  if (isApex)
+                    const Icon(Icons.diamond, size: 12, color: Color(0xFFFFF0B0)),
+                ],
+              ),
+            ),
           ),
         );
       },
