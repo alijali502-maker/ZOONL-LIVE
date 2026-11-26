@@ -152,6 +152,37 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
         ),
+        if (isWealth)
+          Card(
+            color: const Color(0xFF211735),
+            child: ExpansionTile(
+              leading: const Icon(Icons.crop_portrait, color: Color(0xFFE6C47A)),
+              title: Text('PROFILE FRAME COLLECTION • ${rows.where((r) => r['frame_name'] != null).length}',
+                style: const TextStyle(color: Color(0xFFFFE6A6), fontWeight: FontWeight.w900)),
+              subtitle: const Text('50 frame records loaded from Supabase wealth_levels',
+                style: TextStyle(color: Colors.white54, fontSize: 10)),
+              children: rows.where((r) => r['frame_name'] != null).map((row) {
+                final frameLevel = (row['level'] as num).toInt();
+                final unlocked = level >= frameLevel;
+                final frameName = row['frame_name'].toString();
+                final motif = (row['motif'] ?? 'profile frame').toString();
+                final tier = (row['color_tier'] ?? 'Standard').toString();
+                return ListTile(
+                  dense: true,
+                  leading: Icon(Icons.auto_awesome,
+                    color: unlocked ? const Color(0xFFFFD77A) : Colors.white38),
+                  title: Text(frameName,
+                    style: TextStyle(color: unlocked ? Colors.white : Colors.white54,
+                      fontWeight: FontWeight.w700, fontSize: 12)),
+                  subtitle: Text('Level $frameLevel • $tier • $motif',
+                    style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                  trailing: unlocked
+                      ? const Text('UNLOCKED', style: TextStyle(color: Color(0xFFFFD77A), fontSize: 9))
+                      : const Icon(Icons.lock_outline, color: Colors.white30, size: 16),
+                );
+              }).toList(),
+            ),
+          ),
         for (final range in groups)
           Card(
             color: const Color(0xFF171126),
