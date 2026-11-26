@@ -5,7 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Receiver progression is separate from sender Wealth Level.
 /// Level thresholds and tier styling are read from Supabase.
 class ZoonlCrownDemonBadge extends StatefulWidget {
-  const ZoonlCrownDemonBadge({super.key});
+  final VoidCallback? onTap;
+  const ZoonlCrownDemonBadge({super.key, this.onTap});
   @override
   State<ZoonlCrownDemonBadge> createState() => _ZoonlCrownDemonBadgeState();
 }
@@ -122,7 +123,7 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
             : ((data.exp - data.currentExp) / (data.nextExp - data.currentExp))
                 .clamp(0.0, 1.0).toDouble();
         return GestureDetector(
-          onTap: () => showDialog<void>(
+          onTap: widget.onTap ?? () => showDialog<void>(
             context: context,
             builder: (dialogContext) => AlertDialog(
               title: const Text('CROWN / DEMON PROGRESSION'),
