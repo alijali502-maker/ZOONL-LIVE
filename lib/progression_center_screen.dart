@@ -159,7 +159,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
               leading: const Icon(Icons.crop_portrait, color: Color(0xFFE6C47A)),
               title: Text('PROFILE FRAME COLLECTION • ${rows.where((r) => r['frame_name'] != null).length}',
                 style: const TextStyle(color: Color(0xFFFFE6A6), fontWeight: FontWeight.w900)),
-              subtitle: const Text('50 frame records loaded from Supabase wealth_levels',
+              subtitle: const Text('50 frame records loaded • frame artwork files are not yet in Supabase Storage',
                 style: TextStyle(color: Colors.white54, fontSize: 10)),
               children: rows.where((r) => r['frame_name'] != null).map((row) {
                 final frameLevel = (row['level'] as num).toInt();
