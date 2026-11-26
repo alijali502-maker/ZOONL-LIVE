@@ -106,15 +106,20 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     required List<Map<String, dynamic>> rows,
     required bool isWealth,
   }) {
-    final current = rows.where((r) => (r['level'] as num).toInt() == level).firstOrNull;
-    final next = rows.where((r) => (r['level'] as num).toInt() > level).firstOrNull;
+    Map<String, dynamic>? current;
+    Map<String, dynamic>? next;
+    for (final row in rows) {
+      final rowLevel = (row['level'] as num).toInt();
+      if (rowLevel == level) current = row;
+      if (rowLevel > level && (next == null || rowLevel < (next['level'] as num).toInt())) next = row;
+    }
     final currentExp = (current?['required_exp'] as num?)?.toInt() ?? 0;
     final nextExp = (next?['required_exp'] as num?)?.toInt() ?? currentExp;
     final progress = next == null ? 1.0 :
         ((exp - currentExp) / (nextExp - currentExp)).clamp(0.0, 1.0).toDouble();
     final groups = isWealth
-        ? <(int,int)>[(1,20),(21,40),(41,60),(61,80),(81,100)]
-        : <(int,int)>[(1,10),(11,20),(21,30),(31,40),(41,50)];
+        ? <List<int>>[[1,20],[21,40],[41,60],[61,80],[81,100]]
+        : <List<int>>[[1,10],[11,20],[21,30],[31,40],[41,50]];
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
@@ -151,7 +156,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           Card(
             color: const Color(0xFF171126),
             child: ExpansionTile(
-              initiallyExpanded: level >= range.$1 && level <= range.$2,
+              initiallyExpanded: level >= range[0] && level <= range[1],
               title: Text('LEVELS ${range.$1}–${range.$2}',
                 style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w800)),
               children: rows.where((r) {
