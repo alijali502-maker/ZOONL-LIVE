@@ -23,6 +23,10 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           .order('level'),
       db.from('talent_levels').select('level,tier,required_exp,required_coins')
           .order('level'),
+      db.from('gift_sends').select('id,total_coins,quantity,gift_id,created_at')
+          .eq('sender_id', user.id).order('created_at', ascending: false).limit(20),
+      db.from('gift_sends').select('id,total_coins,quantity,gift_id,created_at')
+          .eq('receiver_id', user.id).order('created_at', ascending: false).limit(20),
     ]);
     final profile = values[0] as Map<String, dynamic>? ?? <String, dynamic>{};
     return _ProgressionData(
@@ -32,6 +36,8 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       talentLevel: (profile['talent_level'] as num?)?.toInt() ?? 1,
       wealthRows: (values[1] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
       talentRows: (values[2] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      sentHistory: (values[3] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+      receivedHistory: (values[4] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
     );
   }
 
@@ -84,6 +90,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       exp: data.wealthExp,
       rows: data.wealthRows,
       isWealth: true,
+      history: data.sentHistory,
     );
   }
 
@@ -95,6 +102,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       exp: data.talentExp,
       rows: data.talentRows,
       isWealth: false,
+      history: data.receivedHistory,
     );
   }
 
@@ -105,6 +113,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     required int exp,
     required List<Map<String, dynamic>> rows,
     required bool isWealth,
+    required List<Map<String, dynamic>> history,
   }) {
     Map<String, dynamic>? current;
     Map<String, dynamic>? next;
@@ -151,6 +160,40 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 14, bottom: 8),
+          child: Text(isWealth ? 'GIFT SENDING HISTORY' : 'GIFT RECEIVING HISTORY',
+            style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900, letterSpacing: .8)),
+        ),
+        Card(
+          color: const Color(0xFF211735),
+          child: history.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('No gift activity recorded yet.',
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                )
+              : Column(
+                  children: history.map((item) {
+                    final rawDate = item['created_at']?.toString() ?? '';
+                    final parsed = DateTime.tryParse(rawDate)?.toLocal();
+                    final dateLabel = parsed == null
+                        ? rawDate
+                        : '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+                    final coins = (item['total_coins'] as num?)?.toInt() ?? 0;
+                    final quantity = (item['quantity'] as num?)?.toInt() ?? 1;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(isWealth ? Icons.card_giftcard : Icons.redeem,
+                        color: const Color(0xFFFFD77A), size: 18),
+                      title: Text('${coins.toString()} Coins • x$quantity',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                      subtitle: Text(dateLabel,
+                        style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    );
+                  }).toList(),
+                ),
         ),
         if (isWealth)
           Card(
@@ -226,10 +269,11 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
 
 class _ProgressionData {
   final int wealthExp, wealthLevel, talentExp, talentLevel;
-  final List<Map<String, dynamic>> wealthRows, talentRows;
+  final List<Map<String, dynamic>> wealthRows, talentRows, sentHistory, receivedHistory;
   const _ProgressionData({
     required this.wealthExp, required this.wealthLevel,
     required this.talentExp, required this.talentLevel,
     required this.wealthRows, required this.talentRows,
+    required this.sentHistory, required this.receivedHistory,
   });
 }
