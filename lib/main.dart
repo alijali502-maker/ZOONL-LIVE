@@ -3673,20 +3673,25 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                         ),
                       ),
                       const SizedBox(height: 5),
-                      ZoonlMiniLevelBadge(
-                        onTap: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ProgressionCenterScreen(),
+                      Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        children: [
+                          ZoonlMiniLevelBadge(
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const ProgressionCenterScreen(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      ZoonlCrownDemonBadge(
-                        onTap: () => Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ProgressionCenterScreen(),
+                          ZoonlCrownDemonBadge(
+                            onTap: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const ProgressionCenterScreen(),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
