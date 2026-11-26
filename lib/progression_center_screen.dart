@@ -192,7 +192,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
                 style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w800)),
               children: rows.where((r) {
                 final n = (r['level'] as num).toInt();
-                return n >= range.$1 && n <= range.$2;
+                return n >= range[0] && n <= range[1];
               }).map((row) {
                 final n = (row['level'] as num).toInt();
                 final requiredExp = (row['required_exp'] as num).toInt();
