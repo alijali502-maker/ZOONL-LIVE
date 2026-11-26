@@ -20,7 +20,7 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) {
-      return const _TalentProgress(level: 1, tier: 1, exp: 0, nextExp: 0);
+      return const _TalentProgress(level: 1, tier: 1, exp: 0, currentExp: 0, nextExp: 0);
     }
     final profile = await client.from('profiles')
         .select('talent_exp,talent_level').eq('id', user.id).maybeSingle();
@@ -38,6 +38,7 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
           (profile?['talent_level'] as num?)?.toInt() ?? 1,
       tier: (current['tier'] as num?)?.toInt() ?? 1,
       exp: exp,
+      currentExp: (current['required_exp'] as num?)?.toInt() ?? 0,
       nextExp: (next?['required_exp'] as num?)?.toInt() ?? 0,
     );
   }
@@ -56,7 +57,8 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
             const _TalentProgress(level: 1, tier: 1, exp: 0, nextExp: 0);
         final progress = data.nextExp <= 0
             ? 1.0
-            : (data.exp / data.nextExp).clamp(0.0, 1.0).toDouble();
+            : ((data.exp - data.currentExp) / (data.nextExp - data.currentExp))
+                .clamp(0.0, 1.0).toDouble();
         return GestureDetector(
           onTap: () => showDialog<void>(
             context: context,
@@ -144,6 +146,7 @@ class _TalentProgress {
   final int level;
   final int tier;
   final int exp;
+  final int currentExp;
   final int nextExp;
   const _TalentProgress({
     required this.level,
