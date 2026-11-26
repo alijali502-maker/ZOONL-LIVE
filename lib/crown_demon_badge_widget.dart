@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Receiver progression is separate from sender Wealth Level.
-/// Level thresholds and tier styling are read from Supabase.
+/// Talent progression badge: same five-level heart/diamond/crown tiers as FeatureHub.
 class ZoonlCrownDemonBadge extends StatefulWidget {
   final VoidCallback? onTap;
   const ZoonlCrownDemonBadge({super.key, this.onTap});
@@ -11,19 +10,32 @@ class ZoonlCrownDemonBadge extends StatefulWidget {
   State<ZoonlCrownDemonBadge> createState() => _ZoonlCrownDemonBadgeState();
 }
 
+class _TalentProgress {
+  final int level, exp, currentExp, nextExp;
+  final String tierName;
+  final Color pill, gradA, gradB, rim;
+  final IconData icon;
+  const _TalentProgress({
+    required this.level, required this.exp, required this.currentExp,
+    required this.nextExp, required this.tierName, required this.pill,
+    required this.gradA, required this.gradB, required this.rim,
+    required this.icon,
+  });
+}
+
 class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
   late Future<_TalentProgress> _future;
-  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _subscription;
 
   @override
   void initState() {
     super.initState();
     _future = _load();
     final client = Supabase.instance.client;
-    final userId = client.auth.currentUser?.id;
-    if (userId != null) {
-      _profileSubscription = client.from('profiles')
-          .stream(primaryKey: ['id']).eq('id', userId).listen((_) {
+    final uid = client.auth.currentUser?.id;
+    if (uid != null) {
+      _subscription = client.from('profiles').stream(primaryKey: ['id'])
+          .eq('id', uid).listen((_) {
         if (mounted) setState(() => _future = _load());
       });
     }
@@ -31,81 +43,68 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
 
   @override
   void dispose() {
-    _profileSubscription?.cancel();
+    _subscription?.cancel();
     super.dispose();
   }
 
-  Color _hex(String? raw, Color fallback) {
-    final match = RegExp(r'#[0-9a-fA-F]{6}').firstMatch(raw ?? '');
-    if (match == null) return fallback;
-    final value = int.tryParse(match.group(0)!.substring(1), radix: 16);
-    return value == null ? fallback : Color(0xFF000000 | value);
-  }
-
-  List<Color> _colors(String? raw) {
-    final values = RegExp(r'#[0-9a-fA-F]{6}')
-        .allMatches(raw ?? '')
-        .map((m) => _hex(m.group(0), const Color(0xFF8E4568)))
-        .toList();
-    return values.length >= 2
-        ? values
-        : const [Color(0xFF4A2339), Color(0xFF9B4567)];
+  _TalentProgress _styleFor(int level, int exp, int current, int next) {
+    final safe = level.clamp(1, 50).toInt();
+    final tier = (safe - 1) ~/ 5;
+    const palettes = <List<Color>>[
+      [Color(0xFFFB7185), Color(0xFFE11D48), Color(0xFFFDE047)],
+      [Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFFFDE047)],
+      [Color(0xFF34D399), Color(0xFF059669), Color(0xFFFDE047)],
+      [Color(0xFFF87171), Color(0xFFDC2626), Color(0xFFFBBF24)],
+      [Color(0xFFA78BFA), Color(0xFF7C3AED), Color(0xFFFBBF24)],
+      [Color(0xFFFBBF24), Color(0xFFB45309), Color(0xFFFEF08A)],
+      [Color(0xFF60A5FA), Color(0xFF1D4ED8), Color(0xFFFDE047)],
+      [Color(0xFFFB7185), Color(0xFF9F1239), Color(0xFFFBBF24)],
+      [Color(0xFF94A3B8), Color(0xFF1E293B), Color(0xFFE2E8F0)],
+      [Color(0xFFC084FC), Color(0xFF6D28D9), Color(0xFFFEF08A)],
+    ];
+    const names = <String>[
+      'Rose Heart', 'Sky Diamond', 'Emerald Diamond', 'Crimson Crown',
+      'Violet Crown', 'Amber Gold Crown', 'Sapphire Crown', 'Ruby Crown',
+      'Obsidian Crown', 'Celestial Crown',
+    ];
+    final p = palettes[tier];
+    final icon = tier == 0 ? Icons.favorite
+        : (tier == 1 || tier == 2) ? Icons.diamond
+        : Icons.workspace_premium;
+    return _TalentProgress(
+      level: safe, exp: exp, currentExp: current, nextExp: next,
+      tierName: names[tier], pill: p[1], gradA: p[0], gradB: p[1],
+      rim: p[2], icon: icon,
+    );
   }
 
   Future<_TalentProgress> _load() async {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
-    if (user == null) {
-      return const _TalentProgress(level: 1, tier: 1, exp: 0,
-          currentExp: 0, nextExp: 0, gradient: [Color(0xFF4A2339), Color(0xFF9B4567)],
-          border: Color(0xFFFFC5D2));
-    }
+    if (user == null) return _styleFor(1, 0, 0, 0);
     final values = await Future.wait<dynamic>([
       client.from('profiles').select('talent_exp,talent_level')
           .eq('id', user.id).maybeSingle(),
-      client.from('talent_levels').select('level,tier,required_exp')
-          .order('level'),
-      client.from('wealth_levels')
-          .select('tier_bracket,badge_gradient,badge_border')
-          .order('level'),
+      client.from('talent_levels').select('level,required_exp')
+          .order('level', ascending: true),
     ]);
-    final profile = values[0] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final profile = values[0] as Map<String, dynamic>? ?? {};
     final exp = (profile['talent_exp'] as num?)?.toInt() ?? 0;
-    final rows = (values[1] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final styles = <Map<String, dynamic>>[];
-    final seen = <String>{};
-    for (final raw in values[2] as List) {
-      final row = Map<String, dynamic>.from(raw as Map);
-      final key = (row['tier_bracket'] ?? '').toString();
-      if (key.isNotEmpty && seen.add(key)) styles.add(row);
-    }
+    final rows = (values[1] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map)).toList();
     Map<String, dynamic>? current;
     Map<String, dynamic>? next;
     for (final row in rows) {
-      final threshold = (row['required_exp'] as num).toInt();
+      final threshold = (row['required_exp'] as num?)?.toInt() ?? 0;
       if (threshold <= exp) current = row;
       if (threshold > exp && next == null) next = row;
     }
-    final level = (current?['level'] as num?)?.toInt()
-        ?? (profile['talent_level'] as num?)?.toInt() ?? 1;
-    final tier = (current?['tier'] as num?)?.toInt() ?? 1;
-    final style = styles.isEmpty ? <String, dynamic>{}
-        : styles[(tier - 1).clamp(0, styles.length - 1).toInt()];
-    return _TalentProgress(
-      level: level,
-      tier: tier,
-      exp: exp,
-      currentExp: (current?['required_exp'] as num?)?.toInt() ?? 0,
-      nextExp: (next?['required_exp'] as num?)?.toInt() ?? 0,
-      gradient: _colors(style['badge_gradient']?.toString()),
-      border: _hex(style['badge_border']?.toString(), const Color(0xFFFFC5D2)),
-    );
-  }
-
-  Future<void> _refresh() async {
-    if (!mounted) return;
-    setState(() => _future = _load());
-    try { await _future; } catch (_) {}
+    final dbLevel = (current?['level'] as num?)?.toInt();
+    final profileLevel = (profile['talent_level'] as num?)?.toInt() ?? 1;
+    final level = (dbLevel ?? profileLevel).clamp(1, 50).toInt();
+    final currentExp = (current?['required_exp'] as num?)?.toInt() ?? 0;
+    final nextExp = (next?['required_exp'] as num?)?.toInt() ?? currentExp;
+    return _styleFor(level, exp, currentExp, nextExp);
   }
 
   @override
@@ -113,44 +112,35 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
     return FutureBuilder<_TalentProgress>(
       future: _future,
       builder: (context, snapshot) {
-        final data = snapshot.data ?? const _TalentProgress(
-          level: 1, tier: 1, exp: 0, currentExp: 0, nextExp: 0,
-          gradient: [Color(0xFF4A2339), Color(0xFF9B4567)],
-          border: Color(0xFFFFC5D2),
-        );
-        final progress = data.nextExp <= data.currentExp
-            ? 1.0
-            : ((data.exp - data.currentExp) / (data.nextExp - data.currentExp))
-                .clamp(0.0, 1.0).toDouble();
+        final data = snapshot.data ?? _styleFor(1, 0, 0, 0);
         return GestureDetector(
-          onTap: widget.onTap ?? () => showDialog<void>(
-            context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: const Text('CROWN / DEMON PROGRESSION'),
-              content: Text('Talent Level ${data.level} • Tier ${data.tier}\nReceived-gift EXP: ${data.exp}'),
-              actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CLOSE'))],
-            ),
-          ),
+          onTap: widget.onTap,
           child: Tooltip(
-            message: 'Crown / Demon • Level ${data.level}',
+            message: 'Talent ${data.level} • ${data.tierName} • EXP ${data.exp}',
             child: Container(
-              width: 112,
-              height: 25,
-              padding: const EdgeInsets.symmetric(horizontal: 7),
+              height: 27,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: data.gradient),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: data.border, width: 1),
-                boxShadow: [BoxShadow(color: data.border.withOpacity(.20), blurRadius: 4)],
+                gradient: LinearGradient(
+                  colors: [data.gradA, data.gradB],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: data.rim, width: 1.2),
+                boxShadow: [BoxShadow(color: data.pill.withOpacity(.35), blurRadius: 7)],
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.workspace_premium, size: 14, color: Color(0xFFFFD6A0)),
+                Icon(data.icon, size: 14, color: Colors.white),
                 const SizedBox(width: 4),
-                Expanded(child: Text('CROWN ${data.level}',
-                  maxLines: 1, overflow: TextOverflow.clip,
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
-                if (snapshot.connectionState == ConnectionState.waiting)
-                  const SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 1)),
+                Text('Lv.${data.level}', style: const TextStyle(
+                  color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900,
+                )),
+                if (snapshot.connectionState == ConnectionState.waiting) ...[
+                  const SizedBox(width: 5),
+                  const SizedBox(width: 8, height: 8,
+                    child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white)),
+                ],
               ]),
             ),
           ),
@@ -158,23 +148,4 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
       },
     );
   }
-}
-
-class _TalentProgress {
-  final int level;
-  final int tier;
-  final int exp;
-  final int currentExp;
-  final int nextExp;
-  final List<Color> gradient;
-  final Color border;
-  const _TalentProgress({
-    required this.level,
-    required this.tier,
-    required this.exp,
-    required this.currentExp,
-    required this.nextExp,
-    required this.gradient,
-    required this.border,
-  });
 }
