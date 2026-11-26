@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,6 +43,7 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
   int _bet = 100;
   String _game = 'teen_patti';
   bool _isBusy = false;
+  bool _isLoadingDb = true;
   String? _statusMsg;
   bool _statusWon = true;
 
@@ -61,10 +63,26 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
   void initState() {
     super.initState();
     _coins = widget.initialCoins;
-    _loadFromSupabase();
+    _readFromSupabase();
   }
 
   String get _currentBeat => _rhythm[_beatIndex % _rhythm.length];
+
+  String get _currentGameTitle {
+    switch (_game) {
+      case 'color_rush':
+        return 'Color Rush';
+      case 'dragon_tiger':
+        return 'Dragon vs Tiger';
+      case 'lucky_dice':
+        return 'Lucky Dice 7';
+      case 'royal_wheel':
+        return 'Royal Wheel';
+      case 'teen_patti':
+      default:
+        return 'Teen Patti Duel';
+    }
+  }
 
   void _showMsg(String text) {
     if (!mounted) return;
@@ -73,13 +91,36 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
       ..showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _loadFromSupabase() async {
+  Future<void> _readFromSupabase() async {
     final db = _db;
-    if (db == null) return;
+    if (db == null) {
+      if (mounted) setState(() => _isLoadingDb = false);
+      return;
+    }
+
+    if (mounted) setState(() => _isLoadingDb = true);
+
     try {
+      final prof = await db
+          .from('profiles')
+          .select('coins')
+          .eq('zoonl_id', widget.zoonlId.trim())
+          .maybeSingle();
+
       final cfg = await db.from('game_config').select().eq('id', 1).maybeSingle();
-      if (cfg != null && mounted) {
-        setState(() {
+
+      final historyRows = await db
+          .from('game_rounds')
+          .select()
+          .order('id', ascending: false)
+          .limit(15);
+
+      if (!mounted) return;
+      setState(() {
+        if (prof != null && prof['coins'] != null) {
+          _coins = (prof['coins'] as num).toInt();
+        }
+        if (cfg != null) {
           _potA = (cfg['pot_a'] as num?)?.toInt() ?? _potA;
           _potB = (cfg['pot_b'] as num?)?.toInt() ?? _potB;
           _potC = (cfg['pot_c'] as num?)?.toInt() ?? _potC;
@@ -89,38 +130,23 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
             final list = (cfg['rhythm'] as List).map((e) => e.toString()).toList();
             if (list.isNotEmpty) _rhythm = list;
           }
-        });
-      }
-
-      final prof = await db
-          .from('profiles')
-          .select('coins')
-          .eq('zoonl_id', widget.zoonlId.trim())
-          .maybeSingle();
-      if (prof != null && prof['coins'] != null && mounted) {
-        setState(() => _coins = (prof['coins'] as num).toInt());
-      }
-
-      final historyRows = await db
-          .from('game_rounds')
-          .select()
-          .order('id', ascending: false)
-          .limit(15);
+        }
+        _rounds
+          ..clear()
+          ..addAll(List>.from(historyRows));
+        _isLoadingDb = false;
+      });
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _rounds
-            ..clear()
-            ..addAll(List>.from(historyRows));
-        });
+        setState(() => _isLoadingDb = false);
+        _showMsg('Supabase read error: $e');
       }
-    } catch (_) {}
+    }
   }
 
   Future<void> _playRound({
-    required String gameTitle,
     required String pick,
     required String potTag,
-    required bool won,
     required double multiplier,
   }) async {
     if (_isBusy) return;
@@ -128,6 +154,11 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
       _showMsg('Coins kam hain ($_bet chahiye).');
       return;
     }
+
+    final beat = _currentBeat;
+    final winChance = beat == 'HIGH' ? 65 : (beat == 'MID' ? 48 : 35);
+    final won = _rng.nextInt(100) < winChance;
+    final title = _currentGameTitle;
 
     setState(() => _isBusy = true);
     final db = _db;
@@ -138,7 +169,7 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
           'play_game_round',
           params: {
             'p_zoonl_id': widget.zoonlId.trim(),
-            'p_game_name': gameTitle,
+            'p_game_name': title,
             'p_pick': '$pick ($potTag)',
             'p_won': won,
             'p_bet': _bet,
@@ -149,7 +180,8 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
         if (res is Map && res['ok'] == true) {
           final nextCoins = (res['coins'] as num?)?.toInt() ?? _coins;
           final payout = (res['payout'] as num?)?.toInt() ?? 0;
-          final playerDelta = (res['player_delta'] as num?)?.toInt() ?? (nextCoins - _coins);
+          final playerDelta =
+              (res['player_delta'] as num?)?.toInt() ?? (nextCoins - _coins);
           final ownerDelta = (res['owner_delta'] as num?)?.toInt() ?? 0;
 
           if (mounted) {
@@ -162,11 +194,11 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
               _beatIndex += 1;
               _statusWon = won;
               _statusMsg = won
-                  ? '$gameTitle • $pick WIN (+$payout Coins)'
-                  : '$gameTitle • $pick LOSS (-$_bet Coins)';
+                  ? '$title • $pick WIN (+$payout Coins)'
+                  : '$title • $pick LOSS (-$_bet Coins)';
               _rounds.insert(0, {
                 'zoonl_id': widget.zoonlId.trim(),
-                'game_name': gameTitle,
+                'game_name': title,
                 'pick': '$pick ($potTag)',
                 'won': won,
                 'bet_amount': _bet,
@@ -184,7 +216,7 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
           return;
         }
       } catch (e) {
-        _showMsg('Supabase sync issue: $e');
+        _showMsg('Supabase RPC error: $e');
       }
     }
 
@@ -203,11 +235,11 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
         _beatIndex += 1;
         _statusWon = won;
         _statusMsg = won
-            ? '$gameTitle • $pick WIN (+$payout Coins)'
-            : '$gameTitle • $pick LOSS (-$_bet Coins)';
+            ? '$title • $pick WIN (+$payout Coins)'
+            : '$title • $pick LOSS (-$_bet Coins)';
         _rounds.insert(0, {
           'zoonl_id': widget.zoonlId.trim(),
-          'game_name': gameTitle,
+          'game_name': title,
           'pick': '$pick ($potTag)',
           'won': won,
           'bet_amount': _bet,
@@ -220,18 +252,25 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
     }
   }
 
-  void _triggerGameAction(String label, String pot, double mult) {
-    final beat = _currentBeat;
-    final winChance = beat == 'HIGH' ? 65 : (beat == 'MID' ? 48 : 35);
-    final won = _rng.nextInt(100) < winChance;
-
-    String title = 'Teen Patti Duel';
-    if (_game == 'color_rush') title = 'Color Rush';
-    if (_game == 'dragon_tiger') title = 'Dragon vs Tiger';
-    if (_game == 'lucky_dice') title = 'Lucky Dice 7';
-    if (_game == 'royal_wheel') title = 'Royal Wheel';
-
-    _playRound(gameTitle: title, pick: label, potTag: pot, won: won, multiplier: mult);
+  void _quickStartGame() {
+    switch (_game) {
+      case 'color_rush':
+        _playRound(pick: 'RED', potTag: 'A', multiplier: 1.9);
+        break;
+      case 'dragon_tiger':
+        _playRound(pick: 'DRAGON', potTag: 'A', multiplier: 1.9);
+        break;
+      case 'lucky_dice':
+        _playRound(pick: '< 7', potTag: 'A', multiplier: 1.85);
+        break;
+      case 'royal_wheel':
+        _playRound(pick: 'SPIN WHEEL', potTag: 'C', multiplier: 2.5);
+        break;
+      case 'teen_patti':
+      default:
+        _playRound(pick: 'Seat A', potTag: 'A', multiplier: 1.95);
+        break;
+    }
   }
 
   Future<void> _updateOwnerRhythm(List<String> nextRhythm) async {
@@ -270,31 +309,31 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
       case 'color_rush':
         return Row(
           children: [
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => _triggerGameAction('RED', 'A', 1.9), child: const Text('RED'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => _playRound(pick: 'RED', potTag: 'A', multiplier: 1.9), child: const Text('RED'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('GREEN', 'B', 1.9), child: const Text('GREEN'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'GREEN', potTag: 'B', multiplier: 1.9), child: const Text('GREEN'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('VIOLET', 'C', 4.5), child: const Text('VIOLET'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'VIOLET', potTag: 'C', multiplier: 4.5), child: const Text('VIOLET'))),
           ],
         );
       case 'dragon_tiger':
         return Row(
           children: [
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => _triggerGameAction('DRAGON', 'A', 1.9), child: const Text('DRAGON'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => _playRound(pick: 'DRAGON', potTag: 'A', multiplier: 1.9), child: const Text('DRAGON'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('TIGER', 'B', 1.9), child: const Text('TIGER'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'TIGER', potTag: 'B', multiplier: 1.9), child: const Text('TIGER'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('TIE', 'C', 8.0), child: const Text('TIE'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'TIE', potTag: 'C', multiplier: 8.0), child: const Text('TIE'))),
           ],
         );
       case 'lucky_dice':
         return Row(
           children: [
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('< 7', 'A', 1.85), child: const Text('< 7'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _playRound(pick: '< 7', potTag: 'A', multiplier: 1.85), child: const Text('< 7'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('= 7', 'C', 5.0), child: const Text('= 7'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _playRound(pick: '= 7', potTag: 'C', multiplier: 5.0), child: const Text('= 7'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('> 7', 'B', 1.85), child: const Text('> 7'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _green, foregroundColor: Colors.black), onPressed: () => _playRound(pick: '> 7', potTag: 'B', multiplier: 1.85), child: const Text('> 7'))),
           ],
         );
       case 'royal_wheel':
@@ -302,7 +341,7 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
           width: double.infinity,
           child: FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black),
-            onPressed: () => _triggerGameAction('SPIN WHEEL', 'C', 2.5),
+            onPressed: () => _playRound(pick: 'SPIN WHEEL', potTag: 'C', multiplier: 2.5),
             child: Text('SPIN ROYAL WHEEL • BET $_bet'),
           ),
         );
@@ -310,11 +349,11 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
       default:
         return Row(
           children: [
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('Seat A', 'A', 1.95), child: const Text('Seat A'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.cyan, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'Seat A', potTag: 'A', multiplier: 1.95), child: const Text('Seat A'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('Seat B', 'B', 1.95), child: const Text('Seat B'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.purpleAccent, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'Seat B', potTag: 'B', multiplier: 1.95), child: const Text('Seat B'))),
             const SizedBox(width: 8),
-            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _triggerGameAction('Seat C', 'C', 3.0), child: const Text('Seat C'))),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => _playRound(pick: 'Seat C', potTag: 'C', multiplier: 3.0), child: const Text('Seat C'))),
           ],
         );
     }
@@ -371,7 +410,7 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
         title: const Text('ZOONL 5-GAME PORTAL', style: TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 16)),
         actions: [
           IconButton(
-            onPressed: _loadFromSupabase,
+            onPressed: _readFromSupabase,
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -389,11 +428,22 @@ class _GamePortalScreenState extends State<GamePortalScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('${widget.playerName} (ID: ${widget.zoonlId})', style: const TextStyle(color: _muted, fontSize: 11)),
-                      Text('$_coins Coins', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                      Text(
+                        _isLoadingDb ? 'Supabase sync...' : '$_coins Coins',
+                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+                      ),
                     ],
                   ),
                 ),
-                if (_isBusy) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _gold)),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: Colors.black,
+                  ),
+                  onPressed: _isBusy ? null : _quickStartGame,
+                  icon: const Icon(Icons.play_arrow, size: 18),
+                  label: const Text('PLAY GAME', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                ),
               ],
             ),
           ),
