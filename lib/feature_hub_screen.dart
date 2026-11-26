@@ -408,38 +408,14 @@ class _FeatureHubScreenState extends State<FeatureHubScreen> {
                 ],
               ),
             ),
-            _sectionTitle('Short Videos', trailing: 'VIEW ALL', onTap: () => _openShortFeed()),
+            _sectionTitle('For You • Published Videos', trailing: 'SEE ALL', onTap: () => _openShortFeed()),
             _panelCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Record, publish and watch public Shorts',
+                    'Public videos from ZOONL LIVE creators',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _openShortStudio,
-                          icon: const Icon(Icons.videocam),
-                          label: const Text('UPLOAD SHORT'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _teal,
-                            foregroundColor: const Color(0xFF071713),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openShortFeed(onlyMine: true),
-                          icon: const Icon(Icons.person),
-                          label: const Text('MY SHORTS'),
-                        ),
-                      ),
-                    ],
                   ),
                   if (_shortVideos.isEmpty)
                     const Padding(
