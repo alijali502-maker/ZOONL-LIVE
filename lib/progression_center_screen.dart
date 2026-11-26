@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProgressionCenterScreen extends StatefulWidget {
-  const ProgressionCenterScreen({super.key});
+  final int initialTab;
+  const ProgressionCenterScreen({super.key, this.initialTab = 0});
   @override
   State<ProgressionCenterScreen> createState() => _ProgressionCenterScreenState();
 }
@@ -66,6 +67,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTab.clamp(0, 1),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('LEVEL & CROWN / DEMON'),
@@ -199,6 +201,14 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
               Text('TIER $currentTier', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Text('${exp.toString()} EXP', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+            if (!isWealth) ...[
+              const SizedBox(height: 5),
+              Text('Crown level coin requirement: ${(current['required_coins'] as num?)?.toInt() ?? 0} Coins',
+                style: const TextStyle(color: Color(0xFFFFE4A0), fontSize: 12, fontWeight: FontWeight.w900)),
+              if (next != null)
+                Text('Next Crown level (${next['level']}): ${(next['required_coins'] as num?)?.toInt() ?? 0} Coins',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700)),
+            ],
             const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -227,7 +237,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           _sectionTitle('PROFILE FRAME UNLOCKS'),
           _frameList(rows, level),
         ],
-        _sectionTitle(isWealth ? 'ALL 100 USER LEVELS • EXP / COINS / COLORS' : 'ALL 50 CROWN / DEMON LEVELS • EXP / COINS'),
+        _sectionTitle(isWealth ? 'ALL 100 USER LEVELS • EXP / COINS / COLORS' : 'ALL 50 CROWN / DEMON LEVELS • REQUIRED COINS / EXP / TIER'),
         for (int start = 1; start <= rows.length; start += 5)
           Card(
             color: const Color(0xFF171126),
@@ -359,8 +369,17 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           style: TextStyle(color: active ? const Color(0xFFFFE3A0) : Colors.white70, fontSize: 10, fontWeight: FontWeight.w900)),
         if (wealth && framePrice > 0)
           Text('Frame: $framePrice Coins', style: const TextStyle(color: Colors.white54, fontSize: 8)),
-        if (!wealth && requiredCoins > 0)
-          Text('Coins: $requiredCoins', style: const TextStyle(color: Colors.white54, fontSize: 8)),
+        if (!wealth) ...[
+          const SizedBox(height: 3),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.monetization_on, size: 11, color: Color(0xFFFFD77A)),
+            const SizedBox(width: 3),
+            Flexible(child: Text('$requiredCoins Coins required',
+              maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFFFE3A0), fontSize: 9, fontWeight: FontWeight.w900))),
+          ]),
+          Text('Tier $tier', style: const TextStyle(color: Colors.white54, fontSize: 8)),
+        ],
         if (wealth && (row['unlocked_perk'] ?? '').toString().isNotEmpty)
           Text(row['unlocked_perk'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white54, fontSize: 8)),
