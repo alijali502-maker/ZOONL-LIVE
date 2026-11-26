@@ -13,6 +13,7 @@ import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'level_badge_widget.dart';
 import 'crown_demon_badge_widget.dart';
+import 'progression_center_screen.dart';
 import 'backup_vault_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
@@ -3774,6 +3775,38 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
           onCreateShortVideo: widget.onCreateShortVideo,
           onOpenWallet: widget.onOpenWallet,
           onOpenPrime: widget.onOpenPrime,
+        ),
+        _luxuryCard(
+          title: 'LEVEL & CROWN / DEMON',
+          child: Column(
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.stars, color: Color(0xFFE6C47A)),
+                title: const Text('User Level'),
+                subtitle: const Text('100 Supabase levels • increases when you send gifts'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProgressionCenterScreen(),
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.workspace_premium, color: Color(0xFFE58BA8)),
+                title: const Text('Crown / Demon'),
+                subtitle: const Text('50 separate Supabase levels • increases when you receive gifts'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ProgressionCenterScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         _luxuryCard(
           title: 'ACCOUNT & PRIVACY SETTINGS',
