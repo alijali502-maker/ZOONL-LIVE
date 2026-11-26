@@ -127,73 +127,31 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
             context: context,
             builder: (dialogContext) => AlertDialog(
               title: const Text('CROWN / DEMON PROGRESSION'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Talent Level ${data.level} • Tier ${data.tier}'),
-                  const SizedBox(height: 8),
-                  Text('Received-gift EXP: ${data.exp}'),
-                  const SizedBox(height: 6),
-                  Text(data.nextExp > 0
-                      ? '${data.nextExp - data.exp} EXP to the next level'
-                      : 'Maximum level reached'),
-                  const SizedBox(height: 10),
-                  LinearProgressIndicator(value: progress),
-                  const SizedBox(height: 8),
-                  const Text('Receiving gifts increases Crown / Demon Talent Level. Sending gifts increases the separate User Wealth Level.'),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CLOSE')),
-                TextButton(onPressed: () {
-                  Navigator.pop(dialogContext);
-                  _refresh();
-                }, child: const Text('REFRESH')),
-              ],
+              content: Text('Talent Level ${data.level} • Tier ${data.tier}\nReceived-gift EXP: ${data.exp}'),
+              actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('CLOSE'))],
             ),
           ),
-          child: Container(
-            constraints: const BoxConstraints(minWidth: 142, maxWidth: 190),
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: data.gradient),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: data.border, width: 1.3),
-              boxShadow: [BoxShadow(color: data.border.withOpacity(.3), blurRadius: 10)],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.workspace_premium, size: 17, color: Color(0xFFFFD6A0)),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('CROWN / DEMON  ${data.level}',
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 3),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          minHeight: 3, value: progress,
-                          backgroundColor: Colors.black38,
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFD6A0)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+          child: Tooltip(
+            message: 'Crown / Demon • Level ${data.level}',
+            child: Container(
+              width: 112,
+              height: 25,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: data.gradient),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: data.border, width: 1),
+                boxShadow: [BoxShadow(color: data.border.withOpacity(.20), blurRadius: 4)],
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.workspace_premium, size: 14, color: Color(0xFFFFD6A0)),
+                const SizedBox(width: 4),
+                Expanded(child: Text('CROWN ${data.level}',
+                  maxLines: 1, overflow: TextOverflow.clip,
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900))),
                 if (snapshot.connectionState == ConnectionState.waiting)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4),
-                    child: SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5)),
-                  ),
-              ],
+                  const SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 1)),
+              ]),
             ),
           ),
         );
