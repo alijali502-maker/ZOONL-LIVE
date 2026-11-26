@@ -228,17 +228,17 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           _frameList(rows, level),
         ],
         _sectionTitle(isWealth ? 'ALL 100 USER LEVELS • EXP / COINS / COLORS' : 'ALL 50 CROWN / DEMON LEVELS • EXP / COINS'),
-        for (int start = 1; start <= rows.length; start += (isWealth ? 20 : 10))
+        for (int start = 1; start <= rows.length; start += 5)
           Card(
             color: const Color(0xFF171126),
             child: ExpansionTile(
               initiallyExpanded: level >= start && level <= (start + (isWealth ? 19 : 9)),
-              title: Text('LEVELS $start–${(start + (isWealth ? 19 : 9)).clamp(1, rows.length)}',
+              title: Text('LEVELS $start–${(start + 4).clamp(1, rows.length)}',
                   style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900)),
               children: rows.where((r) {
                 final n = (r['level'] as num).toInt();
-                return n >= start && n < start + (isWealth ? 20 : 10);
-              }).map((row) => _levelRow(row, rows, level, isWealth, data)).toList(),
+                return n >= start && n < start + 5;
+              }).map((row) => SizedBox(width: (MediaQuery.of(context).size.width - 58) / 2, child: _levelRow(row, rows, level, isWealth, data))).toList(),
             ),
           ),
       ],
@@ -317,8 +317,6 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       int currentLevel, bool wealth, _ProgressionData data) {
     final n = (row['level'] as num).toInt();
     final requiredExp = (row['required_exp'] as num?)?.toInt() ?? 0;
-    final previous = n <= 1 ? 0 :
-      ((rows.firstWhere((r) => (r['level'] as num).toInt() == n - 1)['required_exp'] as num?)?.toInt() ?? 0);
     final active = n == currentLevel;
     final unlocked = n <= currentLevel;
     final tier = (row['tier'] as num?)?.toInt() ?? 1;
@@ -327,44 +325,46 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     final colors = _gradient(style['badge_gradient']?.toString(),
         fallback: wealth ? const Color(0xFF7655A0) : const Color(0xFF8E4568));
     final border = _hex(style['badge_border']?.toString());
-    final coins = wealth
-      ? ((row['coin_price'] as num?)?.toInt() ?? 0)
-      : ((row['required_coins'] as num?)?.toInt() ?? requiredExp);
-    final expLabel = n == 1 ? '0 → $requiredExp EXP' : '$previous → $requiredExp EXP';
-    final title = wealth
-      ? (row['title'] ?? row['tier_name'] ?? 'Level $n').toString()
-      : 'Crown / Demon Level $n • Tier $tier';
-
+    final framePrice = (row['coin_price'] as num?)?.toInt() ?? 0;
+    final requiredCoins = (row['required_coins'] as num?)?.toInt() ?? 0;
     return Container(
-      margin: const EdgeInsets.fromLTRB(9, 4, 9, 7),
+      padding: const EdgeInsets.fromLTRB(7, 7, 7, 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: colors.map((c) => c.withOpacity(active ? .28 : .13)).toList()),
+        color: const Color(0xFF171D35),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: active ? border : border.withOpacity(.35), width: active ? 1.5 : .7),
+        border: Border.all(color: active ? border : border.withOpacity(.30), width: active ? 1.5 : .7),
+        boxShadow: active ? [BoxShadow(color: border.withOpacity(.20), blurRadius: 9)] : null,
       ),
-      child: ListTile(
-        dense: true,
-        leading: CircleAvatar(
-          radius: 17,
-          backgroundColor: colors.last,
-          child: Text('$n', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          height: 31,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: colors),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: border, width: 1),
+          ),
+          child: Row(children: [
+            Container(width: 20, height: 20,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withOpacity(.22), border: Border.all(color: Colors.white70)),
+              child: Icon(n % 5 == 0 ? Icons.workspace_premium : Icons.star, size: 12, color: Colors.white)),
+            const SizedBox(width: 5),
+            Expanded(child: Text('Lv$n', textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10))),
+            Icon(active ? Icons.check_circle : unlocked ? Icons.check : Icons.diamond, size: 12, color: Colors.white),
+          ]),
         ),
-        title: Text(title, style: TextStyle(color: active ? Colors.white : (unlocked ? Colors.white70 : Colors.white54), fontSize: 11, fontWeight: active ? FontWeight.w900 : FontWeight.w600)),
-        subtitle: Text(
-          '$expLabel\n${wealth ? 'Gift coin total needed' : 'Required coins'}: ${wealth ? requiredExp : coins} Coins'
-          '${wealth ? ' • Frame/store price: $coins Coins • ${row['tier_name'] ?? ''} • ${row['unlocked_perk'] ?? ''}' : ''}',
-          style: const TextStyle(color: Colors.white54, fontSize: 9, height: 1.45),
-        ),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (row['is_milestone'] == true) const Icon(Icons.workspace_premium, color: Color(0xFFFFD77A), size: 16),
-            Icon(active ? Icons.radio_button_checked : (unlocked ? Icons.check_circle : Icons.lock_outline),
-                color: active ? const Color(0xFFFFD77A) : (unlocked ? Colors.greenAccent : Colors.white30), size: 16),
-          ],
-        ),
-      ),
+        const SizedBox(height: 6),
+        Text('Exp: $requiredExp', textAlign: TextAlign.center,
+          style: TextStyle(color: active ? const Color(0xFFFFE3A0) : Colors.white70, fontSize: 10, fontWeight: FontWeight.w900)),
+        if (wealth && framePrice > 0)
+          Text('Frame: $framePrice Coins', style: const TextStyle(color: Colors.white54, fontSize: 8)),
+        if (!wealth && requiredCoins > 0)
+          Text('Coins: $requiredCoins', style: const TextStyle(color: Colors.white54, fontSize: 8)),
+        if (wealth && (row['unlocked_perk'] ?? '').toString().isNotEmpty)
+          Text(row['unlocked_perk'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white54, fontSize: 8)),
+      ]),
     );
   }
 }
