@@ -71,7 +71,7 @@ class _ZoonlCrownDemonBadgeState extends State<ZoonlCrownDemonBadge> {
       future: _future,
       builder: (context, snapshot) {
         final data = snapshot.data ??
-            const _TalentProgress(level: 1, tier: 1, exp: 0, nextExp: 0);
+            const _TalentProgress(level: 1, tier: 1, exp: 0, currentExp: 0, nextExp: 0);
         final progress = data.nextExp <= 0
             ? 1.0
             : ((data.exp - data.currentExp) / (data.nextExp - data.currentExp))
@@ -169,6 +169,7 @@ class _TalentProgress {
     required this.level,
     required this.tier,
     required this.exp,
+    required this.currentExp,
     required this.nextExp,
   });
 }
