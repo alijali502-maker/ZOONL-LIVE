@@ -19,7 +19,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     final values = await Future.wait<dynamic>([
       db.from('profiles').select('wealth_exp,wealth_level,talent_exp,talent_level')
           .eq('id', user.id).maybeSingle(),
-      db.from('wealth_levels').select('level,tier_bracket,tier_name,title,required_exp,is_milestone')
+      db.from('wealth_levels').select('level,tier_bracket,tier_name,title,required_exp,is_milestone,frame_name,asset_url,motif,color_tier,glow_primary,glow_core,glow_accent')
           .order('level'),
       db.from('talent_levels').select('level,tier,required_exp,required_coins')
           .order('level'),
@@ -175,10 +175,15 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
                       : 'Crown / Demon Level $n • Tier ${row['tier']}',
                     style: TextStyle(color: active ? const Color(0xFFFFE6A6) : Colors.white70,
                       fontWeight: active ? FontWeight.w900 : FontWeight.w500, fontSize: 12)),
-                  subtitle: Text('${requiredExp.toString()} EXP required',
+                  subtitle: Text(isWealth && row['frame_name'] != null
+                      ? '${requiredExp.toString()} EXP required • Profile Frame: ${row['frame_name']}'
+                      : '${requiredExp.toString()} EXP required',
                     style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                  trailing: active ? const Text('CURRENT',
-                    style: TextStyle(color: Color(0xFFFFD77A), fontSize: 9, fontWeight: FontWeight.w900)) : null,
+                  trailing: isWealth && row['frame_name'] != null
+                    ? Icon(Icons.crop_portrait, size: 19,
+                        color: active ? const Color(0xFFFFD77A) : const Color(0xFFB78BFA))
+                    : (active ? const Text('CURRENT',
+                        style: TextStyle(color: Color(0xFFFFD77A), fontSize: 9, fontWeight: FontWeight.w900)) : null),
                 );
               }).toList(),
             ),
