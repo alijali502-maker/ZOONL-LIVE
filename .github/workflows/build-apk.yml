@@ -12,6 +12,7 @@ on:
     branches:
       - main
       - feat/progressive-levels-3d-chat
+      - fix/profile-wallet-owner-home-integration
 
 permissions:
   contents: read
