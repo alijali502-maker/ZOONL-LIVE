@@ -12,6 +12,7 @@ import 'core/backend.dart';
 import 'core/zoonl_theme.dart';
 import 'profile_edit_screen.dart';
 import 'level_badge_widget.dart';
+import 'crown_demon_badge_widget.dart';
 import 'backup_vault_screen.dart';
 import 'feature_hub_screen.dart';
 import 'settings_center_screen.dart';
@@ -3672,6 +3673,8 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                       ),
                       const SizedBox(height: 5),
                       const ZoonlMiniLevelBadge(),
+                      const SizedBox(height: 5),
+                      const ZoonlCrownDemonBadge(),
                     ],
                   ),
                   const SizedBox(width: 14),
