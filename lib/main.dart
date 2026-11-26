@@ -3687,7 +3687,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                           ZoonlCrownDemonBadge(
                             onTap: () => Navigator.of(context).push<void>(
                               MaterialPageRoute<void>(
-                                builder: (_) => const ProgressionCenterScreen(),
+                                builder: (_) => const ProgressionCenterScreen(initialTab: 1),
                               ),
                             ),
                           ),
