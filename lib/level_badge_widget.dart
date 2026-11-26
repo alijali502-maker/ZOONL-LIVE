@@ -140,7 +140,7 @@ class _ZoonlMiniLevelBadgeState extends State<ZoonlMiniLevelBadge>
           border: Color(0xFFD6B46A),
         );
         final colors = data.gradient;
-        final isApex = false;
+        final isApex = data.level >= 100;
         return GestureDetector(
           onTap: widget.onTap,
           child: AnimatedBuilder(
