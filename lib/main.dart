@@ -6959,7 +6959,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     if(loading)return panel('COINS • TOP-UP • ADMIN',const Center(child:CircularProgressIndicator()));
     return panel('COINS • TOP-UP • ADMIN',Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[
-        Expanded(child:Text('COINS  '+coins.toString()+'\\nDIAMONDS  '+diamonds.toString(),
+        Expanded(child:Text('COINS  '+coins.toString()+'\x5cnDIAMONDS  '+diamonds.toString(),
           style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800,height:1.6))),
         if(owner||admin)Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:8),
           decoration:BoxDecoration(color:Colors.red.shade900,borderRadius:BorderRadius.circular(9),
