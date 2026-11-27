@@ -38,6 +38,9 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       db.from('gift_sends')
           .select('id,sender_id,receiver_id,total_coins,quantity,gift_id,created_at')
           .eq('receiver_id', user.id).order('created_at', ascending: false),
+      db.from('talent_tiers')
+          .select('tier,min_level,max_level,name,shape,pill_color,gradient_from,gradient_to,rim_color')
+          .order('tier'),
     ]);
 
     final profile = values[0] as Map<String, dynamic>? ?? <String, dynamic>{};
@@ -53,6 +56,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
       talentRows: maps(values[2]),
       sentHistory: maps(values[3]),
       receivedHistory: maps(values[4]),
+      talentTierRows: maps(values[5]),
     );
   }
 
@@ -130,13 +134,13 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
   }
 
   List<Map<String, dynamic>> _orderedTierStyles(_ProgressionData data) {
-    final seen = <String>{};
-    final result = <Map<String, dynamic>>[];
-    for (final row in data.wealthRows) {
-      final key = (row['tier_bracket'] ?? '').toString();
-      if (key.isNotEmpty && seen.add(key)) result.add(row);
-    }
-    return result;
+    return data.talentTierRows.map((row) => <String, dynamic>{
+      'tier': row['tier'],
+      'tier_name': row['name'],
+      'motif': row['shape'],
+      'badge_gradient': '${row['gradient_from']},${row['gradient_to']}',
+      'badge_border': row['rim_color'],
+    }).toList();
   }
 
   Map<String, dynamic>? _currentRow(List<Map<String, dynamic>> rows, int level) {
@@ -237,20 +241,18 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           _sectionTitle('PROFILE FRAME UNLOCKS'),
           _frameList(rows, level),
         ],
-        _sectionTitle(isWealth ? 'ALL 100 USER LEVELS • EXP / COINS / COLORS' : 'ALL 50 CROWN / DEMON LEVELS • REQUIRED COINS / EXP / TIER'),
-        for (int start = 1; start <= rows.length; start += 5)
-          Card(
-            color: const Color(0xFF171126),
-            child: ExpansionTile(
-              initiallyExpanded: true,
-              title: Text('LEVELS $start–${(start + 4).clamp(1, rows.length)}',
-                  style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900)),
-              children: rows.where((r) {
-                final n = (r['level'] as num).toInt();
-                return n >= start && n < start + 5;
-              }).map((row) => SizedBox(width: (MediaQuery.of(context).size.width - 58) / 2, child: _levelRow(row, rows, level, isWealth, data))).toList(),
-            ),
-          ),
+        _sectionTitle(isWealth ? 'UNLOCKED USER LEVEL HISTORY' : 'UNLOCKED CROWN / DEMON HISTORY'),
+        ...rows.where((r) => ((r['level'] as num?)?.toInt() ?? 0) <= level)
+            .map((row) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _levelRow(row, rows, level, isWealth, data),
+            )),
+        _sectionTitle(isWealth ? 'UPCOMING USER LEVELS • LOCKED UNTIL EARNED' : 'UPCOMING CROWN / DEMON LEVELS • LOCKED UNTIL EARNED'),
+        ...rows.where((r) => ((r['level'] as num?)?.toInt() ?? 0) > level)
+            .map((row) => Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _levelRow(row, rows, level, isWealth, data),
+            )),
       ],
     );
   }
@@ -434,7 +436,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
 
 class _ProgressionData {
   final int wealthExp, wealthLevel, talentExp, talentLevel;
-  final List<Map<String, dynamic>> wealthRows, talentRows, sentHistory, receivedHistory;
+  final List<Map<String, dynamic>> wealthRows, talentRows, sentHistory, receivedHistory, talentTierRows;
   const _ProgressionData({
     required this.wealthExp,
     required this.wealthLevel,
@@ -444,5 +446,6 @@ class _ProgressionData {
     required this.talentRows,
     required this.sentHistory,
     required this.receivedHistory,
+    required this.talentTierRows,
   });
 }
