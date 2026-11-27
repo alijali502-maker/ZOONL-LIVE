@@ -1679,6 +1679,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       final client = Backend.client;
       final owner = await Backend.isZoonlOwner();
       final remoteLevel = await client.rpc('zoonl_my_level');
+
       var catalogQuery = client
           .from('zoonl_live_cosmetics')
           .select('zoonl_item_code,zoonl_item_name,item_type,media_url,sound_fx,color_theme_hex,min_level_req,coin_price,is_active,sort_order')
@@ -1686,50 +1687,73 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       if (!owner) {
         catalogQuery = catalogQuery.eq('is_active', true);
       }
-      final catalog = await catalogQuery.order('sort_order');
-      final tiers = await client
-          .from('prime_tiers')
-          .select('id,tier_name,benefits,is_active,coin_price,duration_days')
-          .eq('is_active', true)
-          .order('id');
-      final inventory = await client
-          .from('zoonl_live_user_baggage')
-          .select('id,zoonl_item_code,item_type,is_equipped,acquired_via,expires_at,created_at')
-          .eq('project_name', 'ZOONL LIVE')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
-      final prime = await client
-          .from('user_prime_memberships')
-          .select('id,prime_tier_id,started_at,expires_at,is_active')
-          .eq('user_id', userId)
-          .eq('is_active', true);
-      final wallet = await client
-          .from('wallets')
-          .select('coins,diamonds')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final trial = await client
-          .from('zoonl_user_trials')
-          .select('started_at,expires_at,trial_status,svip_active')
-          .eq('user_id', userId)
-          .maybeSingle();
-      final activeStyle = await client
-          .from('zoonl_live_active_styles')
-          .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
-          .eq('user_id', userId)
-          .maybeSingle();
+
+      // Load the real active gift catalog and the signed-in user's ledger.
+      // These were previously never populated, leaving the Gift panel empty
+      // and the wallet history permanently blank despite existing DB rows.
+      final results = await Future.wait<dynamic>([
+        catalogQuery.order('sort_order'),
+        client.from('prime_tiers')
+            .select('id,tier_name,benefits,is_active,coin_price,duration_days')
+            .eq('is_active', true)
+            .order('id'),
+        client.from('zoonl_live_user_baggage')
+            .select('id,zoonl_item_code,item_type,is_equipped,acquired_via,expires_at,created_at')
+            .eq('project_name', 'ZOONL LIVE')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false),
+        client.from('user_prime_memberships')
+            .select('id,prime_tier_id,started_at,expires_at,is_active')
+            .eq('user_id', userId)
+            .eq('is_active', true),
+        client.from('wallets')
+            .select('coins,diamonds')
+            .eq('user_id', userId)
+            .maybeSingle(),
+        client.from('zoonl_user_trials')
+            .select('started_at,expires_at,trial_status,svip_active')
+            .eq('user_id', userId)
+            .maybeSingle(),
+        client.from('zoonl_live_active_styles')
+            .select('active_profile_bg_code,active_frame_code,active_entry_code,active_badge_code,active_chat_bubble_code')
+            .eq('user_id', userId)
+            .maybeSingle(),
+        client.from('gifts')
+            .select('id,gift_name,image_url,preview_url,animation_url,animation_3d_url,sound_url,coin_price,diamond_value,category,gift_config,is_active')
+            .eq('is_active', true)
+            .order('coin_price'),
+        client.from('wallet_transactions')
+            .select('id,transaction_type,currency,amount,reference_id,description,created_at')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(50),
+      ]);
+
+      final catalog = results[0] as List;
+      final tiers = results[1] as List;
+      final inventory = results[2] as List;
+      final prime = results[3] as List;
+      final wallet = results[4] as Map<String, dynamic>?;
+      final trial = results[5] as Map<String, dynamic>?;
+      final activeStyle = results[6] as Map<String, dynamic>?;
+      final gifts = results[7] as List;
+      final transactions = results[8] as List;
 
       if (!mounted) return;
       setState(() {
         _isStoreOwner = owner;
         store.currentUser['level'] = (remoteLevel as num?)?.toInt() ?? 1;
-        store.cosmeticsCatalog = (catalog as List)
+        store.cosmeticsCatalog = catalog
             .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.primeTiers = (tiers as List)
+        store.primeTiers = tiers
             .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.userBaggage = (inventory as List)
+        store.userBaggage = inventory
             .map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        store.memberships = (prime as List)
+        store.memberships = prime
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.giftCatalog = gifts
+            .map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        store.walletTransactions = transactions
             .map((row) => Map<String, dynamic>.from(row as Map)).toList();
         store.userTrial = trial == null
             ? <String, dynamic>{}
@@ -1748,7 +1772,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
       });
       store.refresh();
     } catch (error) {
-      _showMessage('VIP Store data could not load: $error');
+      _showMessage('Wallet / Gift / Store data could not load: $error');
     }
   }
 
