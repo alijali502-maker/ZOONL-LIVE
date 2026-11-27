@@ -3691,6 +3691,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                               ),
                             ),
                           ),
+                          const ZoonlChatRibbonBadge(),
                         ],
                       ),
                     ],
