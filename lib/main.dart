@@ -3811,13 +3811,6 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             ],
           ),
         ),
-        _ProfileSocialPanel(
-          userId: Backend.currentUserId ?? '',
-          onOpenShortVideos: widget.onOpenShortVideos,
-          onCreateShortVideo: widget.onCreateShortVideo,
-          onOpenWallet: widget.onOpenWallet,
-          onOpenPrime: widget.onOpenPrime,
-        ),
         _luxuryCard(
           title: 'LEVEL & CROWN / DEMON',
           child: Column(
@@ -3862,6 +3855,13 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
               ),
             ],
           ),
+        ),
+        _ProfileSocialPanel(
+          userId: Backend.currentUserId ?? '',
+          onOpenShortVideos: widget.onOpenShortVideos,
+          onCreateShortVideo: widget.onCreateShortVideo,
+          onOpenWallet: widget.onOpenWallet,
+          onOpenPrime: widget.onOpenPrime,
         ),
         _luxuryCard(
           title: 'ACCOUNT & PRIVACY SETTINGS',
