@@ -1345,7 +1345,9 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
 
 
 class _ProfileWalletAdminPanel extends StatefulWidget {
-  const _ProfileWalletAdminPanel({super.key});
+  const _ProfileWalletAdminPanel({super.key, required this.vipTier, required this.onOpenPrime});
+  final String vipTier;
+  final VoidCallback onOpenPrime;
   @override
   State<_ProfileWalletAdminPanel> createState() => _ProfileWalletAdminPanelState();
 }
@@ -3922,7 +3924,10 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             ],
           ),
         ),
-        const _ProfileWalletAdminPanel(),
+        _ProfileWalletAdminPanel(
+          vipTier: (store.currentUser['vipTier'] ?? 'NONE').toString(),
+          onOpenPrime: widget.onOpenPrime,
+        ),
         _ProfileSocialPanel(
           userId: Backend.currentUserId ?? '',
           onOpenShortVideos: widget.onOpenShortVideos,
