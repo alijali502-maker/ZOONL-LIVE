@@ -242,7 +242,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           Card(
             color: const Color(0xFF171126),
             child: ExpansionTile(
-              initiallyExpanded: level >= start && level <= (start + (isWealth ? 19 : 9)),
+              initiallyExpanded: true,
               title: Text('LEVELS $start–${(start + 4).clamp(1, rows.length)}',
                   style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900)),
               children: rows.where((r) {
@@ -337,15 +337,46 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     final border = _hex(style['badge_border']?.toString());
     final framePrice = (row['coin_price'] as num?)?.toInt() ?? 0;
     final requiredCoins = (row['required_coins'] as num?)?.toInt() ?? 0;
+    final assetUrl = (style['asset_url'] ?? '').toString().trim();
+    final motif = (style['motif'] ?? style['frame_name'] ?? style['color_tier'] ?? '').toString();
+    final motifIcon = motif.toLowerCase().contains('crown') ? Icons.workspace_premium
+        : motif.toLowerCase().contains('diamond') ? Icons.diamond
+        : motif.toLowerCase().contains('fire') ? Icons.local_fire_department
+        : motif.toLowerCase().contains('star') ? Icons.stars
+        : wealth ? Icons.pets_rounded : Icons.workspace_premium;
     return Container(
       padding: const EdgeInsets.fromLTRB(7, 7, 7, 8),
       decoration: BoxDecoration(
         color: const Color(0xFF171D35),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: active ? border : border.withOpacity(.30), width: active ? 1.5 : .7),
-        boxShadow: active ? [BoxShadow(color: border.withOpacity(.20), blurRadius: 9)] : null,
+        boxShadow: active ? [BoxShadow(color: border.withOpacity(.28), blurRadius: 12, spreadRadius: 1)] : null,
       ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
+      child: Stack(children: [
+        if (wealth && assetUrl.isNotEmpty)
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: Opacity(
+                opacity: unlocked ? .30 : .12,
+                child: Image.network(assetUrl, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              ),
+            ),
+          ),
+        if (wealth)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [colors.first.withOpacity(.32), colors.last.withOpacity(.12), const Color(0xFF171D35).withOpacity(.94)],
+                ),
+              ),
+            ),
+          ),
+        Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           height: 31,
           padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -380,9 +411,22 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
           ]),
           Text('Tier $tier', style: const TextStyle(color: Colors.white54, fontSize: 8)),
         ],
+        if (wealth && motif.isNotEmpty)
+          Text(motif, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w700)),
         if (wealth && (row['unlocked_perk'] ?? '').toString().isNotEmpty)
           Text(row['unlocked_perk'].toString(), maxLines: 1, overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white54, fontSize: 8)),
+        if (!unlocked)
+          const Padding(
+            padding: EdgeInsets.only(top: 3),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.lock_outline, size: 10, color: Colors.white54),
+              SizedBox(width: 3),
+              Text('LOCKED', style: TextStyle(color: Colors.white54, fontSize: 8, fontWeight: FontWeight.w800)),
+            ]),
+          ),
+      ]),
       ]),
     );
   }
