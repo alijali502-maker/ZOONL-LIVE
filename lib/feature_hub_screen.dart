@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/backend.dart';
-import 'lib/features/live_screen.dart';
+import 'features/live_screen.dart';
 import 'role_portals_screen.dart';
 import 'settings_center_screen.dart';
 import 'short_video_studio_screen.dart';

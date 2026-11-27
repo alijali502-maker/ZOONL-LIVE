@@ -5,9 +5,9 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../camera_studio/zoonl_beauty_track_processor.dart';
-import '../../event_control_screen.dart';
-import '../../streamer_progress_screen.dart';
+import '../camera_studio/zoonl_beauty_track_processor.dart';
+import '../event_control_screen.dart';
+import '../streamer_progress_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, LocalVideoTrackExt, CameraPosition, CameraCaptureOptions;
@@ -16,7 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart' show VideoPlayer, VideoPlayerController;
 import 'package:just_audio/just_audio.dart' show AudioPlayer;
 
-import '../../features/pk_battle_screen.dart';
+import 'pk_battle_screen.dart';
 
 // Tables used: live_rooms (owner_id, room_name, is_live) and
 // chat_messages (room_id, sender_id, message).

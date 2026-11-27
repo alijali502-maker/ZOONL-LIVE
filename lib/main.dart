@@ -22,7 +22,7 @@ import 'short_video_studio_screen.dart';
 import 'role_portals_screen.dart';
 import 'features/pk_battle_screen.dart';
 import 'features/pk_broadcast_screen.dart';
-import 'lib/features/live_screen.dart';
+import 'features/live_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
