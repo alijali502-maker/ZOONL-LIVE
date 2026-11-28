@@ -318,21 +318,21 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFE6C47A)),
+      prefixIcon: Icon(icon, color: const Color(0xFF18D6C3)),
       filled: true,
-      fillColor: const Color(0xFF120D24),
+      fillColor: const Color(0xFF0D2635),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Color(0xFF49345F)),
+        borderSide: const BorderSide(color: Color(0xFF1C5967)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: const BorderSide(
-          color: Color(0xFF9360F5),
+          color: Color(0xFF18D6C3),
           width: 1.4,
         ),
       ),
@@ -350,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen> {
       label: Text(title),
       style: OutlinedButton.styleFrom(
         foregroundColor: Colors.white,
-        side: const BorderSide(color: Color(0xFF49345F)),
+        side: const BorderSide(color: Color(0xFF1C5967)),
         padding: const EdgeInsets.symmetric(vertical: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
@@ -368,18 +368,18 @@ class _LoginScreenState extends State<LoginScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF211735),
-            Color(0xFF120D24),
-            Color(0xFF070B17),
+            Color(0xFF12384A),
+            Color(0xFF0D2635),
+            Color(0xFF06141F),
           ],
         ),
         border: Border.all(
-          color: const Color(0xFFE6C47A).withOpacity(0.65),
+          color: const Color(0xFF18D6C3).withOpacity(0.65),
           width: 1.3,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF9360F5).withOpacity(0.3),
+            color: const Color(0xFF18D6C3).withOpacity(0.3),
             blurRadius: 26,
             offset: const Offset(0, 9),
           ),
@@ -391,7 +391,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               _tag('● LIVE STAGE', const Color(0xFFFF2E63)),
               const Spacer(),
-              _tag('CREATOR VIP', const Color(0xFFE6C47A)),
+              _tag('CREATOR VIP', const Color(0xFF18D6C3)),
             ],
           ),
           const SizedBox(height: 10),
@@ -401,15 +401,15 @@ class _LoginScreenState extends State<LoginScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF080510).withOpacity(.72),
+              color: const Color(0xFF06141F).withOpacity(.72),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0x66E6C47A)),
+              border: Border.all(color: const Color(0x6618D6C3)),
             ),
             child: Image.asset(
               'assets/branding/zoonl_logo.png',
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.live_tv_rounded, size: 88, color: Color(0xFFE6C47A)),
+                child: Icon(Icons.live_tv_rounded, size: 88, color: Color(0xFF18D6C3)),
               ),
             ),
           ),
@@ -423,7 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
               letterSpacing: 3,
               shadows: [
                 Shadow(
-                  color: Color(0xFF9360F5),
+                  color: Color(0xFF18D6C3),
                   blurRadius: 16,
                 ),
               ],
@@ -434,7 +434,7 @@ class _LoginScreenState extends State<LoginScreen> {
             'Welcome to Live Streamer & Creator Arena',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFFE6C47A),
+              color: Color(0xFF18D6C3),
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -540,7 +540,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _loading ? null : _forgotPassword,
                 child: const Text(
                   'Forgot password?',
-                  style: TextStyle(color: Color(0xFFE6C47A)),
+                  style: TextStyle(color: Color(0xFF18D6C3)),
                 ),
               ),
             ),
@@ -625,14 +625,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   },
             child: const Text(
               'Change Number',
-              style: TextStyle(color: Color(0xFFE6C47A)),
+              style: TextStyle(color: Color(0xFF18D6C3)),
             ),
           ),
           TextButton(
             onPressed: _loading ? null : _sendPhoneOtp,
             child: const Text(
               'Resend OTP',
-              style: TextStyle(color: Color(0xFFE6C47A)),
+              style: TextStyle(color: Color(0xFF18D6C3)),
             ),
           ),
         ],
@@ -646,7 +646,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: ElevatedButton(
         onPressed: _loading ? null : action,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF9360F5),
+          backgroundColor: const Color(0xFF18D6C3),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
@@ -681,13 +681,13 @@ class _LoginScreenState extends State<LoginScreen> {
       onPressed: _loading ? null : onTap,
       style: OutlinedButton.styleFrom(
         backgroundColor: selected
-            ? const Color(0xFF211735)
-            : const Color(0xFF120D24),
+            ? const Color(0xFF12384A)
+            : const Color(0xFF0D2635),
         foregroundColor: Colors.white,
         side: BorderSide(
           color: selected
-              ? const Color(0xFF9360F5)
-              : const Color(0xFF49345F),
+              ? const Color(0xFF18D6C3)
+              : const Color(0xFF1C5967),
         ),
         padding: const EdgeInsets.symmetric(vertical: 13),
         shape: RoundedRectangleBorder(
@@ -717,7 +717,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xDD100B1D),
+            color: const Color(0xDD0A1F2C),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0x66FFFFFF)),
             boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 28, offset: Offset(0, 10))],
@@ -731,16 +731,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080510),
+      backgroundColor: const Color(0xFF06141F),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF171126),
-              Color(0xFF100B1D),
-              Color(0xFF080510),
+              Color(0xFF0D2635),
+              Color(0xFF0A1F2C),
+              Color(0xFF06141F),
             ],
           ),
         ),
@@ -804,7 +804,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : 'New user? Create an account',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFFD2CEFF),
+                        color: Color(0xFF8CEBE2),
                       ),
                     ),
                   ),
@@ -825,7 +825,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       Expanded(
-                        child: Divider(color: Color(0xFF49345F)),
+                        child: Divider(color: Color(0xFF1C5967)),
                       ),
                     ],
                   ),
@@ -873,7 +873,7 @@ class ZoonlLogoPainter extends CustomPainter {
     canvas.translate(-center.dx, -center.dy);
 
     final glow = Paint()
-      ..color = const Color(0xFF786BFF).withOpacity(.28)
+      ..color = const Color(0xFF18D6C3).withOpacity(.28)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26);
     canvas.drawCircle(center, 82, glow);
 
@@ -881,8 +881,8 @@ class ZoonlLogoPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..shader = const SweepGradient(colors: [
-        Color(0xFF8CEBFF), Color(0xFF8F7BFF), Color(0xFFE4E8FF),
-        Color(0xFF9360F5), Color(0xFF8CEBFF),
+        Color(0xFF8CEBFF), Color(0xFF18D6C3), Color(0xFFE4E8FF),
+        Color(0xFF18D6C3), Color(0xFF8CEBFF),
       ]).createShader(Rect.fromCircle(center: center, radius: 78));
     canvas.drawCircle(center, 77, outer);
 
@@ -898,13 +898,13 @@ class ZoonlLogoPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF263B68), Color(0xFF151E3C), Color(0xFF10182E)],
+        colors: [Color(0xFF12384A), Color(0xFF0D2635), Color(0xFF0A1F2C)],
       ).createShader(Rect.fromCenter(center: center, width: 112, height: 140));
     canvas.drawPath(shield, shieldPaint);
     canvas.drawPath(shield, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = const Color(0xFFB6B4FF));
+      ..color = const Color(0xFF8CEBE2));
 
     // A broadcast aperture and play core, rather than a single-letter mark.
     final ringPaint = Paint()
@@ -937,7 +937,7 @@ class ZoonlLogoPainter extends CustomPainter {
       ..lineTo(center.dx + 28, center.dy - 82)
       ..lineTo(center.dx + 34, center.dy - 65)
       ..close();
-    canvas.drawPath(crown, Paint()..color = const Color(0xFFC7C2FF));
+    canvas.drawPath(crown, Paint()..color = const Color(0xFF8CEBE2));
     canvas.drawPath(crown, Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
