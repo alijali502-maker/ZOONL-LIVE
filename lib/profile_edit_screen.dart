@@ -201,7 +201,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               child: Container(
                 width: circular ? 112 : double.infinity,
                 height: circular ? 112 : 116,
-                color: const Color(0xFF211735),
+                color: const Color(0xFF12384A),
                 child: url == null || url.isEmpty
                     ? Icon(circular ? Icons.person : Icons.wallpaper,
                         size: circular ? 56 : 44, color: ZoonlTheme.champagne)
