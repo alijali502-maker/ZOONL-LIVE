@@ -84,7 +84,7 @@ class _StreamerProgressScreenState extends State<StreamerProgressScreen> {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF29365E), Color(0xFF141E35)]),
+                    gradient: const LinearGradient(colors: [Color(0xFF29365E), Color(0xFF0D2635)]),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: ZoonlTheme.champagne.withOpacity(.5)),
                   ),
