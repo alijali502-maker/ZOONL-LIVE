@@ -404,7 +404,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
     final mediaReady = (preview != null && preview.value.isInitialized) || (camera != null && camera.value.isInitialized);
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: const Color(0xFF05070D),
+      backgroundColor: const Color(0xFF06141F),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent, elevation: 0,
@@ -425,7 +425,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
           _cameraSurface(camera, size)
         else
           Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.no_photography, color: Color(0xFFB9AEFF), size: 48),
+            const Icon(Icons.no_photography, color: Color(0xFF18D6C3), size: 48),
             Text(_error ?? 'Camera unavailable', style: const TextStyle(color: Colors.white70)),
             TextButton(onPressed: _initializeCamera, child: const Text('Retry camera')),
           ])),
@@ -444,7 +444,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                   Row(children:[
                     const Text('LOOKS & CAMERA',style:TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:11,letterSpacing:.8)),
                     const Spacer(),
-                    Text(_filterLoading?'Preparing LUT…':_filter,style:const TextStyle(color:Color(0xFFE6C47A),fontSize:10,fontWeight:FontWeight.w800)),
+                    Text(_filterLoading?'Preparing LUT…':_filter,style:const TextStyle(color:Color(0xFF18D6C3),fontSize:10,fontWeight:FontWeight.w800)),
                   ]),
                   const SizedBox(height:8),
                   SizedBox(
@@ -461,7 +461,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                           'Cool' => const Color(0xFF70BFFF),
                           'Rose' => const Color(0xFFFF78B7),
                           'Mono' => const Color(0xFFB9C0CC),
-                          _ => const Color(0xFFE6C47A),
+                          _ => const Color(0xFF18D6C3),
                         };
                         return InkWell(
                           borderRadius: BorderRadius.circular(15),
@@ -477,7 +477,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                               color: selected ? const Color(0xFF3A2B43) : const Color(0xFF202638),
                               borderRadius: BorderRadius.circular(15),
                               border: Border.all(
-                                color: selected ? const Color(0xFFE6C47A) : Colors.white12,
+                                color: selected ? const Color(0xFF18D6C3) : Colors.white12,
                                 width: selected ? 1.6 : 1,
                               ),
                             ),
@@ -495,7 +495,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                                 const SizedBox(height: 4),
                                 Text(filter, maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: selected ? const Color(0xFFE6C47A) : Colors.white70,
+                                    color: selected ? const Color(0xFF18D6C3) : Colors.white70,
                                     fontSize: 9, fontWeight: FontWeight.w800,
                                   )),
                               ],
@@ -514,7 +514,7 @@ class _ShortVideoStudioScreenState extends State<ShortVideoStudioScreen> {
                     decoration:InputDecoration(labelText:'Caption',labelStyle:const TextStyle(color:Colors.white70,fontSize:11),
                       counterText:'',isDense:true,filled:true,fillColor:const Color(0xFF202638),
                       border:OutlineInputBorder(borderRadius:BorderRadius.circular(12),borderSide:BorderSide.none))),
-                  Text('Duration: $_recordingSeconds / 60 sec',style:const TextStyle(color:Color(0xFFB9AEFF),fontSize:10)),
+                  Text('Duration: $_recordingSeconds / 60 sec',style:const TextStyle(color:Color(0xFF18D6C3),fontSize:10)),
                   const SizedBox(height:7),
                   if (_recording)
                     SizedBox(width:double.infinity,child:FilledButton.icon(onPressed:_stopRecording,
