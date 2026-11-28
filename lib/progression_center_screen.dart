@@ -118,7 +118,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
     );
   }
 
-  Color _hex(String? raw, [Color fallback = const Color(0xFFE6C47A)]) {
+  Color _hex(String? raw, [Color fallback = const Color(0xFF18D6C3)]) {
     final match = RegExp(r'#[0-9a-fA-F]{6}').firstMatch(raw ?? '');
     if (match == null) return fallback;
     final value = int.tryParse(match.group(0)!.substring(1), radix: 16);
@@ -258,11 +258,11 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
   }
 
   Widget _infoCard(String title, String body) => Card(
-    color: const Color(0xFF211735),
+    color: const Color(0xFF12384A),
     child: Padding(
       padding: const EdgeInsets.all(13),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900, fontSize: 11)),
+        Text(title, style: const TextStyle(color: Color(0xFF18D6C3), fontWeight: FontWeight.w900, fontSize: 11)),
         const SizedBox(height: 5),
         Text(body, style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.4)),
       ]),
@@ -271,19 +271,19 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
 
   Widget _sectionTitle(String title) => Padding(
     padding: const EdgeInsets.only(top: 15, bottom: 7),
-    child: Text(title, style: const TextStyle(color: Color(0xFFE6C47A), fontWeight: FontWeight.w900, letterSpacing: .5, fontSize: 12)),
+    child: Text(title, style: const TextStyle(color: Color(0xFF18D6C3), fontWeight: FontWeight.w900, letterSpacing: .5, fontSize: 12)),
   );
 
   Widget _historyList(List<Map<String, dynamic>> history, bool sent) {
     if (history.isEmpty) {
       return const Card(
-        color: Color(0xFF211735),
+        color: Color(0xFF12384A),
         child: Padding(padding: EdgeInsets.all(14),
           child: Text('No gift transactions recorded for this account yet.', style: TextStyle(color: Colors.white54, fontSize: 11))),
       );
     }
     return Card(
-      color: const Color(0xFF211735),
+      color: const Color(0xFF12384A),
       child: Column(children: history.map((item) {
         final date = DateTime.tryParse(item['created_at']?.toString() ?? '')?.toLocal();
         final dateText = date == null ? 'Date unavailable' :
@@ -306,7 +306,7 @@ class _ProgressionCenterScreenState extends State<ProgressionCenterScreen> {
   Widget _frameList(List<Map<String, dynamic>> rows, int level) {
     final frames = rows.where((r) => r['frame_name'] != null).toList();
     return Card(
-      color: const Color(0xFF211735),
+      color: const Color(0xFF12384A),
       child: Column(children: frames.map((row) {
         final n = (row['level'] as num).toInt();
         final unlocked = level >= n;
