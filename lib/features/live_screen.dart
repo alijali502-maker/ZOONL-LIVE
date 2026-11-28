@@ -414,9 +414,9 @@ class _LiveScreenState extends State<LiveScreen> {
       final approved = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          backgroundColor: const Color(0xFF171126),
+          backgroundColor: const ZoonlTheme.surface,
           title: Text('Unlock ${selectedTheme['theme_name']}',
-              style: const TextStyle(color: Color(0xFFE6C47A))),
+              style: const TextStyle(color: ZoonlTheme.primary)),
           content: Text('Unlock this animated audio background for $price coins?',
               style: const TextStyle(color: Colors.white70)),
           actions: [
@@ -1857,7 +1857,7 @@ class _LiveScreenState extends State<LiveScreen> {
               style: TextStyle(color: Color(0xFFFFE7B0), fontWeight: FontWeight.w900)),
           ),
           ListTile(
-            leading: const Icon(Icons.timer, color: Color(0xFFFFD98B)),
+            leading: const Icon(Icons.timer, color: ZoonlTheme.primary),
             title: const Text('Mute for 1 hour'),
             onTap: () => Navigator.pop(sheetContext, 60),
           ),
@@ -1993,7 +1993,10 @@ class _LiveScreenState extends State<LiveScreen> {
       final value = int.tryParse(hex, radix: 16);
       if (value != null) customColors.add(Color(0xFF000000 | value));
     }
-    final colors = customColors.length >= 3 ? customColors : _chatRibbonColors(level);
+    final isVip = badge == 'VIP' || badge == 'SVIP' || badge == 'VVIP';
+    final colors = isVip
+        ? const [Color(0xFFFF6478), Color(0xFFD52D4C), Color(0xFF5B1426)]
+        : (customColors.length >= 3 ? customColors : _chatRibbonColors(level));
     final name = item['name'] ?? 'User';
     final initial = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
     final avatar = item['avatar'] ?? '';
@@ -2055,7 +2058,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   spacing: 4, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colors[0], fontSize: 10, fontWeight: FontWeight.w900,
+                      style: TextStyle(color: isVip ? const Color(0xFFFF6478) : colors[0], fontSize: 10, fontWeight: FontWeight.w900,
                         shadows: [Shadow(color: colors[1].withOpacity(.8), blurRadius: 5)])),
                     if (badge == 'VIP' || badge == 'SVIP' || badge == 'VVIP')
                       Container(
@@ -2083,7 +2086,14 @@ class _LiveScreenState extends State<LiveScreen> {
                   ],
                 ),
                 const SizedBox(height: 1),
-                Text(item['message'] ?? '', style: TextStyle(color: badge == 'NONE' ? Colors.white : colors[0], fontSize: 11, height: 1.12, fontWeight: badge == 'NONE' ? FontWeight.normal : FontWeight.w600)),
+                Text(item['message'] ?? '', style: TextStyle(
+                  color: isVip ? const Color(0xFFFF6478) : (badge == 'NONE' ? Colors.white : colors[0]),
+                  fontFamily: 'sans-serif-medium',
+                  fontSize: 11.5, height: 1.18,
+                  letterSpacing: .12,
+                  fontWeight: isVip ? FontWeight.w900 : (badge == 'NONE' ? FontWeight.w500 : FontWeight.w700),
+                  shadows: isVip ? const [Shadow(color: Color(0x99FF304F), blurRadius: 7)] : const [],
+                )),
               ],
             ),
           ),
@@ -2708,7 +2718,7 @@ class _LiveScreenState extends State<LiveScreen> {
     const tabs = <String>['Beauty', 'Filters', 'Makeup', 'AR'];
 
     await showModalBottomSheet<void>(
-      context: context, isScrollControlled: true, backgroundColor: const Color(0xFF10091D),
+      context: context, isScrollControlled: true, backgroundColor: const ZoonlTheme.backgroundRaised,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
@@ -2732,7 +2742,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   width: double.infinity,
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF21152F),
+                    color: const ZoonlTheme.surface,
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: const Color(0x88A45BFF)),
                   ),
@@ -2762,7 +2772,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 ),
                 const SizedBox(height: 10),
                 Wrap(spacing: 6, children: tabs.map((item) => ChoiceChip(
-                  label: Text(item), selected: tab == item, selectedColor: const Color(0xFF8F3BDB),
+                  label: Text(item), selected: tab == item, selectedColor: const ZoonlTheme.primary,
                   backgroundColor: const Color(0xFF21152F),
                   labelStyle: TextStyle(color: tab == item ? Colors.white : Colors.white70),
                   onSelected: saving ? null : (_) => setSheetState(() => tab = item),
@@ -2796,7 +2806,7 @@ class _LiveScreenState extends State<LiveScreen> {
                                   if (camera != null && camera.value.isInitialized)
                                     ColorFiltered(colorFilter: _filterThumbnailEffect(filter), child: CameraPreview(camera))
                                   else
-                                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [tint, const Color(0xFF241638), const Color(0xFF080510)])),
+                                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [tint, const Color(0xFF241638), const ZoonlTheme.background])),
                                       child: const Center(child: Icon(Icons.face_retouching_natural, color: Colors.white, size: 32))),
                                   if (active) const Positioned(right: 5, top: 5, child: CircleAvatar(radius: 10, backgroundColor: Color(0xFFE6C47A), child: Icon(Icons.check, size: 13, color: Colors.black))),
                                 ]))),
@@ -3049,7 +3059,7 @@ class _LiveScreenState extends State<LiveScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1B2844),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF9360F5)),
+        border: Border.all(color: const ZoonlTheme.primary),
       ),
       child: Stack(
         fit: StackFit.expand,
