@@ -4,17 +4,18 @@ import 'package:flutter/material.dart';
 class ZoonlTheme {
   ZoonlTheme._();
 
-  static const Color background = Color(0xFF080510);
-  static const Color backgroundRaised = Color(0xFF100B1D);
-  static const Color surface = Color(0xFF171126);
-  static const Color surfaceRaised = Color(0xFF211735);
-  static const Color border = Color(0xFF49345F);
-  static const Color champagne = Color(0xFF9360F5);
-  static const Color champagneLight = Color(0xFFE6C47A);
-  static const Color teal = Color(0xFFDA65C8);
+  static const Color background = Color(0xFF06141F);
+  static const Color backgroundRaised = Color(0xFF0A1F2C);
+  static const Color surface = Color(0xFF0D2635);
+  static const Color surfaceRaised = Color(0xFF12384A);
+  static const Color border = Color(0xFF1C5967);
+  static const Color primary = Color(0xFF18D6C3);
+  static const Color champagne = primary;
+  static const Color champagneLight = primary;
+  static const Color teal = primary;
   static const Color textPrimary = Color(0xFFF4F6FF);
-  static const Color textSecondary = Color(0xFFC2B8D2);
-  static const Color danger = Color(0xFFFF788E);
+  static const Color textSecondary = Color(0xFFA9C0CB);
+  static const Color danger = Color(0xFFFF5368);
 
   static ThemeData get dark {
     final ColorScheme scheme = const ColorScheme.dark(
@@ -44,11 +45,12 @@ class ZoonlTheme {
         titleTextStyle: TextStyle(
           color: textPrimary,
           fontSize: 19,
-          fontWeight: FontWeight.w700,
-          letterSpacing: .2,
+          fontWeight: FontWeight.w800,
+          letterSpacing: .35,
         ),
         iconTheme: IconThemeData(color: champagne),
       ),
+      fontFamily: 'sans-serif',
       textTheme: ThemeData.dark().textTheme.apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
@@ -99,8 +101,8 @@ class ZoonlTheme {
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            letterSpacing: .25,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .35,
           ),
         ),
       ),
