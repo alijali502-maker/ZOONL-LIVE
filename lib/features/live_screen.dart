@@ -415,7 +415,7 @@ class _LiveScreenState extends State<LiveScreen> {
       final approved = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          backgroundColor: const ZoonlTheme.surface,
+          backgroundColor: ZoonlTheme.surface,
           title: Text('Unlock ${selectedTheme['theme_name']}',
               style: const TextStyle(color: ZoonlTheme.primary)),
           content: Text('Unlock this animated audio background for $price coins?',
@@ -2719,7 +2719,7 @@ class _LiveScreenState extends State<LiveScreen> {
     const tabs = <String>['Beauty', 'Filters', 'Makeup', 'AR'];
 
     await showModalBottomSheet<void>(
-      context: context, isScrollControlled: true, backgroundColor: const ZoonlTheme.backgroundRaised,
+      context: context, isScrollControlled: true, backgroundColor: ZoonlTheme.backgroundRaised,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => SafeArea(
@@ -2743,7 +2743,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   width: double.infinity,
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    color: const ZoonlTheme.surface,
+                    color: ZoonlTheme.surface,
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: const Color(0x88A45BFF)),
                   ),
@@ -2773,7 +2773,7 @@ class _LiveScreenState extends State<LiveScreen> {
                 ),
                 const SizedBox(height: 10),
                 Wrap(spacing: 6, children: tabs.map((item) => ChoiceChip(
-                  label: Text(item), selected: tab == item, selectedColor: const ZoonlTheme.primary,
+                  label: Text(item), selected: tab == item, selectedColor: ZoonlTheme.primary,
                   backgroundColor: const Color(0xFF21152F),
                   labelStyle: TextStyle(color: tab == item ? Colors.white : Colors.white70),
                   onSelected: saving ? null : (_) => setSheetState(() => tab = item),
@@ -2807,7 +2807,7 @@ class _LiveScreenState extends State<LiveScreen> {
                                   if (camera != null && camera.value.isInitialized)
                                     ColorFiltered(colorFilter: _filterThumbnailEffect(filter), child: CameraPreview(camera))
                                   else
-                                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [tint, const Color(0xFF241638), const ZoonlTheme.background])),
+                                    DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [tint, const Color(0xFF241638), ZoonlTheme.background])),
                                       child: const Center(child: Icon(Icons.face_retouching_natural, color: Colors.white, size: 32))),
                                   if (active) const Positioned(right: 5, top: 5, child: CircleAvatar(radius: 10, backgroundColor: Color(0xFFE6C47A), child: Icon(Icons.check, size: 13, color: Colors.black))),
                                 ]))),
@@ -3060,7 +3060,7 @@ class _LiveScreenState extends State<LiveScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1B2844),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const ZoonlTheme.primary),
+        border: Border.all(color: ZoonlTheme.primary),
       ),
       child: Stack(
         fit: StackFit.expand,
