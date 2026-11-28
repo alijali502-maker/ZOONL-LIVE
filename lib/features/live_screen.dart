@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../camera_studio/zoonl_beauty_track_processor.dart';
 import '../event_control_screen.dart';
 import '../streamer_progress_screen.dart';
+import '../core/zoonl_theme.dart';
 import 'package:camera/camera.dart';
 import 'package:livekit_client/livekit_client.dart'
     show Room, RoomOptions, VideoTrack, VideoTrackRenderer, LocalVideoTrack, LocalVideoTrackExt, CameraPosition, CameraCaptureOptions;
