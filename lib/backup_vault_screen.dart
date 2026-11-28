@@ -49,16 +49,16 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
       margin: const EdgeInsets.only(bottom: 13),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF12101E),
+        color: const Color(0xFF0D2635),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0x665E4A85)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Icon(icon, color: const Color(0xFFE6C47A), size: 20),
+          Icon(icon, color: const Color(0xFF18D6C3), size: 20),
           const SizedBox(width: 9),
           Expanded(child: Text(title, style: const TextStyle(
-            color: Color(0xFFE6C47A), fontWeight: FontWeight.w800, letterSpacing: .7))),
+            color: Color(0xFF18D6C3), fontWeight: FontWeight.w800, letterSpacing: .7))),
           Text('${items.length}', style: const TextStyle(color: Colors.white60)),
         ]),
         const SizedBox(height: 8),
@@ -79,15 +79,15 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
               leading: Container(
                 width: 42, height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF241A38),
+                  color: const Color(0xFF12384A),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0x66E6C47A)),
+                  border: Border.all(color: const Color(0x6618D6C3)),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: media.startsWith('http')
                     ? Image.network(media, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFFE6C47A)))
-                    : const Icon(Icons.inventory_2_outlined, color: Color(0xFFE6C47A)),
+                        errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome, color: Color(0xFF18D6C3)))
+                    : const Icon(Icons.inventory_2_outlined, color: Color(0xFF18D6C3)),
               ),
               title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
@@ -112,9 +112,9 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080611),
+      backgroundColor: const Color(0xFF06141F),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF100C1D),
+        backgroundColor: const Color(0xFF0A1F2C),
         title: const Text('MY BACKUP VAULT', style: TextStyle(
           color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1)),
         actions: [IconButton(
@@ -126,7 +126,7 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFFE6C47A)));
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF18D6C3)));
           }
           if (snapshot.hasError) {
             return Center(child: Padding(
@@ -170,13 +170,13 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF12101E),
+                  color: const Color(0xFF0D2635),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0x66E6C47A)),
+                  border: Border.all(color: const Color(0x6618D6C3)),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('OWNER BACKUP LOOKUP', style: TextStyle(
-                    color: Color(0xFFE6C47A), fontWeight: FontWeight.w800)),
+                    color: Color(0xFF18D6C3), fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
                   Row(children: [
                     Expanded(child: TextField(
@@ -189,7 +189,7 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
                       ),
                     )),
                     IconButton(
-                      icon: const Icon(Icons.search, color: Color(0xFFE6C47A)),
+                      icon: const Icon(Icons.search, color: Color(0xFF18D6C3)),
                       onPressed: () async {
                         final zid = _ownerLookup.text.trim();
                         if (zid.isEmpty) return;
@@ -228,16 +228,16 @@ class _BackupVaultScreenState extends State<BackupVaultScreen> {
                 padding: const EdgeInsets.all(15),
                 margin: const EdgeInsets.only(bottom: 14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFF24183A), Color(0xFF11101D)]),
+                  gradient: const LinearGradient(colors: [Color(0xFF12384A), Color(0xFF0A1F2C)]),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0x77E6C47A)),
+                  border: Border.all(color: const Color(0x7718D6C3)),
                 ),
                 child: Row(children: [
-                  const Icon(Icons.cloud_done, color: Color(0xFFE6C47A), size: 30),
+                  const Icon(Icons.cloud_done, color: Color(0xFF18D6C3), size: 30),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('AUTOMATIC ACCOUNT VAULT', style: TextStyle(
-                      color: Color(0xFFE6C47A), fontWeight: FontWeight.w900, letterSpacing: .6)),
+                      color: Color(0xFF18D6C3), fontWeight: FontWeight.w900, letterSpacing: .6)),
                     const SizedBox(height: 4),
                     Text('Account: ${profile['display_name'] ?? profile['username'] ?? 'ZOONL User'}',
                       style: const TextStyle(color: Colors.white70, fontSize: 12)),
