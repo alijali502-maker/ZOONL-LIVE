@@ -478,7 +478,7 @@ class ZoonlStore extends ChangeNotifier {
       'kind': 'CROWN',
       'count': min(40, crown),
       'title': '$crown Crown',
-      'color': const ZoonlTheme.primary,
+      'color': ZoonlTheme.primary,
     };
   }
 
@@ -791,7 +791,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const ZoonlTheme.primary,
+          color: ZoonlTheme.primary,
         ),
       ),
       child: Row(
@@ -2527,7 +2527,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF171D36),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const ZoonlTheme.primary.withOpacity(.5)),
+                  border: Border.all(color: ZoonlTheme.primary.withOpacity(.5)),
                 ),
                 child: const Text(
                   'Camera colour filters are selected on the Pre-Live screen before Start. Face retouch controls stay hidden until they can process the outgoing LiveKit video, not just change a local slider.',
@@ -2751,7 +2751,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     if (!_isStoreOwner) return;
     final choice = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: const ZoonlTheme.surface,
+      backgroundColor: ZoonlTheme.surface,
       builder: (sheetContext) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
