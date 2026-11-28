@@ -478,7 +478,7 @@ class ZoonlStore extends ChangeNotifier {
       'kind': 'CROWN',
       'count': min(40, crown),
       'title': '$crown Crown',
-      'color': const Color(0xFFFFD700),
+      'color': const ZoonlTheme.primary,
     };
   }
 
@@ -791,7 +791,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFD6B46A),
+          color: const ZoonlTheme.primary,
         ),
       ),
       child: Row(
@@ -1227,7 +1227,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
           ),
           IconButton(
             tooltip: 'Backup Vault',
-            icon: const Icon(Icons.inventory_2_outlined, color: Color(0xFFE6C47A)),
+            icon: const Icon(Icons.inventory_2_outlined, color: ZoonlTheme.primary),
             onPressed: () => setState(() => bottomIndex = 5),
           ),
         ],
@@ -1408,13 +1408,47 @@ class _ProfileWalletAdminPanelState extends State<_ProfileWalletAdminPanel> {
     child:TextField(controller:c,keyboardType:number?TextInputType.number:TextInputType.text,
       style:const TextStyle(color:Colors.white),decoration:InputDecoration(labelText:label,isDense:true)));
 
-  Widget section(String title,Widget child,{Color color=const Color(0xFF9360F5)})=>Container(
-    width:double.infinity,margin:const EdgeInsets.only(top:9),padding:const EdgeInsets.all(11),
-    decoration:BoxDecoration(color:const Color(0xFF171126),borderRadius:BorderRadius.circular(13),
-      border:Border.all(color:color.withOpacity(.4))),
-    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text(title,style:TextStyle(color:color,fontWeight:FontWeight.w900)),
-      const SizedBox(height:7),child]));
+  Widget section(String title,Widget child,{Color color=ZoonlTheme.primary}) {
+    final key = title.toLowerCase();
+    final icon = key.contains('vip') ? Icons.workspace_premium_rounded
+        : key.contains('top-up') || key.contains('topup') ? Icons.account_balance_wallet_rounded
+        : key.contains('admin') ? Icons.admin_panel_settings_rounded
+        : key.contains('payment') ? Icons.account_balance_rounded
+        : key.contains('review') || key.contains('request') ? Icons.receipt_long_rounded
+        : Icons.folder_rounded;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: ZoonlTheme.surface,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: ZoonlTheme.primary.withOpacity(.42)),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 12, offset: Offset(0, 5))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 34, height: 30,
+            decoration: BoxDecoration(
+              color: ZoonlTheme.surfaceRaised,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: ZoonlTheme.primary.withOpacity(.55)),
+            ),
+            child: Icon(icon, color: ZoonlTheme.primary, size: 18),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(title, style: const TextStyle(
+            color: ZoonlTheme.primary, fontWeight: FontWeight.w900,
+            fontSize: 12, letterSpacing: .55,
+          ))),
+          const Icon(Icons.folder_open_rounded, color: ZoonlTheme.primary, size: 16),
+        ]),
+        const SizedBox(height: 11),
+        child,
+      ]),
+    );
+  }
 
   Future<void> addCoins() async {
     final id=target.text.trim(), n=int.tryParse(amount.text.trim());
@@ -1466,7 +1500,7 @@ class _ProfileWalletAdminPanelState extends State<_ProfileWalletAdminPanel> {
   Widget build(BuildContext context){
     if(loading)return const Padding(padding:EdgeInsets.all(18),child:Center(child:CircularProgressIndicator()));
     return section('VIP • COINS • TOP-UP • ADMIN',Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.workspace_premium,color:Color(0xFFDA65C8)),
+      ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.workspace_premium,color:ZoonlTheme.primary),
         title:const Text('VIP / PRIME MEMBERSHIP'),subtitle:Text('VIP: '+widget.vipTier+' • Prime tiers and benefits'),
         trailing:const Icon(Icons.chevron_right),onTap:widget.onOpenPrime),
       Row(children:[
@@ -2493,7 +2527,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF171D36),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF9360F5).withOpacity(.5)),
+                  border: Border.all(color: const ZoonlTheme.primary.withOpacity(.5)),
                 ),
                 child: const Text(
                   'Camera colour filters are selected on the Pre-Live screen before Start. Face retouch controls stay hidden until they can process the outgoing LiveKit video, not just change a local slider.',
@@ -2717,7 +2751,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
     if (!_isStoreOwner) return;
     final choice = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const ZoonlTheme.surface,
       builder: (sheetContext) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
