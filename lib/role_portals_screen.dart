@@ -6,12 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/backend.dart';
 import 'event_control_screen.dart';
 
-const Color _bg = Color(0xFF080510);
-const Color _panel = Color(0xFF171126);
-const Color _raised = Color(0xFF211735);
-const Color _gold = Color(0xFFE6C47A);
-const Color _teal = Color(0xFFDA65C8);
-const Color _muted = Color(0xFFC2B8D2);
+const Color _bg = Color(0xFF06141F);
+const Color _panel = Color(0xFF0D2635);
+const Color _raised = Color(0xFF12384A);
+const Color _gold = Color(0xFF18D6C3);
+const Color _teal = Color(0xFF18D6C3);
+const Color _muted = Color(0xFFA9C0CB);
 
 class RolePortalGateScreen extends StatefulWidget {
   const RolePortalGateScreen({super.key});
@@ -205,7 +205,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
               selectedColor: _gold.withOpacity(.22),
               backgroundColor: _panel,
               labelStyle: TextStyle(color: selected == i ? _gold : _muted, fontSize: 11, fontWeight: FontWeight.w700),
-              side: BorderSide(color: selected == i ? _gold : const Color(0xFF354653)),
+              side: BorderSide(color: selected == i ? _gold : const Color(0xFF1C5967)),
             ),
           ),
         ),
@@ -276,7 +276,7 @@ class _OwnerMasterPortalScreenState extends State<OwnerMasterPortalScreen> {
           borderRadius: BorderRadius.circular(14),
           child: Container(
             padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF354653))),
+            decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF1C5967))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(items[i].$3, color: _gold, size: 23),
               const SizedBox(height: 7),
@@ -1001,7 +1001,7 @@ class _AgencyPortalScreenState extends State<AgencyPortalScreen> {
 
   Widget _agencyMetric(String label, String value, IconData icon) => Container(
     padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFF354653))),
+    decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(13), border: Border.all(color: const Color(0xFF1C5967))),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, color: _gold, size: 20),
       const SizedBox(height: 6),
@@ -1041,7 +1041,7 @@ Widget _portalHeader(String title, String subtitle, IconData icon) => Container(
 Widget _portalCard(String title, String body, IconData icon) => Container(
   width: double.infinity,
   padding: const EdgeInsets.all(15),
-  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF354653))),
+  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF1C5967))),
   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Icon(icon, color: _gold, size: 24),
     const SizedBox(width: 12),
