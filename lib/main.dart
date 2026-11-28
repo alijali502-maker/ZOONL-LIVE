@@ -798,7 +798,7 @@ class _ZoonlMainShellState extends State<ZoonlMainShell> {
         children: <Widget>[
           const Icon(
             Icons.card_giftcard,
-            color: Color(0xFFFFD700),
+            color: ZoonlTheme.primary,
             size: 16,
           ),
           const SizedBox(width: 6),
@@ -4033,7 +4033,7 @@ class _ZoonlCompleteBodyState extends State<ZoonlCompleteBody> {
             children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.stars, color: Color(0xFFE6C47A)),
+                leading: const Icon(Icons.stars, color: ZoonlTheme.primary),
                 title: const Text('User Level'),
                 subtitle: const Text('100 Supabase levels • increases when you send gifts'),
                 trailing: const Icon(Icons.chevron_right),
