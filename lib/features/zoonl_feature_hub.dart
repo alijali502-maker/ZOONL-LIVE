@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../core/backend.dart';
 
-const Color _bg = Color(0xFF080D14);
+const Color _bg = Color(0xFF06141F);
 const Color _panel = Color(0xFF17232E);
 const Color _purple = Color(0xFF4BC2B0);
-const Color _gold = Color(0xFFD6B46A);
-const Color _muted = Color(0xFFAAB5BE);
+const Color _gold = Color(0xFF18D6C3);
+const Color _muted = Color(0xFFA9C0CB);
 const Color _pink = Color(0xFF79D7C8);
 
 class ZoonlFeatureHub extends StatefulWidget {
